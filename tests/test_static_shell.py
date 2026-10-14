@@ -172,17 +172,32 @@ def test_index_and_assets_are_served(client):
         "js/router.js",
         "js/api.js",
         "js/tags.js",
+        "js/state.js",
+        "js/filters.js",
+        "js/map.js",
+        "data/gmu.json",
     ):
         r = client.get(f"/static/{path}")
         assert r.status_code == 200, path
         if path.endswith(".js"):
             assert "javascript" in r.mimetype, (path, r.mimetype)
+        if path.endswith(".json"):
+            assert r.mimetype == "application/json", (path, r.mimetype)
         r.close()
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed (CI runs it)")
 @pytest.mark.parametrize(
-    "name", ["ui.test.mjs", "router.test.mjs", "api.test.mjs", "tags.test.mjs"]
+    "name",
+    [
+        "ui.test.mjs",
+        "router.test.mjs",
+        "api.test.mjs",
+        "tags.test.mjs",
+        "state.test.mjs",
+        "map.test.mjs",
+        "filters.test.mjs",
+    ],
 )
 def test_js_components_under_node(name: str):
     proc = subprocess.run(
@@ -193,3 +208,39 @@ def test_js_components_under_node(name: str):
         timeout=60,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# ---- T-07 map ----------------------------------------------------------------
+
+
+def _rule(css: str, selector: str) -> str:
+    m = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+    assert m, f"missing CSS rule {selector}"
+    return m.group(1)
+
+
+def test_map_status_classes_use_status_tokens():
+    """§4.3: fills come from --open/--restricted/--closed; untagged = closed fill + gold dashes."""
+    css = APP_CSS.read_text()
+    for status, token in [
+        ("open", "--open"),
+        ("restricted", "--restricted"),
+        ("closed", "--closed"),
+        ("untagged", "--closed"),
+    ]:
+        assert f"fill: var({token})" in _rule(css, f".gmu-map path[data-unit].u-{status}")
+    ring = _rule(css, ".gmu-map .overlay .ut")
+    assert "var(--gold)" in ring and "2px" in ring and "stroke-dasharray" in ring
+    assert "var(--gold2)" in _rule(css, ".gmu-map .overlay .hover-ring")
+    label = _rule(css, ".gmu-map text")
+    assert "var(--font-mono)" in label and "6.5px" in label and "var(--map-label)" in label
+    assert "var(--text3)" in _rule(css, ".gmu-map text.c")
+    tip = _rule(css, ".tip")
+    assert "position: fixed" in tip and "var(--gold)" in tip
+
+
+def test_untagged_checkbox_and_map_containers(index: _Index):
+    assert index.find(id="include-untagged", type="checkbox")
+    js = (STATIC / "js" / "main.js").read_text()
+    for mod in ("./state.js", "./filters.js", "./map.js"):
+        assert mod in js, f"main.js must import {mod}"

@@ -163,11 +163,24 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
-/* Map filter bar: the tags you hold, listed (T-09). --text keeps AA on the tint. */
-.chip.tagchip {
-  background: var(--chip-on-bg);
-  border-color: var(--tl-green);
-  color: var(--text);
+/* Map filter bar (T-07): "Manage tags" / "No tags yet → add one" is a link styled as a chip. */
+.chip.link {
+  color: var(--gold2);
+}
+.chip.more {
+  border-style: dashed;
+}
+.tags-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hint {
+  margin: 4px 0 0;
+}
+.hint[hidden] {
+  display: none;
 }
 .chip-sep {
   width: 1px;
@@ -277,6 +290,155 @@ input[type="date"] {
 .b-error {
   background: var(--badge-error-bg);
   color: var(--sc1);
+}
+
+/* ---- map (T-07, §4.3; look from docs/mockup.html) ------------------------ */
+.gmu-map {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.gmu-map path[data-unit] {
+  stroke: var(--bg);
+  stroke-width: 0.7;
+  cursor: pointer;
+  transition: fill 0.15s;
+  outline: none; /* focus is drawn by the gold hover ring instead */
+}
+.gmu-map path[data-unit].u-open {
+  fill: var(--open);
+}
+.gmu-map path[data-unit].u-restricted {
+  fill: var(--restricted);
+}
+.gmu-map path[data-unit].u-closed {
+  fill: var(--closed);
+}
+/* Open only for a tag you don't hold: closed fill plus a 2 px dashed gold outline (§4.3),
+   drawn as .overlay .ut so neighbouring fills can't cover half of it. */
+.gmu-map path[data-unit].u-untagged {
+  fill: var(--closed);
+}
+.gmu-map .overlay path {
+  fill: none;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+.gmu-map .overlay .hover-ring {
+  stroke: var(--gold2);
+  stroke-width: 2.2px;
+}
+.gmu-map .overlay .ut {
+  stroke: var(--gold);
+  stroke-width: 2px;
+  stroke-dasharray: 4 3;
+}
+.gmu-map .overlay .hl {
+  stroke: var(--gold);
+  stroke-width: 2.2px;
+}
+.gmu-map text {
+  font-family: var(--font-mono);
+  font-size: 6.5px;
+  fill: var(--map-label);
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.gmu-map text.c {
+  fill: var(--text3);
+}
+#map-card[aria-busy="true"] .gmu-map {
+  opacity: 0.85;
+}
+.legend {
+  display: flex;
+  gap: 6px 14px;
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.legend b {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text);
+}
+.legend .sw {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+.sw-open {
+  background: var(--open);
+}
+.sw-restricted {
+  background: var(--restricted);
+}
+.sw-closed {
+  background: var(--closed);
+}
+.sw-untagged {
+  background: var(--closed);
+  outline: 2px dashed var(--gold);
+  outline-offset: -2px;
+}
+
+/* tooltip: follows the mouse, clamped to the viewport by map.js placeTip() */
+.tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  background: var(--bg3);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  max-width: 340px;
+  z-index: 9;
+  box-shadow: 0 6px 20px var(--shadow);
+}
+.tip[hidden] {
+  display: none;
+}
+.tip h3,
+.brief-head h3 {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  color: var(--gold2);
+}
+.sline {
+  margin-top: 2px;
+}
+.st {
+  font-weight: 600;
+}
+.st.open {
+  color: var(--open);
+}
+.st.restricted {
+  color: var(--restricted);
+}
+.st.untagged {
+  color: var(--gold);
+}
+.b-untagged {
+  background: var(--bg5);
+  color: var(--gold);
+}
+.brief-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 /* ---- toasts ------------------------------------------------------------ */
