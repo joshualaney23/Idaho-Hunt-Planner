@@ -11,7 +11,9 @@
 | D1 | **Residents only** for now. | No nonresident quotas, fees, or rules anywhere: no resident/nonresident setting, and nonresident-only text isn't parsed into restrictions. The Tags (quota) column is stored for checksums only and isn't shown in the UI. |
 | D2 | **Controlled hunts are in core scope (MVP)**, not a later phase. Josh may hold a controlled tag. | The controlled-hunt parser, hunt-area descriptions, unit coverage, and the "add controlled tag by hunt number" flow are all Phase 1 (§10, T-17a/b/c). |
 | D3 | **PDF parsing accuracy is the top priority.** Everything else depends on it. | New §8.7 accuracy strategy and ticket T-22: two independent extraction paths must agree, checksums and completeness checks run on every import, every section is checked against hand-verified golden data, and publishing is **blocked** while any check fails. No LLM-extracted data is ever published. |
-| D4 | Other answers from the original Q&A (turkey/moose/sheep/goat, Friday in the default weekend, land-ownership overlays) **were lost and need re-confirming**. | Until then: Sat–Sun default with a Fri–Sun setting; turkey, moose, sheep, goat and land overlays stay out of v1 (§11). |
+| D4 | **Every animal that can be hunted under the Big Game and the Upland Game, Turkey & Furbearer regulations is in scope.** | See the species matrix in §5.3. Big Game PDF: deer (mule + white-tailed), elk, pronghorn, black bear, mountain lion, gray wolf. Upland PDF: forest grouse (dusky/ruffed/spruce), California & bobwhite quail, chukar, gray partridge, sage-grouse, sharp-tailed grouse, pheasant, wild turkey, cottontail, snowshoe hare, red squirrel, the furbearers that may be **hunted** (badger, bobcat, red fox), predatory/unprotected animals (year-round), and falconry seasons. **Out:** trapping-only furbearers (beaver, mink, muskrat, otter, marten), and anything published in other brochures (moose/bighorn sheep/mountain goat, and migratory birds: doves, crows, sandhill cranes, waterfowl). Those can be added later the same way, by uploading that brochure plus a new parser. |
+| D5 | **Friday counts as part of the default weekend.** | Default `weekend_def = 'fri_sun'` (§7.3). Sat–Sun stays available as a setting. |
+| D6 | **No land ownership/access layers, ever.** Other apps already do that. | Removed from the roadmap. The map shows GMUs only. |
 
 ---
 
@@ -36,7 +38,8 @@ The look and feel follows Treeline Hunt Research IQ's **State Heat Map**: dark f
 
 ### 1.2 Non-goals (v1)
 - Draw odds, harvest stats, unit scoring (that's what Treeline does).
-- Land ownership / access layers (maybe later, see §11).
+- Land ownership / access layers (D6: use another app for that).
+- Trapping seasons, and species from other IDFG brochures (moose/sheep/goat, migratory birds). See D4.
 - Mobile-first layout (it should work on a phone, but it's designed for desktop).
 - Multi-user / hosted deployment.
 - Nonresident hunters (D1).
@@ -69,6 +72,8 @@ I tested real sources before writing this. Summary:
 | **Hunt-area description pages are two-column prose** (deer pp. 32–34, elk 60–62, pronghorn 68). Full-page `extract_text()` interleaves the columns. | p. 32 output mixed "Hunt Area 1-1" with text from the right column. | Detect the column gutter from word x-positions and extract each column separately. Descriptions are stored verbatim for display and to cross-check unit lists against the GIS overlay. |
 | **Rotated elk zone calendars are readable.** pdfplumber `extract_text(line_dir_rotated='ltr', char_dir_rotated='btt')` returns proper text ("Panhandle Zone (Units 1, 2, 3, 4, 4A, 5, 6, 7, 9)", "Aug 30 - Sep 30 Archery only — any elk", "A Tag"). | p. 38 test. | Elk A/B parsing is automatable. Assigning each label to its zone and its A/B row needs geometry clustering (T-12). Manual entry stays as the fallback only. |
 | **Printed page numbers ≠ PDF page indexes.** In-text references like "(See pg 31)" use the brochure's printed numbers, which are one less than the PDF page index in 2026. | p. 22 footer reads "idfg.idaho.gov 21"; the deer area descriptions referenced as "pg 31" are on PDF p. 32. | Store physical pages, map printed → physical from footers, and verify every reference resolves (`page_ref_resolves`). Page numbers elsewhere in this doc are **PDF page indexes**. |
+| **Upland brochure scope** ("Upland Game, Turkey & Furbearer, 2026 & 2027", 55 pp.): upland birds, turkey (general + controlled), cottontail/snowshoe hare/red squirrel, furbearer **trapping and hunting** seasons by **region** ("\* Indicates species can also be hunted": badger, bobcat, red fox), and predatory/unprotected animals (year-round, defined in prose). Migratory birds are in a separate brochure. | Contents p. 6 and pp. 32, 36–38, 46 of the 2026 PDF. | Species matrix §5.3. Furbearer seasons need a **region → GMU** overlay. Predatory animals are modeled as statewide year-round seasons sourced from the rules prose. |
+| IDFG GIS has **region polygons**: `WC_Regions/MapServer/0`, 8 features (Panhandle, Clearwater, Salmon, McCall SubRegion, Nampa SubRegion, Upper Snake, Magic Valley, Southeast). | Queried live. | McCall + Nampa = Southwest Region. `scripts/build_region_overlay.py` → `static/data/region_units.json` (T-24). |
 | IDFG Hunt Planner pages use **internal IDs, not hunt numbers** (`/hunt/1002` is a 2003 bear season), and much of the data is old. | Fetched p. 1002. | Not a dependable cross-check source. Optional only (T-20). |
 
 The spike output drives `docs/mockup.html`. For **Oct 17–18, 2026** with a Regular Deer tag and an archery permit, it shows **68 units open and 13 restricted**. This is spike output and hasn't been checked against the regs.
@@ -199,7 +204,7 @@ body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);fon
 │ IDAHO HUNT PLANNER  v0.x · regs 2026 (+1 supplement)            Where can I hunt this weekend? │
 │ [🗺️ Where Can I Hunt] [🎟️ My Tags] [📅 Season Table] [📥 Regulations] [⚙️ Settings]           │
 │ Viewing 🦌 Deer · Regular Deer · All legal weapons · Oct 17 – Oct 18                         │
-│ Species [Deer][Elk][Pronghorn][Bear][Lion][Wolf][Forest Grouse][Pheasant]…                 │
+│ Species [Deer][Elk][Pronghorn][Bear][Lion][Wolf] | [Grouse][Quail][Chukar][Partridge][Pheasant][Turkey]… [More ▾] │
 │ Tags    [Regular Deer ✓][White-tailed Deer]  Weapon [All][Rifle][Archery][Muzzleloader]     │
 │ Permits [🏹 Archery ✓][Muzzleloader]   Dates [2026-10-17]→[2026-10-18] [This wknd][Next wknd][Today][7 days] │
 │ [ ] Also show seasons I don't hold a tag for (gold dashed outline)                          │
@@ -258,14 +263,16 @@ CREATE TABLE units (               -- seeded from static/data/gmu.json
 );
 
 CREATE TABLE species (
-  id    TEXT PRIMARY KEY,          -- 'deer','elk','pronghorn','black_bear','mountain_lion','wolf',
-                                   -- 'forest_grouse','pheasant','quail','gray_partridge','chukar','sage_grouse','sharptail','turkey'
-  label TEXT NOT NULL, icon TEXT, grp TEXT NOT NULL   -- grp: 'big_game' | 'upland' | 'turkey'
+  id    TEXT PRIMARY KEY,          -- full list + sources in §5.3: 'deer','elk','pronghorn','black_bear','mountain_lion','wolf',
+                                   -- 'forest_grouse','quail','chukar','gray_partridge','sage_grouse','sharptail','pheasant','turkey',
+                                   -- 'cottontail','snowshoe_hare','red_squirrel','badger','bobcat','red_fox','predatory_unprotected'
+  label TEXT NOT NULL, icon TEXT, grp TEXT NOT NULL   -- grp: 'big_game' | 'upland_bird' | 'turkey' | 'upland_animal' | 'furbearer' | 'predatory'
 );
 
 CREATE TABLE tag_types (
   id               TEXT PRIMARY KEY, -- 'deer_regular','deer_whitetail','elk_zone_a','elk_zone_b','controlled',
-                                     -- 'pronghorn_general','black_bear','mountain_lion','wolf','upland_license','turkey_general'
+                                     -- 'pronghorn_general','black_bear','mountain_lion','wolf','turkey_general',
+                                     -- 'hunting_license' (upland birds/animals, furbearers, predatory: no species tag needed)
   species_id       TEXT REFERENCES species(id),   -- NULL for 'controlled' (species comes from hunt)
   label            TEXT NOT NULL,
   requires_zone    INTEGER NOT NULL DEFAULT 0,    -- elk A/B
@@ -357,11 +364,11 @@ CREATE TABLE import_checks (        -- results of every accuracy invariant for a
 CREATE TABLE profile (               -- single row, id = 1. Residents only (D1): no resident flag.
   id INTEGER PRIMARY KEY CHECK (id = 1),
   youth INTEGER NOT NULL DEFAULT 0,
-  weekend_def TEXT NOT NULL DEFAULT 'sat_sun', default_species TEXT DEFAULT 'deer'
+  weekend_def TEXT NOT NULL DEFAULT 'fri_sun', default_species TEXT DEFAULT 'deer'
 );
 
 CREATE TABLE my_permits (
-  license_year INTEGER NOT NULL, permit TEXT NOT NULL CHECK (permit IN ('archery','muzzleloader','hunting_license','wmb')),
+  license_year INTEGER NOT NULL, permit TEXT NOT NULL CHECK (permit IN ('archery','muzzleloader','hunting_license','wmb','falconry')),
   PRIMARY KEY (license_year, permit)
 );
 
@@ -384,6 +391,33 @@ Upland seasons attach to **areas**, which are resolved into `season_units` rows 
 - "Counties A, B, C" → units whose area is ≥ 98 % inside the union → `full`, 2–98 % → `partial`.
 - "… except units X, Y" → remove X, Y.
 - "Remainder of the state" → all units not `full` in the sibling areas. Units that were `partial` there are `partial` here too.
+
+### 5.3 Species coverage matrix (D4)
+
+Page numbers are **printed** brochure pages from each table of contents. Physical PDF index = printed + 1 in both 2026 brochures (verify per year with the footer map, §8.7 `page_ref_resolves`).
+
+| Species (`species.id`) | Brochure · printed pp. | Area type → how it becomes `season_units` | Tag / license needed | Ticket |
+|---|---|---|---|---|
+| Deer: general Regular + White-tailed (`deer`) | Big Game · 11–15, 17–20 | GMU lists in tables | `deer_regular` / `deer_whitetail` | T-11 |
+| Deer, controlled (`deer`) | Big Game · 21–33 | Hunt areas → GIS polygons (T-17b) | `controlled` + hunt # | T-17a/b |
+| Elk, A/B zones (`elk`) | Big Game · 35–49 (rotated) | Elk zones → `zone_units` | `elk_zone_a/b` + zone | T-12 |
+| Elk, controlled (`elk`) | Big Game · 50–61 | Hunt areas → GIS polygons | `controlled` | T-17a/b |
+| Pronghorn general + controlled (`pronghorn`) | Big Game · 63–67 | GMU lists / hunt areas | `pronghorn_general` / `controlled` | T-13, T-17a |
+| Black bear, spring/fall general + controlled (`black_bear`) | Big Game · 68–73 | GMU lists / hunt areas | `black_bear` / `controlled` | T-13, T-17a |
+| Mountain lion (`mountain_lion`) | Big Game · ~74–76 | GMU lists, "all units except…" | `mountain_lion` | T-13 |
+| Gray wolf, hunting only (`wolf`) | Big Game · ~77–83 (private vs. public land tables) | GMU lists; private/public land → `private_land_only` restriction | `wolf` | T-13 |
+| Forest grouse, dusky/ruffed/spruce (`forest_grouse`) | Upland · 6 | Areas by **county lists ± units** → county overlay | `hunting_license` | T-14 |
+| California & bobwhite quail (`quail`), chukar (`chukar`), gray partridge (`gray_partridge`) | Upland · 7–8 (statewide standardized in 2026) | Statewide or areas | `hunting_license` | T-14 |
+| Sage-grouse (`sage_grouse`), sharp-tailed grouse (`sharptail`) | Upland · 9–10 | Areas (counties/units) | `hunting_license` (+ any permit the regs name) | T-14 |
+| Pheasant (`pheasant`) | Upland · 11–13 | Areas; WMA rules → `wmb_permit_on_wma` | `hunting_license`; Upland Game Bird Permit on WMAs | T-14 |
+| Wild turkey, spring/fall general + controlled (`turkey`) | Upland · 18–25 | General: GMU lists plus maps (p. 23). Controlled: hunt areas (GIS MapServer/4 has **2026 turkey** polygons) | `turkey_general` / `controlled` | T-23 |
+| Cottontail (`cottontail`), snowshoe hare (`snowshoe_hare`) | Upland · 16 | Statewide/areas | `hunting_license` | T-24 |
+| Red squirrel (`red_squirrel`) | Upland · 17 | Statewide/areas | `hunting_license` | T-24 |
+| Badger, bobcat, red fox (hunting) (`badger`/`bobcat`/`red_fox`) | Upland · 31–33 ("\* Indicates species can also be hunted") | **IDFG regions** → region overlay (GIS `WC_Regions`) | `hunting_license` (bobcat: also harvest report, informational) | T-24 |
+| Predatory & unprotected (coyote, raccoon, jackrabbit, skunk, weasel; marmot, porcupine, opossum, some ground squirrels…) (`predatory_unprotected`) | Upland · 35–37, 42, 45 (rules prose, not tables) | Statewide, year-round (Jul 1–Jun 30), with ground-squirrel exceptions from p. 42 | `hunting_license` | T-24 |
+| Falconry seasons (`weapon='falconry'` on existing species) | Upland · 30 | As printed | `hunting_license` + falconry permit (new permit code) | T-24 |
+
+Species with no hunting season are never shown. That includes closed species (e.g. fisher, kit fox, lynx, Northern/Southern Idaho ground squirrels) and trapping-only furbearers.
 
 ---
 
@@ -458,8 +492,8 @@ Errors use `{error: {code, message, detail}}` with HTTP 4xx/5xx. The server bind
 - When the user holds a controlled tag **and** a general tag for the same species, the map shows the union. Each season in the tooltip is labeled with the tag that unlocks it.
 
 ### 7.3 Default date range (`planner/dates.py` and `static/js/dates.js`, which must agree)
-- `sat_sun` (default): if today is Sat, return [today, tomorrow]. If today is Sun, return [today, today]. Otherwise return the next Saturday and Sunday.
-- `fri_sun`: same idea with Friday as the start. If today is Fri, Sat or Sun, return [today, Sunday].
+- `fri_sun` (**default**, D5): if today is Fri, Sat or Sun, return [today, Sunday]. Otherwise return the next Friday through Sunday.
+- `sat_sun`: if today is Sat, return [today, tomorrow]. If today is Sun, return [today, today]. Otherwise return the next Saturday and Sunday.
 - Uses the **browser's local date** on the frontend. The server's `/api/meta` value is only a fallback.
 - Presets: *This weekend*, *Next weekend* (+7 days), *Today*, *Next 7 days*, *Opening day* (the earliest start among my tags' seasons on or after today).
 
@@ -563,10 +597,11 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **0 – Foundations** | Repo runs, themed shell, map renders | T-01 … T-05 |
 | **1 – MVP: Deer + all controlled hunts, accuracy-gated** | Upload the 2026 big-game PDF; general deer **and** every controlled deer/elk/pronghorn/bear hunt parse with every invariant passing and a 100 % golden match; review and publish; add a Regular Deer tag and/or a controlled tag by hunt number; see this weekend's green units | T-06 … T-11, T-15, T-16, **T-17a, T-17b, T-17c, T-22** |
 | **2 – Elk A/B & other general big game** | Elk A/B zones, pronghorn, bear, lion, wolf, supplements | T-12, T-13, T-18 |
-| **3 – Upland** | Forest grouse and other birds via county areas | T-14 |
-| **4 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings | T-19, T-20, T-21 |
+| **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
+| **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
+| **5 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings | T-19, T-20, T-21 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24} ; T-17b → T-23 ; T-19 spans all`.
 
 ---
 
@@ -579,8 +614,9 @@ Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-0
 | "Portion of unit" nuances | Shown as *restricted* with the verbatim note and page link. Never shown as plain green. |
 | Wrong data means an illegal hunt | Accuracy gate (§8.7): two-path agreement, checksums, completeness, golden match. Permanent disclaimer, source page on every season, no auto-publish. |
 | GIS hunt-area polygons lag a year behind the PDF (2026 big game not yet published) | Use the latest available year, flag `geometry_year < license_year`, and require review of each area whose description text changed vs. last year. If an area is new and has no polygon, fall back to the parsed description's unit list as `partial` with a warning. |
-| Upland county overlay is approximate | Partial coverage → restricted plus a note. |
-| **Open questions for Josh (answers were lost, D4)** | (1) Turkey, moose/sheep/goat, waterfowl later? (2) Friday in the default weekend? (3) Land-ownership overlays (BLM/USFS/state) in a later phase? |
+| Upland county / region overlays are approximate | Partial coverage → restricted plus a note naming the counties/regions. |
+| Predatory/unprotected rules are prose, not tables | A small curated parser for the named species lists, plus a **mandatory** golden file. Any change in the prose year over year fails the check and must be reviewed. |
+| **Open questions** | None outstanding. All answered (D1–D6). |
 
 ---
 
@@ -730,10 +766,10 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ---
 
-### T-14 · Upland parser + county overlay
+### T-14 · Upland bird parser + county overlay
 **Depends on:** T-02, T-10 · **Size:** L
-**Description:** (a) Implement `scripts/build_county_overlay.py` per §9 and commit `static/data/county_units.json`. (b) `importer/upland.py` for the Upland brochure: species sections (FOREST GROUSE, PHEASANT, QUAIL, GRAY PARTRIDGE, CHUKAR, SAGE-GROUSE, SHARP-TAILED GROUSE, plus TURKEY general seasons if in the same PDF); per section, parse `AREA n` blocks: the definition text, then `Seasons` lines (one line per year of the 2-year brochure, e.g. `2026 – 2027: August 30, 2026 through January 31, 2027`), and bag/possession limits into `bag_limit`. Resolve area text to `season_units` via §5.2 (county lists, "except units …", "remainder of the state", and explicit unit lists). Tag type `upland_license` (an Idaho hunting license is required; pheasant on WMAs requires the upland game bird permit, so add the `wmb` permit code as an informational restriction `wmb_permit_on_wma`).
-**Acceptance criteria:** the 2026–27 Forest Grouse Area 1 resolves to units in the listed counties minus 19A, 20A, 22, 23, 26; Area 2 is the remainder; both years' seasons are created; partial units are marked `partial` with a note naming the counties.
+**Description:** (a) Implement `scripts/build_county_overlay.py` per §9 and commit `static/data/county_units.json`. (b) `importer/upland.py` for the Upland brochure's **upland game bird** sections (FOREST GROUSE, CALIFORNIA AND BOBWHITE QUAIL, CHUKAR AND GRAY PARTRIDGE, SAGE-GROUSE, SHARP-TAILED GROUSE, PHEASANT; turkey is T-23); per section, parse `AREA n` blocks: the definition text, then `Seasons` lines (one line per year of the 2-year brochure, e.g. `2026 – 2027: August 30, 2026 through January 31, 2027`), and bag/possession limits into `bag_limit`. Resolve area text to `season_units` via §5.2 (county lists, "except units …", "remainder of the state", and explicit unit lists). Tag type `hunting_license` (an Idaho hunting license is required; pheasant on WMAs requires the upland game bird permit, so add the `wmb` permit code as an informational restriction `wmb_permit_on_wma`).
+**Acceptance criteria:** the 2026–27 Forest Grouse Area 1 resolves to units in the listed counties minus 19A, 20A, 22, 23, 26; Area 2 is the remainder; both years' seasons are created; partial units are marked `partial` with a note naming the counties. §8.7 checks (`two_path_agreement`, `date_token_accounting`, `unit_tokens_valid`) pass for every bird section, and each section matches a hand-verified `tests/golden/2026/upland_<species>.json`.
 
 ---
 
@@ -815,6 +851,25 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ---
 
+### T-23 · Wild turkey: general + controlled hunts
+**Depends on:** T-14 (upland doc classification + 2-year handling), T-17b (polygon coverage machinery) · **Size:** M
+**Description:** `importer/turkey.py` for the Upland brochure's turkey sections (printed pp. 18–25: general information, rules, distribution, **general seasons** p. 22, **general season maps** p. 23, **controlled hunt seasons** pp. 24–25). General seasons: spring and fall, by GMU list. Parse the unit lists from the table text only. The p. 23 maps are images and are **not** a data source; if a table refers to "see map", stage the row as `fail` for manual unit entry. Youth seasons → `youth_only`. Controlled turkey: reuse the T-17a parser (same `Hunt No.` table layout; verify on the real pages first) and T-17b coverage. GIS MapServer/4 already has **2026 turkey** hunt-area polygons (15 features, e.g. `21-1`, `22-3`, `38-2`, `50-2`, `50-3`), so no year lag. The brochure covers 2026 and 2027: create seasons for both years with each year's printed dates. Tag types: `turkey_general` (spring/fall as printed; if the regs distinguish spring and fall tags, model them as two tag types and say so in the PR) and `controlled`.
+**Acceptance criteria:** all §8.7 checks pass for `turkey_general` and `controlled_turkey` (including `tag_checksum` if the section header prints a total); every controlled turkey hunt area matches a 2026 GIS polygon; hand-verified golden files for both sections; spot checks (three general rows and two controlled hunts, chosen by the implementer, with page refs) listed in the PR.
+
+---
+
+### T-24 · Small game, furbearer hunting, predatory/unprotected, falconry
+**Depends on:** T-14 · **Size:** L
+**Description:**
+1. `scripts/build_region_overlay.py`: GIS `https://gisportal-idfg.idaho.gov/hosting/rest/services/WC_Regions/MapServer/0` (8 polygons; **merge "McCall SubRegion" + "Nampa SubRegion" into "Southwest"**). Intersect with GMUs and write `static/data/region_units.json` with full/partial fractions, like the county overlay. Check: the regions listed in the brochure's furbearer tables must exactly equal the 7 resulting region names.
+2. **Cottontail & snowshoe hare** (printed p. 16) and **red squirrel** (p. 17): parse season tables/areas → seasons for both brochure years.
+3. **Furbearer hunting** (pp. 31–33, "FURBEARER TRAPPING AND HUNTING SEASONS BY REGION"): import **only** species marked with `*` ("Indicates species can also be hunted"): badger, bobcat, red fox. Ignore trapping-only species. Season area = region → GMUs via the overlay. Region text exceptions (named drainages, waters) → `coverage='partial'` + verbatim note. Example (2026): Bobcat Dec 14 – Feb 16; Fox Oct 10 – Mar 31 in one region and "July 1 – June 30: Year-round" in another. Bobcat → informational restriction `harvest_report_required`.
+4. **Predatory & unprotected** (pp. 35–37, 45; ground squirrels p. 42): one species `predatory_unprotected` with a season of Jul 1 – Jun 30 covering every unit. `notes` lists the named species verbatim from the text (2026: predatory = coyote, raccoon, jackrabbit, skunk, weasel; unprotected per p. 45). Ground-squirrel closures/exceptions from p. 42 go in as `see_notes` with verbatim text. This is prose, so the golden file is mandatory, and the check `prose_unchanged` compares the normalized source paragraphs with last year's and fails on any change.
+5. **Falconry** (p. 30): seasons with `weapon='falconry'` on the matching species, requiring the new `falconry` permit (§5 `my_permits`). Hidden unless the user holds that permit.
+**Acceptance criteria:** the region overlay assigns all 99 non-YNP GMUs to ≥ 1 region (sum of fractions per GMU ≈ 1.0 ± 0.02); with only a hunting license on 2026-12-18, bobcat shows the regions whose bobcat season includes that date; `predatory_unprotected` shows every unit green on any date, with its notes; trapping-only species never appear; all §8.7 checks pass and each section matches its hand-verified golden file.
+
+---
+
 ### T-18 · Supplemental proclamations
 **Depends on:** T-10, T-15 · **Size:** S
 **Description:** `importer/supplemental.py`: classify `kind='supplemental'`, `priority = 10 + n`. Parse whatever tables or "change" statements it contains, using the T-11/T-13 parsers on matching tables plus a generic "Unit X … season … dates" text pattern. Everything stages at confidence ≤ 0.8 so it is always reviewed. Publishing applies §8.5.
@@ -845,7 +900,28 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ## 13. Annual workflow (what using it looks like)
 
-1. **Spring (Big Game regs drop):** open the app → 📥 Regulations → drop `seasons-rules-big-game-2027.pdf` → review the about 5 % of rows flagged yellow or red, using the side-by-side PDF and the "changed since 2026" diff → **Publish**.
-2. **Summer:** 🎟️ My Tags → "Copy from 2026" → adjust (bought an elk B tag in the Sawtooth zone, archery permit ✓).
-3. **Any Thursday in October:** open the app. It's already on this weekend. Pick 🦌 Deer and the map shows where to go. Click a unit for the brief and the source page.
+1. **Spring (Big Game regs drop):** open the app → 📥 Regulations → drop `seasons-rules-big-game-2027.pdf` → fix anything the Accuracy panel flags, review changed rows using the side-by-side PDF and the "changed since 2026" diff → **Publish**. (The Upland brochure covers two years, so it's uploaded every other year: 2026, 2028, ….)
+2. **Summer:** 🎟️ My Tags → "Copy from 2026" → adjust (bought an elk B tag in the Sawtooth zone, archery permit ✓, drew controlled hunt #1002).
+3. **Any Thursday in October:** open the app. It's already on Fri–Sun of this weekend. Pick 🦌 Deer and the map shows where to go. Click a unit for the brief and the source page.
 4. **Mid-season supplement published:** upload it, review the few changes, publish. Superseded seasons drop off the map automatically.
+
+---
+
+## 14. Implementing with agents
+
+**Use one fresh agent session per ticket.** Don't run the build in the long design session. Each turn of a session re-sends the whole conversation, so a session that already holds the design research costs several times more per turn than a fresh one. Tickets are written to be self-contained, so a new agent only needs this document plus the repo.
+
+- **Group** tightly coupled tickets into one session when the second needs the first's fresh context: T-01+T-04+T-05, T-17a+T-17b, T-07+T-08. Keep the parser tickets (T-11, T-17a, T-12, T-14, T-23, T-24) separate. They are the hardest and need the most room in the context.
+- **Order:** T-01/04/05 → T-02, T-03, T-10 (in parallel) → **T-22** → T-11 and T-17a (in parallel) → T-17b → T-06 → T-09, T-15 → T-07/08 → T-17c → T-16 → Phase 2+.
+- **Hand-off lives in the repo, not in chat:** each ticket ends with a PR whose description lists what was built, check results, and any deviation from this doc. If the design changes, update `DESIGN.md` in the same PR.
+- **Golden-data verification (T-22) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
+
+**Kickoff prompt template:**
+```
+Repo: ~/git/Idaho-Hunt-Planner (remote github.com/joshualaney23/Idaho-Hunt-Planner).
+Implement ticket T-XX from docs/DESIGN.md. Read §0 (decisions), §2–§9, and §8.7 (accuracy) first,
+then the ticket. Stack/conventions are in §12's header. Work on branch t-xx-<slug>, run `pytest -q`
+until green, push, and open a PR titled "T-XX: <title>" whose description lists every acceptance
+criterion with its evidence (command output, spot-check values, screenshots). Don't change
+behavior outside the ticket's scope; if the design is wrong, say so in the PR and update DESIGN.md.
+```
