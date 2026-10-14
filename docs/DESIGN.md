@@ -514,7 +514,8 @@ Errors use `{error: {code, message, detail}}` with HTTP 4xx/5xx. The server bind
 - `fri_sun` (**default**, D5): if today is Fri, Sat or Sun, return [today, Sunday]. Otherwise return the next Friday through Sunday.
 - `sat_sun`: if today is Sat, return [today, tomorrow]. If today is Sun, return [today, today]. Otherwise return the next Saturday and Sunday.
 - Uses the **browser's local date** on the frontend. The server's `/api/meta` value is only a fallback.
-- Presets: *This weekend*, *Next weekend* (+7 days), *Today*, *Next 7 days*, *Opening day* (the earliest start among my tags' seasons on or after today).
+- Presets: *This weekend*, *Next weekend* (the full weekend after this one, i.e. this weekend's Sunday + 7 days; on a Saturday with `fri_sun` that is next Fri–Sun, not just next Sat–Sun), *Today*, *Next 7 days* (today + 6, inclusive), *Opening day* (the single day [d, d] where d is the earliest start among my tags' seasons on or after today; none if there isn't one).
+- All ranges are inclusive. `days(a, b)` counts the days in [a, b] (0 if b < a); `overlap` counts the days two ranges share. The shared fixture `tests/fixtures/dates_cases.json` is the contract for both twins.
 
 ### 7.4 License-year crossover
 Tags are valid for their calendar license year. If the range spans Dec 31 to Jan 1 (upland late season), each day is evaluated against the tags of that day's year. If the user has no next-year license, the unit is `restricted` with reason `no_tag_next_year`.
