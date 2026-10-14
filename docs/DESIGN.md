@@ -241,7 +241,7 @@ For each unit, take the set **S** of published seasons that pass the tag, permit
 | Status | Rule |
 |---|---|
 | **open** (green) | At least one season in S covers the **entire** selected range, the **full** unit, and has **no restriction flags** that narrow what a typical adult hunter with that tag can take. |
-| **restricted** (yellow) | S is non-empty but every season has at least one of: partial date coverage, partial unit coverage, white-tailed only (on a Regular tag), antlerless only, 2-point only, private land only, youth only (when "youth" is enabled in settings), or "see notes" closures. The tooltip lists the reasons. |
+| **restricted** (yellow) | S is non-empty but every season has at least one **narrowing** reason (§5.1): partial date coverage, partial unit coverage, white-tailed or mule deer only (on a Regular tag), private land only, outfitted hunters only, youth only (when "youth" is enabled in settings), no tag for part of a Dec 31 → Jan 1 range (§7.4), or "see notes" closures. Animal limits (antlered, antlerless, 2-point, spike, brow-tined) are informational badges and don't make a unit yellow. The tooltip lists the reasons. |
 | **closed** (grey) | S is empty. |
 | **untagged** (dashed gold outline) | S is empty, but seasons would exist if tag ownership were ignored. Only shown when the toggle is on. |
 
@@ -448,7 +448,7 @@ Species with no hunting season are never shown. That includes closed species (e.
 |---|---|
 | `GET /api/meta` | Species, tag types, weapons, restriction codes with severity, available license years, default date range (computed server-side using the local timezone). |
 | `GET /api/units` | Unit metadata (id, elk zone, region). Geometry stays in the static `gmu.json`. |
-| `GET /api/availability?species=deer&start=2026-10-17&end=2026-10-18&weapon=all&tags=mine\|<id,id>&include_untagged=0` | **Core query.** Returns `{range, units:{"39":{status,reasons:[],seasons:[…]}}, summary:{open,restricted,untagged}}`. |
+| `GET /api/availability?species=deer&start=2026-10-17&end=2026-10-18&weapon=all&tags=mine\|<id,id>&include_untagged=0` | **Core query.** Returns `{range:{start,end,days}, species, weapon, include_untagged, tags, units:{"39":{status,reasons:[],days_open,seasons:[…]}}, summary:{open,restricted,untagged,closed}}`. Every unit appears (`closed` when no season applies). Each season entry carries its own `status`, `reasons` and `tag_ids` (the tags that unlock it) besides the §12 T-06 fields. Defaults: the profile's species, the coming weekend, `weapon=all`, `tags=mine`. |
 | `GET /api/units/<unit>/seasons?year=2026` | All published seasons for the Unit Brief. |
 | `GET /api/seasons?year&species&status=published` | Season Table. `POST`, `PUT /<id>`, `DELETE /<id>` for manual edits (creates or updates rows under a `manual` source document). |
 | `GET /api/tags?year=2026` · `POST /api/tags` · `PUT /api/tags/<id>` · `DELETE /api/tags/<id>` · `POST /api/tags/copy?from=2025&to=2026` | My Tags. |
@@ -503,6 +503,14 @@ Errors use `{error: {code, message, detail}}` with HTTP 4xx/5xx. The server bind
                = closed
 7. days_open = count of days in [start,end] covered by the union of tag_ok seasons (for table sorting)
 ```
+
+**Engine notes (T-06):**
+- `reasons` contains only **narrowing** codes (§5.1). Codes outside the vocabulary also narrow (D3: never guess green). Informational codes stay in each season's `restrictions` for badges.
+- Engine-derived reasons, beyond §5.1: `partial_dates`, `no_tag_next_year`, `no_tag_prev_year` (§7.4, when only the later year's tag is held), and `needs_archery_permit` / `needs_muzzleloader_permit` / `needs_falconry_permit`. The permit reasons appear only on `untagged` seasons (include_untagged on): the user holds the tag but not the permit. `/api/meta` lists them under `reasons`.
+- Permits are checked per license year, like tags. `hunt_class = 'youth'` implies `youth_only`; for a youth profile `youth_only` still narrows (yellow).
+- The weapon filter is a hard exclusion, even with include_untagged. `shotgun` and `falconry` seasons (upland/migratory) show only for `weapon=all`, and falconry also needs the falconry permit.
+- A `season_units` row is partial if `coverage = 'partial'` **or** `coverage_frac < 0.98`.
+- A unit's `reasons` is the deduped union over the seasons that reach its status, in §5.1 order, then derived codes.
 
 **Controlled-hunt specifics (D2):**
 - A controlled tag matches **only** the season(s) with the same `hunt_number` **and** the same `license_year`. Hunt numbers are reused for different hunts in different years, so a 2025 tag `1001` must never match the 2026 hunt `1001`.
@@ -709,7 +717,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 **Depends on:** T-04, T-05 · **Size:** L
 **Description:** Implement §7 in `planner/engine.py` as pure functions: `evaluate(seasons, season_units, my_tags, permits, profile, species, start, end, weapon, include_untagged) -> dict`. Then add the API wrapper in `api.py` that loads rows with one SQL query per table (published only, date-overlap filter in SQL), calls `evaluate`, and returns the §6 shape. Each unit entry contains `status`, `reasons` (deduped union across seasons for the *best* status), `days_open`, and `seasons` (id, tag_type, zone, hunt_number, weapon, sex, start, end, restrictions, coverage, coverage_note, source_page, document_id). Also implement `GET /api/meta` and `GET /api/units`.
 **Acceptance criteria:**
-- Unit tests cover: full-range open; partial dates → restricted; antlerless-only → restricted; whitetail_only on a Regular tag → restricted, but **open** on a White-tailed tag; archery season hidden without an archery permit; weapon=rifle excludes archery/ML seasons; elk A tag in the wrong zone → closed; filled tag excluded; include_untagged → `untagged`; youth_only hidden for adults; Dec 31 → Jan 1 crossover with no next-year tag → restricted `no_tag_next_year`.
+- Unit tests cover: full-range open; partial dates → restricted; antlerless-only → **open** with an informational badge (§5.1; animal limits don't change the color); whitetail_only on a Regular tag → restricted, but **open** on a White-tailed tag; archery season hidden without an archery permit; weapon=rifle excludes archery/ML seasons; elk A tag in the wrong zone → closed; filled tag excluded; include_untagged → `untagged`; youth_only hidden for adults; Dec 31 → Jan 1 crossover with no next-year tag → restricted `no_tag_next_year`.
 - `/api/availability` responds in under 150 ms on a DB with 5,000 seasons (add a perf test with synthetic data).
 
 ---
