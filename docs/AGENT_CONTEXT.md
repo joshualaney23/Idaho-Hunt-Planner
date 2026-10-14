@@ -30,7 +30,11 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 | `docs/tools/issue_map.json` | Ticket → GitHub issue number. Numbers match through T-16, then shift by one (T-17a = #17, T-18 = #20, T-22 = #24). |
 | `docs/tools/make_issues.py` | Re-syncs issue bodies from §12 (`--link`) after a ticket is edited |
 | `docs/tools/section.py` | Prints one DESIGN.md section or ticket |
-| App code (`planner/`, `static/`, `tests/`) | **Not started.** T-01 creates the scaffold. |
+| `planner/` | T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `GET /api/health` (`api.py`), `__version__` in `__init__.py`. Other modules are docstring stubs for their tickets. |
+| `static/index.html` | Placeholder page with disclaimer; T-03 replaces it with the app shell |
+| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests |
+| `.github/workflows/ci.yml` | `ruff check` + `pytest -q` on 3.11 and 3.12 for pushes to main and PRs |
+| `pyproject.toml` | ruff + pytest config (`docs/` excluded from ruff) |
 
 ## Commands
 ```bash
@@ -44,6 +48,10 @@ python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 python -m planner --no-browser               # run (http://127.0.0.1:5050, GET /api/health)
 pytest -q && ruff check .                    # must pass before a PR
+
+ruff format .                                # formatter (config in pyproject.toml)
+PLANNER_PORT=6060 python -m planner          # alternate port; omit --no-browser to open browser
+# .gitignore anchors /data/ to the repo root so static/data/ stays committed.
 
 # Source PDFs (go in data/regs/, git-ignored; base URL https://idfg.idaho.gov/sites/default/files/)
 #   seasons-rules-big-game-2026.pdf   seasons-rules-upland-game-2026-2027.pdf
