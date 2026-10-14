@@ -2,10 +2,16 @@
 // placeholder cards for tabs that later tickets fill in, and a static shell of
 // the Where Can I Hunt filter bar. T-07 replaces the filter shell with
 // filters.js + state.js wired to /api/availability.
+//
+// T-09 mounts the My Tags tab (tags.js) and subscribes the map tab to
+// TAGS_CHANGED, so filling or deleting a tag updates the tag filter and the
+// breadcrumb at once (the shared state that invalidates availability).
 
 import { card, chipGroup, textEl } from "./ui.js";
 import { TABS, parseRoute, tabHash } from "./router.js";
 import { defaultRange, fmtShort, localToday, parseISO, presets, toISO } from "./dates.js";
+import { TAGS_CHANGED, activeTags, initTags, tagChipLabel, tagsSummary } from "./tags.js";
+import { getJSON } from "./api.js";
 
 const DISCLAIMER_KEY = "ihp.disclaimerDismissed";
 
@@ -45,10 +51,6 @@ async function initVersion() {
 
 // ---- placeholder cards for tabs owned by later tickets ---------------------
 const PLACEHOLDERS = {
-  tags: [
-    "My Tags",
-    "Tags and permits by license year, including controlled-hunt tags, arrive in T-09.",
-  ],
   seasons: [
     "Season Table",
     "A sortable, filterable table of every published season arrives in T-16.",
@@ -59,6 +61,15 @@ const PLACEHOLDERS = {
   ],
   settings: ["Settings", "Default species, weekend definition and backups arrive in T-21."],
 };
+
+let tagsMounted = false;
+function ensureTags() {
+  if (tagsMounted) return;
+  tagsMounted = true;
+  initTags().catch(() => {
+    tagsMounted = false;
+  });
+}
 
 function renderPlaceholder(tab) {
   const panel = document.getElementById(`panel-${tab}`);
@@ -115,7 +126,15 @@ function filterGroup(labelText, id, ...content) {
 function initMapTab() {
   const today = localToday();
   const [d1, d2] = defaultRange(today);
-  const shell = { species: "deer", weapon: "all", permits: [], start: toISO(d1), end: toISO(d2) };
+  const shell = {
+    species: "deer",
+    weapon: "all",
+    permits: [],
+    start: toISO(d1),
+    end: toISO(d2),
+    year: today.getFullYear(),
+    tags: [],
+  };
 
   const viewing = document.getElementById("viewing");
   function renderViewing() {
@@ -126,7 +145,7 @@ function initMapTab() {
       "Viewing ",
       textEl("b", `${sp[2]} ${sp[1]}`),
       " · ",
-      textEl("b", "No tags yet"),
+      textEl("b", tagsSummary(shell.tags)),
       " · ",
       textEl("b", weapon),
       " · ",
@@ -149,11 +168,41 @@ function initMapTab() {
   sep.setAttribute("aria-hidden", "true");
   species.insertBefore(sep, species.children[BIG_GAME_COUNT]);
 
+  // My tags: filled tags are dropped here the moment tags.js reports a change,
+  // which is what invalidates the availability query (T-07 wires the map itself).
   const tagsRow = document.createElement("div");
   tagsRow.className = "chips";
-  const addTag = textEl("a", "No tags yet → add one", "chip");
-  addTag.href = "#/tags";
-  tagsRow.appendChild(addTag);
+  tagsRow.id = "f-tags-row";
+  function renderTagsRow() {
+    const active = activeTags(shell.tags);
+    const chips = active.map((t) => {
+      const chip = textEl("span", tagChipLabel(t), "chip tagchip");
+      // A static list, not a toggle: no aria-pressed on a span (it isn't allowed
+      // without a widget role, and the chips aren't clickable yet — T-07 owns that).
+      chip.dataset.tagId = String(t.id);
+      return chip;
+    });
+    const manage = textEl("a", active.length ? "Manage tags" : "No tags yet → add one", "chip");
+    manage.href = "#/tags";
+    tagsRow.replaceChildren(...chips, manage);
+  }
+  renderTagsRow();
+
+  window.addEventListener(TAGS_CHANGED, (e) => {
+    if (!e.detail || e.detail.year !== shell.year) return;
+    shell.tags = e.detail.tags;
+    renderTagsRow();
+    renderViewing();
+  });
+  getJSON(`/api/tags?year=${shell.year}`)
+    .then(({ tags }) => {
+      shell.tags = tags;
+      renderTagsRow();
+      renderViewing();
+    })
+    .catch(() => {
+      // offline: keep the empty tag row
+    });
 
   const weapon = chipGroup({
     id: "f-weapon",
@@ -261,7 +310,8 @@ function activate(tab, { focus = false } = {}) {
     document.getElementById(`panel-${t.id}`).hidden = !on;
     if (on && focus) a.focus();
   }
-  if (tab !== "map") renderPlaceholder(tab);
+  if (tab === "tags") ensureTags();
+  else if (tab !== "map") renderPlaceholder(tab);
   const label = TABS.find((t) => t.id === tab).label;
   document.title = `${label} · Idaho Hunt Planner`;
   document.body.dataset.tab = tab;

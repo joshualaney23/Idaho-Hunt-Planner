@@ -164,7 +164,15 @@ def test_header_disclaimer_and_assets(index: _Index):
 def test_index_and_assets_are_served(client):
     resp = client.get("/")
     assert resp.status_code == 200 and b'role="tablist"' in resp.data
-    for path in ("css/theme.css", "css/app.css", "js/main.js", "js/ui.js", "js/router.js"):
+    for path in (
+        "css/theme.css",
+        "css/app.css",
+        "js/main.js",
+        "js/ui.js",
+        "js/router.js",
+        "js/api.js",
+        "js/tags.js",
+    ):
         r = client.get(f"/static/{path}")
         assert r.status_code == 200, path
         if path.endswith(".js"):
@@ -173,7 +181,9 @@ def test_index_and_assets_are_served(client):
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node not installed (CI runs it)")
-@pytest.mark.parametrize("name", ["ui.test.mjs", "router.test.mjs"])
+@pytest.mark.parametrize(
+    "name", ["ui.test.mjs", "router.test.mjs", "api.test.mjs", "tags.test.mjs"]
+)
 def test_js_components_under_node(name: str):
     proc = subprocess.run(
         ["node", "--test", f"static/js/{name}"],
