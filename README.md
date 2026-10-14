@@ -6,7 +6,7 @@ A local, single-user web app for planning Idaho hunts. It parses the official ID
 
 ## Setup
 
-Requires Python 3.11 or newer. On macOS the system `python3` may be older, so install one with `brew install python@3.12` if needed.
+Requires Python 3.12. On macOS the system `python3` may be older, so install one with `brew install python@3.12` if needed.
 
 ```bash
 git clone https://github.com/joshualaney23/Idaho-Hunt-Planner.git

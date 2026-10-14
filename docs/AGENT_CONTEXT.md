@@ -15,7 +15,7 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 - Always show the "verify against official regulations" disclaimer, and link every season to its source PDF page.
 
 ## Stack & conventions
-- Python 3.11+, Flask 3, stdlib `sqlite3` (plain SQL, no ORM), pdfplumber. Use shapely/pyproj only in build scripts (`requirements-dev.txt`).
+- Python 3.12 (the only version required and tested), Flask 3, stdlib `sqlite3` (plain SQL, no ORM), pdfplumber. Use shapely/pyproj only in build scripts (`requirements-dev.txt`).
 - Frontend: vanilla ES modules plus SVG, no framework, no build step. Colors come only from the CSS vars in `static/css/theme.css`.
 - Type hints, `ruff`, and `pytest -q` from the repo root. The server binds `127.0.0.1:5050` (override with `PLANNER_PORT`).
 - Commit `static/data/*.json`, `tests/fixtures/*`, `tests/golden/*`. **Never commit `data/`** (DB, PDFs).
@@ -43,7 +43,7 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 | `static/js/router.js` | T-03: `TABS`, `parseRoute(hash)` → `{tab, rest, query, known}` (`#/regs/12` → rest `["12"]`; query kept for T-07), `tabHash` |
 | `static/js/main.js` | T-03 boot: disclaimer, version from `/api/health` (regs label waits for `/api/meta`), hash routing (unknown → `replaceState` `#/map`; arrow/Home/End keys), placeholder cards for tags/seasons/regs/settings, and a **local-only filter-bar shell** (species/weapon/permit chips, dates + presets from `dates.js`, breadcrumb). T-07 replaces the shell with `filters.js`/`state.js`. |
 | `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port), `test_dates.py` (also runs the JS twin under 4 time zones when node is installed; `fixtures/dates_cases.json` is the shared Python/JS date contract: change it, not just one twin), `test_build_gmu_geometry.py` (T-02: decodes the committed paths with an independent SVG number parser and asserts the units tile Idaho with no gaps; `fixtures/gmu_sample.geojson` is its offline 3-unit input), `test_db.py` (T-04: schema.sql == §5 block, migrations order/rollback, seed counts + idempotency, FK/CHECK enforcement, helpers, `RESTRICTIONS` == §5.1), `test_static_shell.py` (T-03: tokens equal DESIGN §4.1, no color literals outside `theme.css`, every `var(--x)` is defined, tablist/tabpanel wiring, runs `ui`/`router` node tests). `js/fakedom.mjs` is a tiny DOM shim for `static/js/ui.test.mjs`; extend it when `ui.js` needs more DOM. |
-| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + `node --test static/js/*.test.mjs` (TZ=America/Boise) on 3.11 and 3.12 for pushes to main and PRs |
+| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + `node --test static/js/*.test.mjs` (TZ=America/Boise) on 3.12 for pushes to main and PRs. The `main: require CI` ruleset requires `test (3.12)` |
 | `pyproject.toml` | ruff + pytest config (`docs/` excluded from ruff) |
 
 ## Commands
@@ -53,7 +53,7 @@ python3 docs/tools/section.py T-11          # one ticket; also 8.7, 5.3, --toc
 gh issue view <N>                            # ticket + acceptance criteria + definition of done
 jq -r '."T-17a"' docs/tools/issue_map.json   # ticket -> issue number
 
-# Environment: this Mac's system python3 is 3.9. Use 3.11+ (e.g. `brew install python@3.12`).
+# Environment: this Mac's system python3 is 3.9. Use 3.12 (`brew install python@3.12`).
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 python -m planner --no-browser               # run (http://127.0.0.1:5050, GET /api/health)

@@ -268,7 +268,16 @@ def test_restrictions_match_design_5_1():
     vocab_line = text.split("\n")[1]
     codes = re.findall(r"`([a-z_]+)`", vocab_line)
     assert list(RESTRICTIONS) == codes
-    informational = {"cwd_testing", "motorized_rule", "second_tag_prohibited", "brow_tined"}
+    informational = {
+        "cwd_testing",
+        "motorized_rule",
+        "second_tag_prohibited",
+        "antlered_only",
+        "antlerless_only",
+        "two_point_only",
+        "spike_only",
+        "brow_tined",
+    }
     for code, r in RESTRICTIONS.items():
         assert r["label"]
         expected = "informational" if code in informational else "narrowing"
