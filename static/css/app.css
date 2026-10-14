@@ -636,3 +636,398 @@ dialog h2 {
   margin: 0 0 12px;
   color: var(--gold2);
 }
+
+/* ---- map zoom (T-08) ----------------------------------------------------- */
+.map-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.gmu-map path[data-unit] {
+  vector-effect: non-scaling-stroke; /* borders stay hairline at 8× */
+}
+.zoombar {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+}
+.zoombar .chip {
+  background: var(--bg3);
+  padding: 2px 9px;
+}
+
+/* ---- results table (T-08, §4.2) ------------------------------------------- */
+.results-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.results-tools {
+  display: flex;
+  gap: 4px;
+}
+.results-wrap {
+  overflow-x: auto;
+}
+table.results {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+table.results th {
+  text-align: left;
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--bg5);
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+table.results th .sort {
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 2px 0;
+  cursor: pointer;
+}
+table.results th .sort:hover {
+  color: var(--text);
+}
+table.results th[aria-sort="ascending"] .sort::after {
+  content: " ▲";
+  color: var(--gold);
+}
+table.results th[aria-sort="descending"] .sort::after {
+  content: " ▼";
+  color: var(--gold);
+}
+table.results td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--bg3);
+  vertical-align: top;
+}
+table.results tbody tr:hover td,
+table.results tbody tr:focus-within td {
+  background: var(--bg3);
+}
+table.results .num {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+table.results .date,
+table.results .weapons {
+  white-space: nowrap;
+}
+.ulink {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-family: var(--font-mono);
+  color: var(--gold2);
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+a.pg {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+table.results .ws {
+  display: none; /* short weapon labels: print only */
+}
+
+/* ---- Unit Brief drawer (T-08, §4.3) ---------------------------------------- */
+dialog.drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  width: min(540px, 100vw);
+  min-width: 0;
+  height: 100%;
+  max-height: 100%;
+  max-width: 100vw;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--gold);
+  border-radius: 0;
+  background: var(--bg2);
+  box-shadow: -10px 0 30px var(--shadow);
+}
+dialog.drawer[open] {
+  display: block;
+}
+.drawer-inner {
+  height: 100%;
+  overflow-y: auto;
+  padding: 14px 18px 24px;
+}
+.drawer .brief-head h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--gold2);
+}
+.brief-status {
+  margin-top: 4px;
+  font-size: 13px;
+}
+.brief-sec {
+  margin-top: 16px;
+}
+.brief-sec h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--text2);
+}
+.brief-sec h4 {
+  margin: 10px 0 4px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.bseasons,
+.brief-links ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.bseason {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--bg3);
+  font-size: 12.5px;
+}
+.bseason .note {
+  margin: 4px 0 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--bg5);
+  color: var(--text2);
+  font-size: 12px;
+  white-space: pre-line;
+}
+.brief-more summary {
+  cursor: pointer;
+  color: var(--text2);
+  font-size: 12.5px;
+  margin-top: 10px;
+}
+.brief-links li {
+  padding: 3px 0;
+  font-size: 13px;
+}
+.disclaim {
+  margin-top: 18px;
+}
+
+/* timeline: Aug 1 → Jan 31, one bar per season, colored by weapon */
+.timeline {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tl-grid line {
+  stroke: var(--bg5);
+  stroke-width: 1;
+}
+.tl-grid text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text2);
+}
+.tl-band {
+  fill: var(--gold);
+  fill-opacity: 0.22;
+}
+.tl-today {
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+}
+.tl-any {
+  fill: var(--rifle);
+  background: var(--rifle);
+}
+.tl-archery {
+  fill: var(--bow);
+  background: var(--bow);
+}
+.tl-muzzleloader {
+  fill: var(--sc2);
+  background: var(--sc2);
+}
+.tl-short_range,
+.tl-shotgun,
+.tl-falconry {
+  fill: var(--text3);
+  background: var(--text3);
+}
+.tl-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
+}
+.tl-sw {
+  display: inline-block;
+  width: 12px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 4px;
+}
+.tl-band-sw {
+  background: var(--badge-archery-bg);
+  outline: 1px solid var(--gold);
+}
+.tl-today-sw {
+  width: 2px;
+  height: 10px;
+  background: var(--text);
+  vertical-align: -1px;
+}
+
+/* ---- print (T-08): map + table on one landscape page, light theme ---------- */
+@page {
+  size: landscape;
+  margin: 8mm;
+}
+@media print {
+  .banner,
+  .tabs,
+  .filters,
+  .checkline,
+  .app-header .sub,
+  .zoombar,
+  .results-tools,
+  .tip,
+  .toasts,
+  dialog,
+  #panel-tags,
+  #panel-seasons,
+  #panel-regs,
+  #panel-settings,
+  table.results .seasons-col {
+    display: none !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body {
+    font-size: 8pt;
+    line-height: 1.25;
+  }
+  .app-header {
+    padding: 0 0 1mm;
+  }
+  .app-header h1 {
+    font-size: 15pt;
+  }
+  .viewing {
+    margin: 0 0 2mm;
+    font-size: 8.5pt;
+  }
+  .wrap {
+    display: grid;
+    grid-template-columns: 95mm 1fr;
+    gap: 4mm;
+    padding: 0;
+  }
+  .card {
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .card h2 {
+    font-size: 11pt;
+    margin: 0 0 1mm;
+  }
+  #map-card .gmu-map {
+    width: 95mm;
+    height: auto;
+  }
+  .legend {
+    font-size: 7pt;
+    gap: 1mm 3mm;
+    margin-top: 1mm;
+  }
+  /* The table flows into newspaper columns so ~100 single-line rows fit one page. */
+  .results-wrap {
+    overflow: visible;
+    column-count: 2;
+    column-gap: 5mm;
+  }
+  /* Fixed widths so a long weapons list wraps instead of spilling into the next
+     column (auto layout let rows overflow their column and overprint). */
+  table.results {
+    font-size: 7pt;
+    table-layout: fixed;
+  }
+  table.results th:nth-child(1) {
+    width: 13%;
+  }
+  table.results th:nth-child(2) {
+    width: 24%;
+  }
+  table.results th:nth-child(3) {
+    width: 12%;
+  }
+  table.results th:nth-child(5) {
+    width: 19%;
+  }
+  /* One line per row: short weapon labels, and an ellipsis rather than ever
+     overprinting the next column. */
+  table.results td,
+  table.results th {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  table.results .wl {
+    display: none;
+  }
+  table.results .ws {
+    display: inline;
+  }
+  table.results th {
+    font-size: 6pt;
+    padding: 0 1mm;
+  }
+  table.results th[aria-sort] .sort::after {
+    content: "";
+  }
+  table.results td {
+    padding: 0 1mm;
+    line-height: 1.12;
+  }
+  table.results .ulink,
+  table.results .num {
+    font-size: 7pt;
+  }
+  table.results tr {
+    break-inside: avoid;
+  }
+  table.results tbody tr:hover td {
+    background: none;
+  }
+  .ulink {
+    text-decoration: none;
+  }
+  .app-footer {
+    padding: 2mm 0 0;
+    font-size: 7pt;
+  }
+  a {
+    text-decoration: none;
+  }
+}

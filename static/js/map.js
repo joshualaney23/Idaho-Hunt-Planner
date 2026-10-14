@@ -158,12 +158,30 @@ export function seasonDates(s) {
   return `${fmtShort(parseISO(s.start))} – ${fmtShort(parseISO(s.end))}`;
 }
 
+/** The stored source PDF opened at a page (`GET /api/documents/<id>/pdf`, §6, T-10). */
+export function pdfHref(documentId, page) {
+  return `/api/documents/${encodeURIComponent(documentId)}/pdf${page ? `#page=${page}` : ""}`;
+}
+
+/** `p.N` as a link to the source PDF page (or plain text when the document is unknown). */
+export function pageLink(s) {
+  if (!s.source_page) return null;
+  if (s.document_id == null) return textEl("span", ` p.${s.source_page}`, "muted");
+  const a = textEl("a", `p.${s.source_page}`, "pg");
+  a.href = pdfHref(s.document_id, s.source_page);
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.title = `Source PDF, page ${s.source_page}`;
+  return a;
+}
+
 /**
- * One season line, shared by the tooltip and the brief: weapon badge, sex, dates,
- * narrowing reasons (yellow), informational restrictions (neutral), source page.
- * `labels` = `{restrictions, reasons}` from `/api/meta`.
+ * One season line, shared by the tooltip, the results table and the brief: weapon
+ * badge, sex, dates, narrowing reasons (yellow), informational restrictions (neutral),
+ * source page. `labels` = `{restrictions, reasons}` from `/api/meta`. With
+ * `{link: true}` the page is a `p.N` link to the PDF (the tooltip can't be clicked).
  */
-export function seasonLine(s, labels = {}) {
+export function seasonLine(s, labels = {}, { link = false } = {}) {
   const restr = labels.restrictions || {};
   const reasons = labels.reasons || {};
   const label = (code) => restr[code]?.label || reasons[code]?.label || code.replace(/_/g, " ");
@@ -179,8 +197,175 @@ export function seasonLine(s, labels = {}) {
   for (const code of s.restrictions || []) {
     if (!narrowing.has(code)) row.appendChild(badge("info", label(code)));
   }
-  if (s.source_page) row.appendChild(textEl("span", ` p.${s.source_page}`, "muted"));
+  if (link && s.source_page) {
+    row.append(" ", pageLink(s));
+  } else if (s.source_page) {
+    row.appendChild(textEl("span", ` p.${s.source_page}`, "muted"));
+  }
   return row;
+}
+
+// ---- zoom (T-08, §4.3): wheel / pinch on the viewBox, clamped to 1×–8× ----------
+export const ZOOM_MIN = 1;
+export const ZOOM_MAX = 8;
+
+/** Parse "x y w h" into `{x, y, w, h}`. */
+export function parseViewBox(vb) {
+  const [x, y, w, h] = String(vb).trim().split(/[\s,]+/).map(Number);
+  return { x, y, w, h };
+}
+
+export const viewBoxString = (b) =>
+  [b.x, b.y, b.w, b.h].map((n) => Math.round(n * 1000) / 1000).join(" ");
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/** Keep a `w`×`h` box inside `base` (it never pans past the map's edges). */
+function clampBox(base, b) {
+  return {
+    x: clamp(b.x, base.x, base.x + base.w - b.w),
+    y: clamp(b.y, base.y, base.y + base.h - b.h),
+    w: b.w,
+    h: b.h,
+  };
+}
+
+/** The zoom level of `cur` relative to `base` (1 = whole map). */
+export const zoomScale = (base, cur) => base.w / cur.w;
+
+/**
+ * Zoom `cur` by `factor` around the focal point (`fx`, `fy`, in SVG user units), so
+ * the point under the cursor stays put. The level is clamped to [min, max] and the box
+ * to the map's bounds.
+ */
+export function zoomBox(base, cur, factor, fx, fy, { min = ZOOM_MIN, max = ZOOM_MAX } = {}) {
+  const scale = clamp(zoomScale(base, cur) * factor, min, max);
+  const w = base.w / scale;
+  const h = base.h / scale;
+  const k = w / cur.w;
+  return clampBox(base, { x: fx - (fx - cur.x) * k, y: fy - (fy - cur.y) * k, w, h });
+}
+
+/** Pan `cur` by (`dx`, `dy`) user units, clamped to the map's bounds. */
+export function panBox(base, cur, dx, dy) {
+  return clampBox(base, { ...cur, x: cur.x + dx, y: cur.y + dy });
+}
+
+/** Wheel delta → zoom factor: one 100 px notch ≈ 1.22×; ctrl+wheel (trackpad pinch) is finer-grained, so it's scaled up. */
+export function wheelFactor(e) {
+  const px = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+  return Math.exp(-px * (e.ctrlKey ? 0.01 : 0.002));
+}
+
+/**
+ * Wheel, pinch (two pointers) and drag-to-pan (one pointer, when zoomed) on `svg`'s
+ * viewBox. A drag never also counts as a click on the unit under it. Returns
+ * `{zoomBy(factor, clientPoint?), reset(), scale(), box(), onChange(cb)}`.
+ */
+export function enableZoom(svg, { min = ZOOM_MIN, max = ZOOM_MAX } = {}) {
+  const base = parseViewBox(svg.getAttribute("viewBox"));
+  let cur = { ...base };
+  const cbs = [];
+  const pointers = new Map();
+  let pinch = null;
+  let moved = 0;
+
+  function apply(next) {
+    cur = next;
+    svg.setAttribute("viewBox", viewBoxString(cur));
+    const s = zoomScale(base, cur);
+    svg.dataset.zoom = String(Math.round(s * 100) / 100);
+    // Let the page scroll over an unzoomed map; take every gesture once zoomed in.
+    svg.style.touchAction = s > 1.001 ? "none" : "pan-x pan-y";
+    for (const cb of cbs) cb(s, cur);
+  }
+
+  /** Client pixels → SVG user units (the svg keeps the viewBox aspect: height auto). */
+  function toUser(clientX, clientY) {
+    const r = svg.getBoundingClientRect();
+    return {
+      x: cur.x + ((clientX - r.left) / (r.width || 1)) * cur.w,
+      y: cur.y + ((clientY - r.top) / (r.height || 1)) * cur.h,
+    };
+  }
+
+  function zoomBy(factor, point) {
+    const r = svg.getBoundingClientRect();
+    const p = point
+      ? toUser(point.clientX, point.clientY)
+      : toUser(r.left + r.width / 2, r.top + r.height / 2);
+    apply(zoomBox(base, cur, factor, p.x, p.y, { min, max }));
+  }
+
+  svg.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      zoomBy(wheelFactor(e), e);
+    },
+    { passive: false },
+  );
+
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  svg.addEventListener("pointerdown", (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) moved = 0;
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinch = { d: dist(a, b) };
+    }
+  });
+  svg.addEventListener("pointermove", (e) => {
+    const prev = pointers.get(e.pointerId);
+    if (!prev) return;
+    const next = { x: e.clientX, y: e.clientY };
+    pointers.set(e.pointerId, next);
+    if (pointers.size >= 2 && pinch) {
+      const [a, b] = [...pointers.values()];
+      const d = dist(a, b);
+      if (pinch.d > 0 && d > 0) {
+        zoomBy(d / pinch.d, { clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
+      }
+      pinch.d = d;
+      moved += 10; // a pinch is never a click
+      return;
+    }
+    if (zoomScale(base, cur) <= 1.001) return;
+    moved += Math.abs(next.x - prev.x) + Math.abs(next.y - prev.y);
+    if (moved < 4) return;
+    const r = svg.getBoundingClientRect();
+    const k = cur.w / (r.width || 1);
+    apply(panBox(base, cur, -(next.x - prev.x) * k, -(next.y - prev.y) * k));
+  });
+  const up = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+  };
+  svg.addEventListener("pointerup", up);
+  svg.addEventListener("pointercancel", up);
+  svg.addEventListener("pointerleave", up);
+  // A drag or pinch ends with a click on whatever unit is under the pointer: swallow it
+  // (capture phase, before the unit path's own click handler).
+  svg.addEventListener(
+    "click",
+    (e) => {
+      if (moved >= 4) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+      moved = 0;
+    },
+    true,
+  );
+
+  apply(cur);
+  return {
+    zoomBy,
+    reset: () => apply({ ...base }),
+    scale: () => zoomScale(base, cur),
+    box: () => ({ ...cur }),
+    onChange: (cb) => cbs.push(cb),
+  };
 }
 
 /**
