@@ -18,6 +18,7 @@ class Restriction(TypedDict):
 # §5.1 closed vocabulary. `narrowing` codes make a unit *restricted* (yellow);
 # `informational` codes show as badges but don't change the color. Mirrored to the
 # frontend via `/api/meta`. `youth_only` narrows only for adult profiles (T-06 decides).
+# `brow_tined` limits which bull you may take, not where/when you may hunt: informational.
 RESTRICTIONS: Final[dict[str, Restriction]] = {
     "whitetail_only": {"label": "White-tailed deer only", "severity": "narrowing"},
     "mule_deer_only": {"label": "Mule deer only", "severity": "narrowing"},
@@ -25,7 +26,7 @@ RESTRICTIONS: Final[dict[str, Restriction]] = {
     "antlerless_only": {"label": "Antlerless only", "severity": "narrowing"},
     "two_point_only": {"label": "Two-point or less only", "severity": "narrowing"},
     "spike_only": {"label": "Spike bull only", "severity": "narrowing"},
-    "brow_tined": {"label": "Brow-tined bull only", "severity": "narrowing"},
+    "brow_tined": {"label": "Brow-tined bull only", "severity": "informational"},
     "youth_only": {"label": "Youth only", "severity": "narrowing"},
     "private_land_only": {"label": "Private land only", "severity": "narrowing"},
     "portion_of_unit": {"label": "Portion of unit only", "severity": "narrowing"},

@@ -397,7 +397,7 @@ CREATE TABLE my_tags (
 
 ### 5.1 Restriction codes (closed vocabulary)
 `whitetail_only`, `mule_deer_only`, `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`, `youth_only`, `private_land_only`, `portion_of_unit`, `outfitter_only`, `cwd_testing`, `motorized_rule`, `second_tag_prohibited`, `see_notes`.
-Each code has a `severity`: **narrowing** codes (`*_only`, `portion_of_unit`, `youth_only` for adults, plus `brow_tined` (an antler-point rule like `spike_only`) and `see_notes` (unexplained conditions stay yellow, never green — D3)) make a unit *restricted*. **Informational** codes (`cwd_testing`, `motorized_rule`, `second_tag_prohibited`) show as badges but don't change color. The mapping lives in `planner/engine.py::RESTRICTIONS` and is mirrored to the frontend via `/api/meta`.
+Each code has a `severity`: **narrowing** codes (`*_only`, `portion_of_unit`, `youth_only` for adults, plus `see_notes`: unexplained conditions stay yellow, never green — D3) make a unit *restricted*. **Informational** codes (`cwd_testing`, `motorized_rule`, `second_tag_prohibited`, and `brow_tined`: it limits which bull may be taken, but the unit is still open to hunt) show as badges but don't change color. The mapping lives in `planner/engine.py::RESTRICTIONS` and is mirrored to the frontend via `/api/meta`.
 
 ### 5.2 Upland areas
 Upland seasons attach to **areas**, which are resolved into `season_units` rows with `full`/`partial` coverage at import time using `static/data/county_units.json` (precomputed percentage of each GMU inside each county). Rules:
