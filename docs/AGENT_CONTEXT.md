@@ -32,8 +32,8 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 | `docs/tools/section.py` | Prints one DESIGN.md section or ticket |
 | `planner/` | T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `GET /api/health` (`api.py`), `__version__` in `__init__.py`. Other modules are docstring stubs for their tickets. |
 | `static/index.html` | Placeholder page with disclaimer; T-03 replaces it with the app shell |
-| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests |
-| `.github/workflows/ci.yml` | `ruff check` + `pytest -q` on 3.11 and 3.12 for pushes to main and PRs |
+| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port) |
+| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` on 3.11 and 3.12 for pushes to main and PRs |
 | `pyproject.toml` | ruff + pytest config (`docs/` excluded from ruff) |
 
 ## Commands
@@ -47,7 +47,8 @@ jq -r '."T-17a"' docs/tools/issue_map.json   # ticket -> issue number
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 python -m planner --no-browser               # run (http://127.0.0.1:5050, GET /api/health)
-pytest -q && ruff check .                    # must pass before a PR
+pytest -q && ruff check . && ruff format --check .   # must pass before a PR (CI runs all three;
+                                             #   tests/test_startup.py boots `python -m planner`)
 
 ruff format .                                # formatter (config in pyproject.toml)
 PLANNER_PORT=6060 python -m planner          # alternate port; omit --no-browser to open browser
@@ -63,6 +64,6 @@ PLANNER_PORT=6060 python -m planner          # alternate port; omit --no-browser
 1. `git checkout main && git pull`, then `git checkout -b t-xx-<slug>`.
 2. Read the issue, then only the DESIGN.md sections it cites (§8.7 too for any importer/accuracy ticket).
 3. Stay in the ticket's scope. If the design is wrong, say so in the PR and fix `DESIGN.md` in the same PR.
-4. Get `pytest -q` and `ruff check` green, and confirm `python -m planner --no-browser` starts.
+4. Get `pytest -q`, `ruff check` and `ruff format --check` green, and confirm `python -m planner --no-browser` starts.
 5. Push and run `gh pr create` titled `T-XX: <title>`, with `Closes #N` in the body. The PR description lists every acceptance criterion with its evidence (real command output and spot-check values).
 6. **Update this file in the same PR** if you changed commands, layout, environment, or the "What exists" table. Keep it short.
