@@ -30,10 +30,11 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 | `docs/tools/issue_map.json` | Ticket → GitHub issue number. Numbers match through T-16, then shift by one (T-17a = #17, T-18 = #20, T-22 = #24). |
 | `docs/tools/make_issues.py` | Re-syncs issue bodies from §12 (`--link`) after a ticket is edited |
 | `docs/tools/section.py` | Prints one DESIGN.md section or ticket |
-| `planner/` | T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `GET /api/health` (`api.py`), `__version__` in `__init__.py`. Other modules are docstring stubs for their tickets. |
+| `planner/` | T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `GET /api/health` (`api.py`), `__version__` in `__init__.py`. `dates.py` (T-05): `default_range`, `overlap`, `days`, `parse_iso`, `to_iso`, `fmt_short`, presets (`presets()` returns all five). Other modules are docstring stubs for their tickets. |
+| `static/js/dates.js` | T-05 JS twin of `planner/dates.py` (local-noon `Date`s; camelCase + snake_case aliases). `dates.test.mjs` runs `node --test`. |
 | `static/index.html` | Placeholder page with disclaimer; T-03 replaces it with the app shell |
-| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port) |
-| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` on 3.11 and 3.12 for pushes to main and PRs |
+| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port), `test_dates.py` (also runs the JS twin under 4 time zones when node is installed). `fixtures/dates_cases.json` is the shared Python/JS date contract: change it, not just one twin. |
+| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + `node --test static/js/*.test.mjs` (TZ=America/Boise) on 3.11 and 3.12 for pushes to main and PRs |
 | `pyproject.toml` | ruff + pytest config (`docs/` excluded from ruff) |
 
 ## Commands
@@ -51,6 +52,7 @@ pytest -q && ruff check . && ruff format --check .   # must pass before a PR (CI
                                              #   tests/test_startup.py boots `python -m planner`)
 
 ruff format .                                # formatter (config in pyproject.toml)
+TZ=America/Boise node --test static/js/*.test.mjs   # JS tests (node 22+; pytest also runs them)
 PLANNER_PORT=6060 python -m planner          # alternate port; omit --no-browser to open browser
 # .gitignore anchors /data/ to the repo root so static/data/ stays committed.
 
