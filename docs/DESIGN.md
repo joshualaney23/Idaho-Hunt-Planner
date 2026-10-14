@@ -223,6 +223,7 @@ body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);fon
 └──────────────────────────────┴─────────────────────────────────────────────────────────────┘
 ```
 Below 1100 px the map and table stack vertically. Below 700 px chip rows scroll horizontally.
+- Species chips are single-select through T-08. T-27 makes them multi-select (max 4) and adds a `Match [any|all]` control, so the map can show only the units where **every** selected species is huntable in the range.
 
 ### 4.3 Map behavior
 - **Fill colors**: `open` = `--open` (green), `restricted` = `--restricted` (yellow), `closed` = `--closed`. Units that are open for a tag the user doesn't hold, when the "show untagged" toggle is on: closed fill with a **2 px dashed `--gold` stroke**.
@@ -244,6 +245,8 @@ For each unit, take the set **S** of published seasons that pass the tag, permit
 | **restricted** (yellow) | S is non-empty but every season has at least one of: partial date coverage, partial unit coverage, white-tailed only (on a Regular tag), antlerless only, 2-point only, private land only, youth only (when "youth" is enabled in settings), or "see notes" closures. The tooltip lists the reasons. |
 | **closed** (grey) | S is empty. |
 | **untagged** (dashed gold outline) | S is empty, but seasons would exist if tag ownership were ignored. Only shown when the toggle is on. |
+
+Status is computed for one species at a time. With several species selected (T-27), each species is evaluated separately and the per-unit statuses are combined: `species_mode=all` takes the **worst** status across them (rank `closed < untagged < restricted < open`), `any` takes the best.
 
 ### 4.5 Other tabs
 - **🎟️ My Tags**: cards per license year. Add a tag by picking a tag type (Regular Deer, White-tailed Deer, Elk A, Elk B, **Controlled hunt**, Pronghorn, Black Bear, Lion, Wolf, Upland/Hunting license…), plus zone (elk) or hunt number (controlled). **Controlled:** type the 4-digit hunt number. The dialog looks it up in that year's published (or staged) controlled hunts and shows species, hunt area, dates, weapon, sex and the verbatim area description before saving. Unknown numbers are rejected. There's a permits panel (Archery, Muzzleloader), Settings for youth status, and a "Copy last year's tags" button (it **never** copies controlled tags, because hunt numbers are reused for different hunts each year).
@@ -448,7 +451,7 @@ Species with no hunting season are never shown. That includes closed species (e.
 |---|---|
 | `GET /api/meta` | Species, tag types, weapons, restriction codes with severity, available license years, default date range (computed server-side using the local timezone). |
 | `GET /api/units` | Unit metadata (id, elk zone, region). Geometry stays in the static `gmu.json`. |
-| `GET /api/availability?species=deer&start=2026-10-17&end=2026-10-18&weapon=all&tags=mine\|<id,id>&include_untagged=0` | **Core query.** Returns `{range, units:{"39":{status,reasons:[],seasons:[…]}}, summary:{open,restricted,untagged}}`. |
+| `GET /api/availability?species=deer&start=2026-10-17&end=2026-10-18&weapon=all&tags=mine\|<id,id>&include_untagged=0` | **Core query.** Returns `{range, units:{"39":{status,reasons:[],seasons:[…]}}, summary:{open,restricted,untagged}}`. **T-27** extends `species` to a comma-separated list (max 4) with `species_mode=any|all`; the response then echoes `species` as a list and adds `per_species` to each unit. |
 | `GET /api/units/<unit>/seasons?year=2026` | All published seasons for the Unit Brief. |
 | `GET /api/seasons?year&species&status=published` | Season Table. `POST`, `PUT /<id>`, `DELETE /<id>` for manual edits (creates or updates rows under a `manual` source document). |
 | `GET /api/tags?year=2026` · `POST /api/tags` · `PUT /api/tags/<id>` · `DELETE /api/tags/<id>` · `POST /api/tags/copy?from=2025&to=2026` | My Tags. |
@@ -474,6 +477,8 @@ Errors use `{error: {code, message, detail}}` with HTTP 4xx/5xx. The server bind
 
 ### 7.1 Inputs
 `species, start, end, weapon ∈ {all, rifle, archery, muzzleloader, short_range}, tag_scope (all my tags | explicit tag ids), include_untagged, profile, permits`.
+
+`evaluate` stays single-species. T-27 adds `evaluate_multi(..., species: list[str], mode)`, which runs this algorithm once per species over the same loaded rows and combines the per-unit results (worst status for `mode='all'`, best for `'any'`; `days_open` from the intersection of the per-species open-day sets).
 
 ### 7.2 Algorithm
 ```
@@ -625,9 +630,9 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
-| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings | T-19, T-20, T-21 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter | T-19, T-20, T-21, T-27 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; T-19 spans all`.
 
 ---
 
@@ -953,6 +958,28 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ---
 
+### T-27 · Multi-species intersection filter
+**Depends on:** T-06, T-07, T-08 · **Size:** M
+**Description:** Let the user select several species at once and see only the units where **all** of them are huntable in the same date range ("where can I hunt deer *and* elk this weekend?"). Today every layer is single-species: one `species` query param, `evaluate(..., species, ...)` is scalar, and the species chips are a radio group.
+- **API (§6):** `species` accepts a comma-separated list (max 4 ids) plus a new `species_mode=any|all` (default `any`). Example: `GET /api/availability?species=deer,elk&species_mode=all&start=2026-10-17&end=2026-10-18`. The response echoes `species` as a **list** and `species_mode`, and each unit gains `per_species: {"deer": {status, reasons, days_open}, "elk": {…}}` whenever more than one species is requested. A single-species request keeps the T-06 payload otherwise unchanged; `species` becoming a list is the only breaking change, so T-06's tests and `static/js/main.js` are updated in the same PR.
+- **Engine (§7):** keep `evaluate` single-species and pure. Add `evaluate_multi(seasons, season_units, my_tags, permits, profile, species: list[str], start, end, weapon, include_untagged, mode)` that calls `evaluate` once per species over the rows already loaded and combines the results. `api.py` still issues **one SQL query per table** (`species_id IN (…)`), never one query per species.
+- **Combining rule:** rank `closed=0 < untagged=1 < restricted=2 < open=3`. `species_mode=all` takes the **minimum** rank across the selected species; `any` takes the maximum (identical to today's behavior for one species). In `all` mode `days_open` is the number of days in the range on which *every* selected species has a tag_ok season — compute it from the **intersection of the per-species open-day sets**, never `min()` of the per-species counts. The combined `reasons` is the union with each code prefixed by its species id (`elk:partial_dates`) so the tooltip can attribute it; per-species `reasons` stay unprefixed inside `per_species`. `summary` counts the combined status.
+- **UI (§4.2):** species chips become multi-select (max 4 selected) with a `Match [any|all]` segmented control that appears only when ≥ 2 species are selected. The "Viewing" line reads `🦌 Deer + 🫎 Elk · both open · Oct 17 – Oct 18`. URL state is `?species=deer,elk&mode=all`, back/forward safe.
+- **Map & results (§4.3, §4.4):** the hover tooltip groups seasons by species under a species-icon header. In `all` mode the results table gains one status-pill column per selected species beside the combined status, and sorts by combined status then days open. The legend caption becomes "green = every selected species open".
+- **Settings:** unchanged. `default_species` stays a single value, so a fresh load is still one species in `any` mode.
+**Acceptance criteria:**
+- On a seeded DB where unit 39 is open for deer and elk, unit 4 for deer only and unit 62 for elk only: `species=deer,elk&species_mode=all` returns 39 `open`, 4 and 62 `closed`, and `per_species` reports each species' own status on all three units.
+- The same query with `species_mode=any` returns all three as non-closed, each with the best per-unit status.
+- A unit open for deer across the whole range but for elk on one day only is combined `restricted` with reason `elk:partial_dates` and `days_open = 1` in `all` mode.
+- A single-species request returns the T-06 payload unchanged apart from `species` being a one-element list and the new `species_mode` echo (regression test).
+- More than 4 species, or an unknown species id, returns 400 `{error:{code:"bad_species"}}`.
+- Perf: a 4-species `all` query on T-06's realistic synthetic DB stays within 2.5× T-06's single-species p95, measured the same way (time only `client.get`, not JSON parsing).
+- Chrome check (real browser, per AGENT_CONTEXT.md): selecting Deer + Elk with Match=all, reloading, then pressing Back restores the previous selection, and the Lighthouse accessibility score for `#/` is unchanged.
+
+---
+
+---
+
 ## 13. Annual workflow (what using it looks like)
 
 1. **Spring (Big Game regs drop):** open the app → 📥 Regulations → drop `seasons-rules-big-game-2027.pdf` → fix anything the Accuracy panel flags, review changed rows using the side-by-side PDF and the "changed since 2026" diff → **Publish**. (The Upland brochure covers two years, so it's uploaded every other year: 2026, 2028, ….)
@@ -1014,6 +1041,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 | T-24 | [#26](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/26) | Small game, furbearer hunting, predatory/unprotected, falconry |
 | T-25 | [#27](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/27) | Moose, bighorn sheep & mountain goat brochure |
 | T-26 | [#28](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/28) | Migratory game birds brochure |
+| T-27 | [#36](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/36) | Multi-species intersection filter |
 
 **Kickoff prompt template:**
 ```
