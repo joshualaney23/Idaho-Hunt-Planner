@@ -213,7 +213,8 @@ def render(t, tickets, conventions, issue_map):
         lines += ["> [!IMPORTANT]", "> Highest-priority ticket (D3: PDF parsing accuracy is the top priority). "
                   "Golden-data verification is **human work** — an agent prepares the page-by-page checklist; Josh ticks off `VERIFICATION.md`.", ""]
     lines += ["## Before you start",
-              f"Read [`docs/DESIGN.md`]({BLOB}/docs/DESIGN.md) **§0 (decisions D1–D7), §2–§9, and §8.7 (accuracy strategy)** first, then this ticket. "
+              f"Read [`docs/AGENT_CONTEXT.md`]({BLOB}/docs/AGENT_CONTEXT.md) first, then this ticket, then only the [`docs/DESIGN.md`]({BLOB}/docs/DESIGN.md) sections it cites "
+              "(`python3 docs/tools/section.py 8.7`; importer/accuracy tickets always read §8.7). "
               "The ticket text below is copied verbatim from §12; if it ever disagrees with DESIGN.md, DESIGN.md on `main` wins.",
               "", "**Shared conventions (§12):**"]
     lines += [f"- {c}" for c in conventions]
@@ -230,8 +231,8 @@ def render(t, tickets, conventions, issue_map):
               "- [ ] If the design changed, `docs/DESIGN.md` is updated in the same PR.",
               "", "## Kickoff prompt", "", "```",
               "Repo: ~/git/Idaho-Hunt-Planner (remote github.com/joshualaney23/Idaho-Hunt-Planner).",
-              f"Implement ticket {t['id']} (GitHub issue #{num if num else 'N'}) from docs/DESIGN.md. Read §0 (decisions), §2–§9, and §8.7 (accuracy) first,",
-              "then the ticket (`gh issue view " + (str(num) if num else "N") + "`). Stack/conventions are in §12's header. "
+              f"Implement ticket {t['id']} (GitHub issue #{num if num else 'N'}). Read docs/AGENT_CONTEXT.md first, then the ticket",
+              "(`gh issue view " + (str(num) if num else "N") + "`), then only the DESIGN.md sections it cites. "
               f"Work on branch {t['id'].lower()}-{slug(t['title'])}, run `pytest -q`",
               f"until green, push, and open a PR titled \"{t['id']}: {t['title']}\" (body includes \"Closes #{num if num else 'N'}\") whose description lists every acceptance",
               "criterion with its evidence (command output, spot-check values, screenshots). Don't change",

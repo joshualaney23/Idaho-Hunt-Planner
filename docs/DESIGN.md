@@ -645,7 +645,7 @@ Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-0
 
 ## 12. Tickets
 
-Each ticket is self-contained for a coding agent. **Every agent should read §2–§9 of this document first.** Shared conventions:
+Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGENT_CONTEXT.md` first**, then the sections the ticket cites. Shared conventions:
 - Python 3.11+, `ruff` formatting, type hints, no ORM.
 - Frontend: vanilla ES modules, no build step, no framework, CSS variables from `theme.css` only (no hard-coded colors).
 - All tests via `pytest -q` from the repo root. A ticket isn't done until its tests pass and `python -m planner` still starts.
@@ -971,7 +971,7 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ## 14. Implementing with agents
 
-**Use one fresh agent session per ticket.** Don't run the build in the long design session. Each turn of a session re-sends the whole conversation, so a session that already holds the design research costs several times more per turn than a fresh one. Tickets are written to be self-contained, so a new agent only needs this document plus the repo.
+**Use one fresh agent session per ticket.** Don't run the build in the long design session. Each turn of a session re-sends the whole conversation, so a session that already holds the design research costs several times more per turn than a fresh one. Tickets are written to be self-contained. A new agent reads `docs/AGENT_CONTEXT.md` (shared context, constraints, commands), then the ticket, then only the sections of this document the ticket cites. In Hermes, `/ihp <ticket>` does this.
 
 - **Group** tightly coupled tickets into one session when the second needs the first's fresh context: T-01+T-04+T-05, T-17a+T-17b, T-07+T-08. Keep the parser tickets (T-11, T-17a, T-12, T-14, T-23, T-24, T-25, T-26) separate. They are the hardest and need the most room in the context.
 - **Order:** T-01/04/05 → T-02, T-03, T-10 (in parallel) → **T-22** → T-11 and T-17a (in parallel) → T-17b → T-06 → T-09, T-15 → T-07/08 → T-17c → T-16 → Phase 2+.
@@ -1014,8 +1014,8 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 **Kickoff prompt template:**
 ```
 Repo: ~/git/Idaho-Hunt-Planner (remote github.com/joshualaney23/Idaho-Hunt-Planner).
-Implement ticket T-XX (GitHub issue #N, `gh issue view N`) from docs/DESIGN.md. Read §0 (decisions),
-§2–§9, and §8.7 (accuracy) first, then the ticket. Stack/conventions are in §12's header. Work on branch t-xx-<slug>, run `pytest -q`
+Implement ticket T-XX (GitHub issue #N). Read docs/AGENT_CONTEXT.md first, then the ticket (`gh issue view N`),
+then only the DESIGN.md sections it cites (`python3 docs/tools/section.py <§>`). Work on branch t-xx-<slug>, run `pytest -q`
 until green, push, and open a PR titled "T-XX: <title>" (body includes "Closes #N") whose description lists every acceptance
 criterion with its evidence (command output, spot-check values, screenshots). Don't change
 behavior outside the ticket's scope; if the design is wrong, say so in the PR and update DESIGN.md.
