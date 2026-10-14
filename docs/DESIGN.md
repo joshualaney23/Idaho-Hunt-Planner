@@ -2,7 +2,7 @@
 
 **Status:** Draft v2 · **Author:** Find A Hunt Planner (Hermes) · **Date:** 2026-10-14
 **Repo:** https://github.com/joshualaney23/Idaho-Hunt-Planner
-**Companion files:** `docs/mockup.html` (working UI mockup with real 2026 deer data), `docs/spike_deer_parser.py` (general-season parser proof of concept), `docs/spike_controlled_parser.py` (controlled-hunt parser plus accuracy invariants)
+**Companion files:** `docs/mockup.html` (working UI mockup with real 2026 deer data), `docs/spike_deer_parser.py` (general-season parser proof of concept), `docs/spike_controlled_parser.py` (Big Game controlled hunts plus accuracy invariants), `docs/spike_msg_parser.py` (moose/sheep/goat controlled hunts plus invariants)
 
 ### 0. Decisions (from Josh)
 
@@ -11,7 +11,8 @@
 | D1 | **Residents only** for now. | No nonresident quotas, fees, or rules anywhere: no resident/nonresident setting, and nonresident-only text isn't parsed into restrictions. The Tags (quota) column is stored for checksums only and isn't shown in the UI. |
 | D2 | **Controlled hunts are in core scope (MVP)**, not a later phase. Josh may hold a controlled tag. | The controlled-hunt parser, hunt-area descriptions, unit coverage, and the "add controlled tag by hunt number" flow are all Phase 1 (§10, T-17a/b/c). |
 | D3 | **PDF parsing accuracy is the top priority.** Everything else depends on it. | New §8.7 accuracy strategy and ticket T-22: two independent extraction paths must agree, checksums and completeness checks run on every import, every section is checked against hand-verified golden data, and publishing is **blocked** while any check fails. No LLM-extracted data is ever published. |
-| D4 | **Every animal that can be hunted under the Big Game and the Upland Game, Turkey & Furbearer regulations is in scope.** | See the species matrix in §5.3. Big Game PDF: deer (mule + white-tailed), elk, pronghorn, black bear, mountain lion, gray wolf. Upland PDF: forest grouse (dusky/ruffed/spruce), California & bobwhite quail, chukar, gray partridge, sage-grouse, sharp-tailed grouse, pheasant, wild turkey, cottontail, snowshoe hare, red squirrel, the furbearers that may be **hunted** (badger, bobcat, red fox), predatory/unprotected animals (year-round), and falconry seasons. **Out:** trapping-only furbearers (beaver, mink, muskrat, otter, marten), and anything published in other brochures (moose/bighorn sheep/mountain goat, and migratory birds: doves, crows, sandhill cranes, waterfowl). Those can be added later the same way, by uploading that brochure plus a new parser. |
+| D4 | **Every animal that can be hunted under the Big Game and the Upland Game, Turkey & Furbearer regulations is in scope.** | See the species matrix in §5.3. Big Game PDF: deer (mule + white-tailed), elk, pronghorn, black bear, mountain lion, gray wolf. Upland PDF: forest grouse (dusky/ruffed/spruce), California & bobwhite quail, chukar, gray partridge, sage-grouse, sharp-tailed grouse, pheasant, wild turkey, cottontail, snowshoe hare, red squirrel, the furbearers that may be **hunted** (badger, bobcat, red fox), predatory/unprotected animals (year-round), and falconry seasons. **Out:** trapping-only furbearers (beaver, mink, muskrat, otter, marten). (Moose/sheep/goat and migratory birds were added by D7.) |
+| D7 | **Moose, bighorn sheep, mountain goat and migratory birds are in scope too**, uploaded from their own brochures. | Two more source documents: **Moose, Bighorn Sheep & Mountain Goat** (2-year brochure, currently "2025 & 2026") and **Migratory Game Bird** (yearly, currently "2026–2027": ducks incl. mergansers, scaup sub-season, Wilson's snipe, American coot, Canada/white-fronted/light geese, swans (controlled), mourning & white-winged dove, American crow, sandhill crane). New tickets T-25 and T-26; species rows in §5.3. |
 | D5 | **Friday counts as part of the default weekend.** | Default `weekend_def = 'fri_sun'` (§7.3). Sat–Sun stays available as a setting. |
 | D6 | **No land ownership/access layers, ever.** Other apps already do that. | Removed from the roadmap. The map shows GMUs only. |
 
@@ -39,7 +40,7 @@ The look and feel follows Treeline Hunt Research IQ's **State Heat Map**: dark f
 ### 1.2 Non-goals (v1)
 - Draw odds, harvest stats, unit scoring (that's what Treeline does).
 - Land ownership / access layers (D6: use another app for that).
-- Trapping seasons, and species from other IDFG brochures (moose/sheep/goat, migratory birds). See D4.
+- Trapping seasons (D4).
 - Mobile-first layout (it should work on a phone, but it's designed for desktop).
 - Multi-user / hosted deployment.
 - Nonresident hunters (D1).
@@ -74,6 +75,10 @@ I tested real sources before writing this. Summary:
 | **Printed page numbers ≠ PDF page indexes.** In-text references like "(See pg 31)" use the brochure's printed numbers, which are one less than the PDF page index in 2026. | p. 22 footer reads "idfg.idaho.gov 21"; the deer area descriptions referenced as "pg 31" are on PDF p. 32. | Store physical pages, map printed → physical from footers, and verify every reference resolves (`page_ref_resolves`). Page numbers elsewhere in this doc are **PDF page indexes**. |
 | **Upland brochure scope** ("Upland Game, Turkey & Furbearer, 2026 & 2027", 55 pp.): upland birds, turkey (general + controlled), cottontail/snowshoe hare/red squirrel, furbearer **trapping and hunting** seasons by **region** ("\* Indicates species can also be hunted": badger, bobcat, red fox), and predatory/unprotected animals (year-round, defined in prose). Migratory birds are in a separate brochure. | Contents p. 6 and pp. 32, 36–38, 46 of the 2026 PDF. | Species matrix §5.3. Furbearer seasons need a **region → GMU** overlay. Predatory animals are modeled as statewide year-round seasons sourced from the rules prose. |
 | IDFG GIS has **region polygons**: `WC_Regions/MapServer/0`, 8 features (Panhandle, Clearwater, Salmon, McCall SubRegion, Nampa SubRegion, Upper Snake, Magic Valley, Southeast). | Queried live. | McCall + Nampa = Southwest Region. `scripts/build_region_overlay.py` → `static/data/region_units.json` (T-24). |
+| **Moose / Bighorn Sheep / Mountain Goat brochure** (`seasons-rules-moose-sheep-goat-2025-26.pdf`, 52 pp., two years). **All hunts are controlled.** Same `Hunt No.` layout, plus traps: (1) fake-bold text printed **4×** ("2222000022225555 MMMMoooouuuu…") on the goat page; (2) sheep/goat tables put **two hunts per row** (8 columns); (3) the California bighorn table is **nested** inside another table, so "Hunt No." is in column 1; (4) a **full-size `*`** is part of the area id, and GIS stores it the same way (`1-1*`), while some ids exist with and without it (`55` / `55*`); (5) superscript `a` here means "wilderness hunt area, extreme terrain", not "includes other units"; (6) superscripts are 6.4 pt but a 7.0 pt `a` exists on the same page. | `docs/spike_msg_parser.py`: **145 hunts** (moose 94, Rocky Mtn bighorn 28, California bighorn 4, goat 19), 0 duplicates, 0 unparsed dates, 0 hunt numbers in table-page text left unparsed, **145/145 exact GIS match**. Checksums: moose 513 = 510 + 3 ✓; goat 40 ✓; RM late rams 16 ✓; sheep 98 + lottery/auction tags = 100; California 5 vs. header 7, explained by the corrections page. The first run missed 7001–7004 (nested table) and was caught only by the completeness check. | `page.dedupe_chars()` always; locate **every** "Hunt No." column from the header row; match GIS area ids **exactly**, markers included; superscript threshold **relative to the page's median font size** (< 75 %); footnote meanings always from the page legend. |
+| **Brochures contain "Corrections" pages** (Big Game p. 2, Upland p. 2, MSG pp. 2–3). Example: "California Bighorn Sheep – Hunt No. 7001 (Area 40): the Commission eliminated the only tag". The table already shows 0 tags (the online PDF is updated), but the header total still says 7. | MSG p. 3; spike sub-header checksum. | New `corrections` extractor: each correction item becomes a structured note on the affected hunt/season, and new check `corrections_applied` verifies that the table matches the correction. It also explains checksum gaps. A correction that can't be matched to a row is a `fail`. Hunts reduced to **0 tags are kept but marked `closed`** and never shown as open. |
+| Completeness scans must be **limited to hunt-table pages**. | A full-document scan flagged "3316" (a street address) and "3529" (a phone number). | The `hunt_number_completeness` scope = pages containing a `Hunt No.` header. |
+| **Migratory Game Bird brochure** (`migratorygame2026-2027_web.pdf`, 36 pp., one season Sep 2026 – Mar 2027). Ducks/geese: per-species pages with **AREA 1/2/3/4** blocks: full dates with years ("October 19, 2026 – January 31, 2027"; "September 1 – 15, 2026"), area definitions by **county lists**, "that portion of X County …" prose, and "all parts of the state NOT included in areas 2 and 3". **Scaup has its own sub-season** inside the duck season. Swans: controlled table (`Hunt No. \| Controlled Hunt Area \| Tags \| Season Dates \| Notes`, e.g. #9301 Area 1, Oct. 10 – Dec. 1). Sandhill crane: table `Hunt Area \| Season \| Tags` with carry-forward ("1-Bear Lake: September 1–30 (300), October 1–30 (150)"), areas defined by county ± exceptions. Dove/crow: statewide, plus extended falconry seasons. Requirements lists: **HIP permit**, **federal duck stamp**, nontoxic shot. Shooting-hour tables by time zone. Pages are multi-column with sidebars ("Areas Closed to Hunting… see pages 27–28") that interleave in plain text. | pp. 8–14, 16–17 of the 2026–27 PDF. | County overlay (reused from T-14) plus `partial` for "portion of" prose; new `sub_species` field on seasons; new date formats in `common.parse_dates` ("Oct. 10 – Dec. 1", "September 1–30", "September 1 – 15, 2026"); permits `hip`, `federal_duck_stamp`; sidebar-aware column cropping. |
 | IDFG Hunt Planner pages use **internal IDs, not hunt numbers** (`/hunt/1002` is a 2003 bear season), and much of the data is old. | Fetched p. 1002. | Not a dependable cross-check source. Optional only (T-20). |
 
 The spike output drives `docs/mockup.html`. For **Oct 17–18, 2026** with a Regular Deer tag and an archery permit, it shows **68 units open and 13 restricted**. This is spike output and hasn't been checked against the regs.
@@ -265,14 +270,19 @@ CREATE TABLE units (               -- seeded from static/data/gmu.json
 CREATE TABLE species (
   id    TEXT PRIMARY KEY,          -- full list + sources in §5.3: 'deer','elk','pronghorn','black_bear','mountain_lion','wolf',
                                    -- 'forest_grouse','quail','chukar','gray_partridge','sage_grouse','sharptail','pheasant','turkey',
-                                   -- 'cottontail','snowshoe_hare','red_squirrel','badger','bobcat','red_fox','predatory_unprotected'
-  label TEXT NOT NULL, icon TEXT, grp TEXT NOT NULL   -- grp: 'big_game' | 'upland_bird' | 'turkey' | 'upland_animal' | 'furbearer' | 'predatory'
+                                   -- 'cottontail','snowshoe_hare','red_squirrel','badger','bobcat','red_fox','predatory_unprotected',
+                                   -- 'moose','bighorn_rocky','bighorn_california','mountain_goat',
+                                   -- 'duck','goose_canada','goose_whitefronted','goose_light','swan','snipe','coot',
+                                   -- 'dove','crow','sandhill_crane'
+  label TEXT NOT NULL, icon TEXT, grp TEXT NOT NULL   -- grp: 'big_game' | 'upland_bird' | 'turkey' | 'upland_animal' | 'furbearer' | 'predatory' | 'migratory'
 );
 
 CREATE TABLE tag_types (
   id               TEXT PRIMARY KEY, -- 'deer_regular','deer_whitetail','elk_zone_a','elk_zone_b','controlled',
                                      -- 'pronghorn_general','black_bear','mountain_lion','wolf','turkey_general',
-                                     -- 'hunting_license' (upland birds/animals, furbearers, predatory: no species tag needed)
+                                     -- 'hunting_license' (upland birds/animals, furbearers, predatory, ducks/geese/snipe/coot/dove/crow: no species tag)
+                                     -- 'sandhill_crane' (area-specific crane tag; requires_zone = 1, zone = crane hunt area)
+                                     -- moose/sheep/goat/swan are controlled-only → 'controlled'
   species_id       TEXT REFERENCES species(id),   -- NULL for 'controlled' (species comes from hunt)
   label            TEXT NOT NULL,
   requires_zone    INTEGER NOT NULL DEFAULT 0,    -- elk A/B
@@ -290,7 +300,7 @@ CREATE TABLE source_documents (
   id            INTEGER PRIMARY KEY,
   license_year  INTEGER NOT NULL,       -- first year covered
   year_end      INTEGER NOT NULL,       -- = license_year, or +1 for 2-yr upland brochures
-  kind          TEXT NOT NULL,          -- 'big_game','upland','supplemental','turkey','moose_sheep_goat','manual'
+  kind          TEXT NOT NULL,          -- 'big_game','upland','moose_sheep_goat','migratory','supplemental','manual'
   title         TEXT, filename TEXT, sha256 TEXT UNIQUE, pages INTEGER,
   stored_path   TEXT,                   -- data/regs/<year>/<sha256>.pdf
   priority      INTEGER NOT NULL DEFAULT 0,   -- supplements > base doc
@@ -303,6 +313,7 @@ CREATE TABLE seasons (             -- staged AND published rows; status column s
   document_id    INTEGER NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
   status         TEXT NOT NULL CHECK (status IN ('staged','approved','rejected','published','superseded')),
   species_id     TEXT NOT NULL REFERENCES species(id),
+  sub_species    TEXT,               -- a sub-season inside a species season, e.g. 'scaup' within 'duck' (shown as an informational badge when closed)
   tag_type_id    TEXT NOT NULL REFERENCES tag_types(id),
   zone           TEXT,               -- elk zone for A/B seasons
   hunt_number    TEXT,               -- controlled hunts ('1001'); unique per (license_year, document) — numbers are REUSED across years
@@ -368,7 +379,7 @@ CREATE TABLE profile (               -- single row, id = 1. Residents only (D1):
 );
 
 CREATE TABLE my_permits (
-  license_year INTEGER NOT NULL, permit TEXT NOT NULL CHECK (permit IN ('archery','muzzleloader','hunting_license','wmb','falconry')),
+  license_year INTEGER NOT NULL, permit TEXT NOT NULL CHECK (permit IN ('archery','muzzleloader','hunting_license','wmb','falconry','hip','federal_duck_stamp')),
   PRIMARY KEY (license_year, permit)
 );
 
@@ -416,6 +427,14 @@ Page numbers are **printed** brochure pages from each table of contents. Physica
 | Badger, bobcat, red fox (hunting) (`badger`/`bobcat`/`red_fox`) | Upland · 31–33 ("\* Indicates species can also be hunted") | **IDFG regions** → region overlay (GIS `WC_Regions`) | `hunting_license` (bobcat: also harvest report, informational) | T-24 |
 | Predatory & unprotected (coyote, raccoon, jackrabbit, skunk, weasel; marmot, porcupine, opossum, some ground squirrels…) (`predatory_unprotected`) | Upland · 35–37, 42, 45 (rules prose, not tables) | Statewide, year-round (Jul 1–Jun 30), with ground-squirrel exceptions from p. 42 | `hunting_license` | T-24 |
 | Falconry seasons (`weapon='falconry'` on existing species) | Upland · 30 | As printed | `hunting_license` + falconry permit (new permit code) | T-24 |
+| Moose, antlered + antlerless (`moose`) | MSG 2025 & 2026 · 6–16 (tables pp. 8–13 physical; area descriptions 17–18) | Controlled hunt areas → GIS MapServer/4 `Moose` polygons (ids include `*`) | `controlled` | T-25 |
+| Rocky Mountain bighorn (`bighorn_rocky`), California bighorn (`bighorn_california`) | MSG · 17–22 (tables pp. 19–20 physical; descriptions p. 24) | GIS `Rocky Mtn Sheep` / `California Sheep` | `controlled` (plus lottery/auction tags, entered as a controlled hunt with a note) | T-25 |
+| Mountain goat (`mountain_goat`) | MSG · 24–27 (table p. 26 physical, 4× fake-bold) | GIS `Goat` | `controlled` | T-25 |
+| Ducks incl. mergansers (`duck`, scaup as `sub_species`), Wilson's snipe (`snipe`), American coot (`coot`) | Migratory 2026–27 · 8 | Areas 1–3 by county lists / "portion of" prose / "remainder" → county overlay | `hunting_license` + `hip` + `federal_duck_stamp` (ducks/geese/coot only, per the requirements list) | T-26 |
+| Canada (`goose_canada`), white-fronted (`goose_whitefronted`), light geese (`goose_light`) | Migratory · 9–11 | Areas 1–4 by counties | `hunting_license` + `hip` + `federal_duck_stamp` | T-26 |
+| Swan, tundra (`swan`) | Migratory · 12 | Controlled hunt areas (Notes column lists counties) | `controlled` | T-26 |
+| Mourning & white-winged dove (`dove`), American crow (`crow`) | Migratory · 13 | Statewide; extended falconry season | `hunting_license` + `hip` (dove) | T-26 |
+| Sandhill crane (`sandhill_crane`) | Migratory · 14 | Named crane hunt areas ("1-Bear Lake" … "6-Malad") by county ± exceptions | `sandhill_crane` tag for that area + `hip` | T-26 |
 
 Species with no hunting season are never shown. That includes closed species (e.g. fisher, kit fox, lynx, Northern/Southern Idaho ground squirrels) and trapping-only furbearers.
 
@@ -513,7 +532,9 @@ upload PDF ─► store (sha256) ─► classify(kind, year) ─► extract page
 
 ### 8.2 Extraction rules (`importer/extract.py`)
 - Open with `pdfplumber`. For each page, **crop 40 pt off the left and right** (side tabs), then `extract_tables()` and `extract_text()`.
-- **Font-size aware.** Characters smaller than 7 pt (body text is 10 pt) are superscript footnote markers. Remove them from the page with `page.filter(...)` before table extraction, then read them **separately from each cell's bbox on the unfiltered page** and store them as structured flags (`a` = includes other units, `b` = portion of unit only, plus any section-specific footnotes resolved from the legend at the bottom of the page). pdfplumber crops keep absolute coordinates, so bboxes from the filtered page apply directly to the original.
+- **Font-size aware.** Superscript footnote markers are characters smaller than **75 % of the page's median body font size** (2026 Big Game: 5.8 pt vs 10 pt; MSG: 6.4 pt, with a legitimate 7.0 pt `a` elsewhere on the same page, so a fixed "< 7 pt" cutoff is unsafe). Remove them from the page with `page.filter(...)` before table extraction, then read them **separately from each cell's bbox on the unfiltered page** and store them as structured flags. **Marker meanings come from each page's footnote legend, never a global map**: Big Game `a` = "includes other units", `b` = "only a portion"; MSG `a` = "wilderness hunt area, extreme terrain", and a full-size `*` is part of the area id. pdfplumber crops keep absolute coordinates, so bboxes from the filtered page apply directly to the original.
+- **Always `page.dedupe_chars(tolerance=1)` first.** Fake-bold headings are printed several times on top of each other (MSG goat page: "2222000022225555 MMMMoooouuuu…").
+- **Locate columns from the header row, never by position.** Find every cell starting with `Hunt No.` and read the 4 cells to its right. This handles two-hunts-per-row tables (8 columns) and tables nested inside other tables (Hunt No. in column 1).
 - **Two-column prose pages** (hunt-area descriptions): find the gutter as the widest vertical band with no word boxes in the middle 40 % of the page width, then extract each column separately.
 - **Rotated pages** (elk zone calendars): `extract_text(line_dir_rotated='ltr', char_dir_rotated='btt')` for text, and `extract_words` with the same options for geometry.
 - Detect rotated layouts. If more than 30 % of a page's chars have `upright == False`, set `page.rotated = True` and route the page to the rotated-layout handler (T-12).
@@ -558,12 +579,13 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | Check | Rule | 2026 spike result |
 |---|---|---|
 | `two_path_agreement` | Table path == text path for every row's key fields. | Controlled: 0 disagreements / 469 |
-| `tag_checksum` | Σ Tags column == the "(N Tags Plus Unlimited Tags)" total in each section header. | Deer 13,226 ✓ · Elk 18,670 ✓ · Pronghorn 2,040 ✓ |
-| `hunt_number_completeness` | The set of 4-digit hunt numbers that start a line in the page text == the set parsed. (Gaps in numbering are legitimate.) | 468 in text, 469 parsed; the extra (2111) was confirmed as a merged text line, ✓ |
+| `tag_checksum` | Σ Tags column == every total printed in section headers and sub-headers ("(N Tags Plus Unlimited Tags)", "- 510 Tags", "16 Tags"). Totals that include tags with no table row (MSG "Including Special Lottery and Auction Tag") must name the extra tags explicitly in the check detail. | Deer 13,226 ✓ · Elk 18,670 ✓ · Pronghorn 2,040 ✓ · Moose 513 ✓ · Goat 40 ✓ · RM late rams 16 ✓ |
+| `hunt_number_completeness` | The set of 4-digit hunt numbers that start a line in the text of **hunt-table pages** (pages with a `Hunt No.` header) == the set parsed. Gaps in numbering are legitimate. Scanning all pages produces false positives (addresses, phone numbers). | Big Game: 468 in text, 469 parsed (the extra, 2111, is a merged text line) ✓ · MSG: 0 missing, after the nested-table fix |
+| `corrections_applied` | Every item on the brochure's "Corrections" page is matched to the affected rows, and the table agrees with the correction. A correction that can't be matched = fail. Checksum gaps are allowed only when a correction explains them. | MSG: 7001/7002 zeroed, explaining California 5 vs. header 7 |
 | `no_duplicate_keys` | Hunt numbers unique per year. General seasons unique per (tag, weapon, sex, unit, dates). | 0 duplicates |
 | `date_token_accounting` | Every date-range token (`Mon D - Mon D`) inside a season table on the page is consumed by **exactly one** parsed season. Leftover tokens = fail, listed with page and text. | Controlled: 0 unparsed date cells |
 | `unit_tokens_valid` | Every unit token is a real GMU from `units`. Every hunt area resolves to ≥ 1 unit. | — |
-| `gis_area_match` | Every controlled hunt area exists in the GIS Controlled Hunts layer for `license_year` (fall back to the latest year with a warning). | 469/469 against 2025 GIS |
+| `gis_area_match` | Every controlled hunt area exists in the GIS Controlled Hunts layer for `license_year` (fall back to the latest year with a warning). Match **exactly**, including a full-size `*`. | Big Game 469/469 · MSG 145/145 (2025 GIS) |
 | `general_coverage` | Every GMU (except `YNP`) has ≥ 1 general Regular deer season **or** appears in a controlled-only list that is confirmed in the page text. | 5 controlled-only: 44, 45, 52, 54, 68A |
 | `golden_match` | For every section with a committed `tests/golden/<year>/<section>.json`, the import matches it **exactly**. | Golden files are built in T-22 |
 | `yoy_diff` (warn) | Changes vs. last year's published data are listed for review. More than 25 % of rows changed in a section → warn. | — |
@@ -599,9 +621,10 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **2 – Elk A/B & other general big game** | Elk A/B zones, pronghorn, bear, lion, wolf, supplements | T-12, T-13, T-18 |
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
-| **5 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings | T-19, T-20, T-21 |
+| **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings | T-19, T-20, T-21 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24} ; T-17b → T-23 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-19 spans all`.
 
 ---
 
@@ -791,13 +814,14 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 **Depends on:** T-10 · **Size:** L
 **Description:** `importer/controlled.py`, productionized from `docs/spike_controlled_parser.py` (read it first; it runs on the real PDF and prints every invariant). Scope: every controlled-hunt table in the Big Game PDF: deer, elk, pronghorn, bear (2026: pp. 22–31, 51–59, 64–67, 73). **Locate pages by content** (`"Hunt No."` in page text), never by hard-coded page numbers.
 - Columns: `Hunt No. | Controlled Hunt Areas | Tags | Season Dates | Notes`.
-- **Superscripts:** filter chars < 7 pt before `find_tables()`, then read `a`/`b` markers from each area cell's bbox on the unfiltered page (§8.2). Resolve marker meanings from the footnote legend at the bottom of the page, not a hard-coded map. Fail the row if a marker has no legend entry. 2026 legend: `a` = "This hunt includes other units or parts of other units", `b` = "This hunt includes only a portion of this unit".
+- **Superscripts:** filter chars below 75 % of the page's median font size before `find_tables()` (§8.2; the spike uses a fixed 7 pt, which is only safe for this brochure), then read markers from each area cell's bbox on the unfiltered page. Resolve marker meanings from the footnote legend at the bottom of the page, not a hard-coded map. Fail the row if a marker has no legend entry. 2026 legend: `a` = "This hunt includes other units or parts of other units", `b` = "This hunt includes only a portion of this unit".
 - `(See pg N)` → `hunt_areas.description_page`. **N is the brochure's printed page number, which is PDF page index − 1 in 2026** ("See pg 31" → PDF page 32). Build a printed→physical map from each page's footer ("…idfg.idaho.gov 21" on PDF p. 22) and store **physical** pages everywhere (`source_page`, `description_page`), keeping the printed number only for display. Add check `page_ref_resolves`: every "See pg N" must map to a page containing the referenced hunt area's `Hunt Area <id> —` entry.
 - **Title carry-forward:** a table that starts with the `Hunt No.` header inherits the previous title. Map titles → (`species_id`, `hunt_class`, `weapon`, `sex`, restrictions): "Antlered" → antlered; "Antlerless" / "Extra Antlerless" → antlerless (+`hunt_class='extra'`); "Either Sex" → either; "Doe or Fawn Pronghorn" → antlerless; "Archery Only … Archery Permit Required" → archery; "Muzzleloader Only" → muzzleloader; "Short Range Weapon" → short_range; "Youth Only" → +`youth_only`; "Outfitter Allocation" → `hunt_class='outfitter'` +`outfitter_only`. **An unrecognized title is a `fail`, not a default.**
 - **Year resolution:** the year printed in the title wins ("**2027** Controlled Hunts — Extra Antlerless Elk" → 2027 dates). Spring bear tables (application period "January 15 – February 15, 2027") → 2027 dates. If the end is before the start, the end rolls into the next year. `license_year` = the calendar year of the start date. Every row whose year differs from the document year gets a `yoy`-style review flag.
 - Tags column → `tag_quota` (`Unlimited` → NULL). Notes column → restriction codes + `notes`. "See Note N, Page P" is stored verbatim and the referenced note text is attached.
 - Writes `seasons` (`tag_type_id='controlled'`, `hunt_number`, `hunt_area`) and `hunt_areas` rows. Units come from T-17b. Until T-17b runs, the area's base unit (the leading `\d+[A-C]?` of the area id) is staged as `partial`.
-- Implements checks for each section `controlled_<species>`: `two_path_agreement` (text-layer regex twin, as in the spike), `tag_checksum`, `hunt_number_completeness`, `no_duplicate_keys`, `date_token_accounting`.
+- Implements checks for each section `controlled_<species>`: `two_path_agreement` (text-layer regex twin, as in the spike), `tag_checksum`, `hunt_number_completeness`, `no_duplicate_keys`, `date_token_accounting`, `corrections_applied`.
+- **Write it as a shared, brochure-agnostic module.** T-23 (turkey), T-25 (moose/sheep/goat) and T-26 (swans) reuse it, so column positions, footnote legends, checksum header patterns and species prefixes must all be data-driven per brochure, not hard-coded for Big Game.
 **Acceptance criteria (2026 Big Game PDF):**
 - Exactly **469** controlled hunts: deer **188** (1001–1188, no gaps), elk **221**, pronghorn **54** (4001–4054), bear **6**. 0 duplicates, 0 unparsed date cells.
 - `tag_checksum` passes: deer **13,226**, elk **18,670**, pronghorn **2,040**.
@@ -870,6 +894,34 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ---
 
+### T-25 · Moose, bighorn sheep & mountain goat brochure
+**Depends on:** T-17a, T-17b, T-22 · **Size:** M
+**Description:** Classify `kind='moose_sheep_goat'` (title "Idaho Moose, Bighorn Sheep & Mountain Goat YYYY & YYYY Seasons & Rules", so `license_year` = first year and `year_end` = second; seasons are created for **both** years with the printed dates). All hunts are controlled, so drive the shared T-17a parser with an MSG profile, reproducing `docs/spike_msg_parser.py` (read it and run it first):
+- `dedupe_chars(tolerance=1)` on every page (the goat page is printed 4× fake-bold).
+- Header-located columns: every `Hunt No.` cell starts a 4-column hunt record (two per row for sheep/goat; column 1 for the nested California table).
+- Species by hunt-number prefix **and** section title: 3xxx moose (antlered / antlerless from the title), 5xxx Rocky Mountain bighorn, 7xxx California bighorn, 6xxx goat. If the prefix and the title disagree → fail.
+- The full-size `*` stays part of `hunt_area` (it matches GIS). Superscript markers (relative threshold) are resolved from each page's legend (2026: `a` = wilderness/extreme terrain → informational restriction `wilderness_terrain`). Area suffix `L` (late) is part of the id.
+- Hunt-area descriptions: moose physical pp. 17–18, sheep p. 24 (locate by heading "HUNT AREA DESCRIPTIONS"), using T-17b coverage with GIS BigGame `Moose` / `Rocky Mtn Sheep` / `California Sheep` / `Goat`.
+- Corrections pages (pp. 2–3): parse each item ("<SPECIES> – HUNT NO. NNNN (AREA X)" + text) → `corrections_applied`. Hunts with 0 tags → status `closed`, kept for history, never shown as open.
+- Lottery/auction tags: no table row; the `tag_checksum` detail must name them (2025 & 2026: sheep header 100 = 98 in tables + lottery + auction).
+**Acceptance criteria (2025 & 2026 MSG PDF):** exactly **145** hunts (moose **94**, Rocky Mtn bighorn **28**, California bighorn **4**, goat **19**); 0 duplicates; 0 unparsed dates; `hunt_number_completeness` clean (hunt-table pages only); checksums moose **513** (510 + 3), goat **40**, Rocky Mountain late rams **16**, California **5** with the 7 → 5 gap explained by corrections 7001/7002; **145/145** exact GIS matches; spot checks **3001** moose `1-1*`, 10 tags, Sep 15 – Dec 1; **6004** goat area `22`, 3 tags, Aug 30 – Nov 12; **7001** California area `40`, 0 tags → `closed`; **5005** area `20A*` (superscript `a` captured as a flag, not glued onto the id); golden files for every section.
+
+---
+
+### T-26 · Migratory game birds brochure
+**Depends on:** T-14 (county overlay), T-17a/b (swan controlled hunts), T-22 · **Size:** L
+**Description:** Classify `kind='migratory'` ("Idaho Migratory Game Bird YYYY-YYYY Seasons & Rules"). One season spans two calendar years, so dates carry explicit years. `license_year` per season = the calendar year of each day (§7.4 crossover applies: a Jan 2027 duck day needs 2027 license/permits).
+1. **Ducks/snipe/coot (physical p. 8), Canada geese (p. 9), white-fronted (p. 10), light geese (p. 11):** pages are multi-column with sidebars, so crop to the main column (detect the sidebar box via `page.rects` and exclude it; the "Areas Closed to Hunting… see pages 27–28" sidebar must not leak into area text). Parse `AREA n` blocks: bullet date lines ("• October 19, 2026 – January 31, 2027"; "• September 1 – 15, 2026"), sub-seasons ("• Scaup Season: November 7, 2026 – January 31, 2027" → a `duck` season with `sub_species='scaup'`), and the definition ("includes the following counties: …", "that portion of X County …" → `partial` with verbatim note, "all parts of the state NOT included in areas 2 and 3" → remainder per §5.2). Bag/possession limits → `bag_limit`. Youth/veteran days, if printed, → `youth_only` / `veteran_only` (new narrowing code).
+2. **Swans (p. 12):** controlled table, header `Hunt No. | Controlled Hunt Area | Tags | Season Dates | Notes`, dates like "Oct. 10 –⏎Dec. 1". The Notes column holds the area's county list, which resolves through the county overlay (there's no GIS polygon for swans; verify and say so in the PR). Hunt numbers 93xx.
+3. **Dove & crow (p. 13):** statewide seasons, plus the extended falconry season (`weapon='falconry'`). Eurasian-collared dove is unprotected year-round → note on `dove`.
+4. **Sandhill crane (p. 14):** table `Hunt Area | Season | Tags` with hunt-area carry-forward ("1-Bear Lake" → September 1–30 (300), October 1–30 (150)); 6 areas in 2026. Area definitions are bullet prose ("Includes all of Bear Lake County and all of Caribou County, except that portion lying within …") → county overlay + `partial`. Tag type `sandhill_crane` with `zone` = crane area.
+5. **Requirements** lists per species ("Migratory Bird (HIP) Permit—REQUIRED", "Federal Migratory Bird (Duck) Stamp—NOT REQUIRED", "Nontoxic Shot—NOT REQUIRED") → required permits per species (`hip`, `federal_duck_stamp`) used by the engine like the archery permit. "Nontoxic shot required" → informational restriction.
+6. Shooting-hour tables (pp. 16–17) are **not** imported; the Unit Brief links to the page.
+7. New `common.parse_dates` formats with tests: "Oct. 10 – Dec. 1", "September 1–30", "September 1 – 15, 2026", "October 19, 2026 – January 31, 2027".
+**Acceptance criteria (2026–27 PDF):** duck Area 1 = Oct 19 2026 – Jan 31 2027, Area 2 = Oct 3 2026 – Jan 15 2027, Area 3 = Oct 10 2026 – Jan 22 2027, with scaup sub-seasons Nov 7 – Jan 31 / Oct 3 – Dec 27 / Oct 29 – Jan 22; Area 3 = Benewah, Bonner, Boundary, Kootenai, Shoshone counties' units; Canada goose Area 4 has two seasons (Sep 1–15 and Oct 3 – Dec 31, 2026); swan #9301 Area 1, 50 tags, Oct 10 – Dec 1; crane has 6 areas with season/tag counts exactly as printed (e.g. 1-Bear Lake 300 + 150); dove Sep 1 – Oct 30, 2026; with ducks selected on 2026-10-17 and HIP + duck stamp held, Area 2 and Area 3 units are open, Area 1 is closed, and Area 3 shows the informational "scaup closed" badge; no sidebar text appears in any area definition; all §8.7 checks pass; golden files for every section.
+
+---
+
 ### T-18 · Supplemental proclamations
 **Depends on:** T-10, T-15 · **Size:** S
 **Description:** `importer/supplemental.py`: classify `kind='supplemental'`, `priority = 10 + n`. Parse whatever tables or "change" statements it contains, using the T-11/T-13 parsers on matching tables plus a generic "Unit X … season … dates" text pattern. Everything stages at confidence ≤ 0.8 so it is always reviewed. Publishing applies §8.5.
@@ -901,6 +953,16 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 ## 13. Annual workflow (what using it looks like)
 
 1. **Spring (Big Game regs drop):** open the app → 📥 Regulations → drop `seasons-rules-big-game-2027.pdf` → fix anything the Accuracy panel flags, review changed rows using the side-by-side PDF and the "changed since 2026" diff → **Publish**. (The Upland brochure covers two years, so it's uploaded every other year: 2026, 2028, ….)
+
+   **Upload cadence** (each brochure is just another upload; the app detects which kind it is):
+
+   | Brochure | Covers | Current | Next expected |
+   |---|---|---|---|
+   | Big Game Seasons & Rules | 1 year | 2026 | 2027 (spring) |
+   | Upland Game, Turkey & Furbearer | 2 years | 2026 & 2027 | 2028 |
+   | Moose, Bighorn Sheep & Mountain Goat | 2 years | 2025 & 2026 | 2027 |
+   | Migratory Game Bird | 1 season (Sep–Mar) | 2026–2027 | 2027–2028 (late summer) |
+   | Supplements / corrections | — | as published | — |
 2. **Summer:** 🎟️ My Tags → "Copy from 2026" → adjust (bought an elk B tag in the Sawtooth zone, archery permit ✓, drew controlled hunt #1002).
 3. **Any Thursday in October:** open the app. It's already on Fri–Sun of this weekend. Pick 🦌 Deer and the map shows where to go. Click a unit for the brief and the source page.
 4. **Mid-season supplement published:** upload it, review the few changes, publish. Superseded seasons drop off the map automatically.
@@ -911,7 +973,7 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 **Use one fresh agent session per ticket.** Don't run the build in the long design session. Each turn of a session re-sends the whole conversation, so a session that already holds the design research costs several times more per turn than a fresh one. Tickets are written to be self-contained, so a new agent only needs this document plus the repo.
 
-- **Group** tightly coupled tickets into one session when the second needs the first's fresh context: T-01+T-04+T-05, T-17a+T-17b, T-07+T-08. Keep the parser tickets (T-11, T-17a, T-12, T-14, T-23, T-24) separate. They are the hardest and need the most room in the context.
+- **Group** tightly coupled tickets into one session when the second needs the first's fresh context: T-01+T-04+T-05, T-17a+T-17b, T-07+T-08. Keep the parser tickets (T-11, T-17a, T-12, T-14, T-23, T-24, T-25, T-26) separate. They are the hardest and need the most room in the context.
 - **Order:** T-01/04/05 → T-02, T-03, T-10 (in parallel) → **T-22** → T-11 and T-17a (in parallel) → T-17b → T-06 → T-09, T-15 → T-07/08 → T-17c → T-16 → Phase 2+.
 - **Hand-off lives in the repo, not in chat:** each ticket ends with a PR whose description lists what was built, check results, and any deviation from this doc. If the design changes, update `DESIGN.md` in the same PR.
 - **Golden-data verification (T-22) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
