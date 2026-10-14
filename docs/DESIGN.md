@@ -656,7 +656,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ### T-01 · Repository scaffold & dev environment
 **Depends on:** none · **Size:** S
-**Description:** Create the layout in §3.3 with empty or minimal modules. Add `requirements.txt` (`flask>=3`, `pdfplumber>=0.11`), `requirements-dev.txt` (`pytest`, `ruff`, `shapely>=2`, `pyproj`, `requests`), and a `.gitignore` covering `data/`, `.venv/`, `__pycache__/`, `*.db`. Make `planner/__main__.py` start Flask on `127.0.0.1:5050` (port overridable via `PLANNER_PORT`), create `data/` if missing, and open the default browser unless `--no-browser` is passed. `app.py` exposes `create_app(db_path=None)` and serves `static/index.html` at `/`. Add `GET /api/health` → `{"ok":true,"version":…}`. README covers setup (`python -m venv .venv`, install, run) and the disclaimer. Add a GitHub Actions workflow running `ruff check` and `pytest` on 3.11 and 3.12.
+**Description:** Create the layout in §3.3 with empty or minimal modules. Add `requirements.txt` (`flask>=3`, `pdfplumber>=0.11`), `requirements-dev.txt` (`pytest`, `ruff`, `shapely>=2`, `pyproj`, `requests`), and a `.gitignore` covering `/data/` (anchored to the repo root so `static/data/` stays committed), `.venv/`, `__pycache__/`, `*.db`. Make `planner/__main__.py` start Flask on `127.0.0.1:5050` (port overridable via `PLANNER_PORT`), create `data/` if missing, and open the default browser unless `--no-browser` is passed. `app.py` exposes `create_app(db_path=None)` and serves `static/index.html` at `/`. Add `GET /api/health` → `{"ok":true,"version":…}`. README covers setup (`python -m venv .venv`, install, run) and the disclaimer. Add a GitHub Actions workflow running `ruff check` and `pytest` on 3.11 and 3.12.
 **Acceptance criteria:**
 - `python -m planner --no-browser` serves `/` (placeholder page) and `/api/health`.
 - `pytest` passes with at least one smoke test using Flask's test client.
@@ -973,8 +973,9 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 **Use one fresh agent session per ticket.** Don't run the build in the long design session. Each turn of a session re-sends the whole conversation, so a session that already holds the design research costs several times more per turn than a fresh one. Tickets are written to be self-contained. A new agent reads `docs/AGENT_CONTEXT.md` (shared context, constraints, commands), then the ticket, then only the sections of this document the ticket cites. In Hermes, `/ihp <ticket>` does this.
 
-- **Group** tightly coupled tickets into one session when the second needs the first's fresh context: T-01+T-04+T-05, T-17a+T-17b, T-07+T-08. Keep the parser tickets (T-11, T-17a, T-12, T-14, T-23, T-24, T-25, T-26) separate. They are the hardest and need the most room in the context.
-- **Order:** T-01/04/05 → T-02, T-03, T-10 (in parallel) → **T-22** → T-11 and T-17a (in parallel) → T-17b → T-06 → T-09, T-15 → T-07/08 → T-17c → T-16 → Phase 2+.
+- **No grouping.** Every ticket gets its own session and its own PR, including small, closely related ones (e.g. T-01/T-04/T-05, T-07/T-08). Context is handed off through the repo: merged code, the PR description, and `AGENT_CONTEXT.md`. This matters most for the parser tickets (T-11, T-17a, T-17b, T-12, T-14, T-23, T-24, T-25, T-26), which are the hardest and need the most room in the context.
+- **Merge before you build on it.** Start a ticket only after its dependencies' PRs are merged into `main`.
+- **Order** (every step's dependencies are in earlier steps): T-01 → T-02, T-03, T-05 (in parallel) → T-04 → T-10 → **T-22** → T-11 and T-17a (in parallel) → T-17b → T-06 → T-09, T-15 (in parallel) → T-07 → T-08 → T-17c → T-16 → Phase 2+.
 - **Hand-off lives in the repo, not in chat:** each ticket ends with a PR whose description lists what was built, check results, and any deviation from this doc. If the design changes, update `DESIGN.md` in the same PR.
 - **Golden-data verification (T-22) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
 
