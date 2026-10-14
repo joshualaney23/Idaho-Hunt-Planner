@@ -1,8 +1,17 @@
 # Idaho Hunt Planner — Design Document
 
-**Status:** Draft v1 · **Author:** Find A Hunt Planner (Hermes) · **Date:** 2026-10-14
+**Status:** Draft v2 · **Author:** Find A Hunt Planner (Hermes) · **Date:** 2026-10-14
 **Repo:** https://github.com/joshualaney23/Idaho-Hunt-Planner
-**Companion files:** `docs/mockup.html` (working UI mockup with real 2026 deer data), `docs/spike_deer_parser.py` (parser proof of concept)
+**Companion files:** `docs/mockup.html` (working UI mockup with real 2026 deer data), `docs/spike_deer_parser.py` (general-season parser proof of concept), `docs/spike_controlled_parser.py` (controlled-hunt parser plus accuracy invariants)
+
+### 0. Decisions (from Josh)
+
+| # | Decision | Effect on the design |
+|---|---|---|
+| D1 | **Residents only** for now. | No nonresident quotas, fees, or rules anywhere: no resident/nonresident setting, and nonresident-only text isn't parsed into restrictions. The Tags (quota) column is stored for checksums only and isn't shown in the UI. |
+| D2 | **Controlled hunts are in core scope (MVP)**, not a later phase. Josh may hold a controlled tag. | The controlled-hunt parser, hunt-area descriptions, unit coverage, and the "add controlled tag by hunt number" flow are all Phase 1 (§10, T-17a/b/c). |
+| D3 | **PDF parsing accuracy is the top priority.** Everything else depends on it. | New §8.7 accuracy strategy and ticket T-22: two independent extraction paths must agree, checksums and completeness checks run on every import, every section is checked against hand-verified golden data, and publishing is **blocked** while any check fails. No LLM-extracted data is ever published. |
+| D4 | Other answers from the original Q&A (turkey/moose/sheep/goat, Friday in the default weekend, land-ownership overlays) **were lost and need re-confirming**. | Until then: Sat–Sun default with a Fri–Sun setting; turkey, moose, sheep, goat and land overlays stay out of v1 (§11). |
 
 ---
 
@@ -30,6 +39,7 @@ The look and feel follows Treeline Hunt Research IQ's **State Heat Map**: dark f
 - Land ownership / access layers (maybe later, see §11).
 - Mobile-first layout (it should work on a phone, but it's designed for desktop).
 - Multi-user / hosted deployment.
+- Nonresident hunters (D1).
 - Legal advice. The app is a planning aid and always shows a "verify with official regs" disclaimer.
 
 ---
@@ -46,11 +56,20 @@ I tested real sources before writing this. Summary:
 | Gotcha 1: a **vertical side tab** ("DEER / REGULAR") on each page breaks table detection on some pages. | Pages 13–14 returned zero tables until the page was **cropped 40 pt off each side**. | The extraction layer always crops page margins before finding tables. |
 | Gotcha 2: **one unit row spans several sub-rows**. The unit cell is `None` on the continuation rows. | e.g. `1, 2, 3, 4A, 5, 6` has 3 antlered date ranges. | Carry the unit list forward while unit cell is empty. |
 | Gotcha 3: dates carry **qualifiers in the same cell**: `(White-tailed deer only)`, `(Youth hunt only)`, `(2-point deer only)`, `(Private land only)`, `None`. | Seen throughout pp. 12–21. | Qualifiers become structured restriction flags, not free text. |
-| Gotcha 4: **Elk zone season pages are graphical calendars rotated 90°**. `extract_tables()` returns reversed text. | p. 38: `'rebmetpeS'`, `'gaT\nA'`. | Elk needs a separate parser (de-rotate the page, or fall back to text+layout parsing), with a spike ticket first. Manual entry/CSV is the fallback. |
+| Gotcha 4: **Elk zone season pages are graphical calendars rotated 90°**. `extract_tables()` returns reversed text. | p. 38: `'rebmetpeS'`, `'gaT\nA'`. | Elk needs a dedicated rotated-page parser. Text **is** recoverable (see the rotated-calendar row below). Manual entry/CSV is the fallback. |
 | The **Upland brochure** is **2 years long** (2026–2027) and defines areas by **county lists with GMU exceptions**: e.g. Forest Grouse Area 1 = "Benewah, Bonner, … counties, and Adams and Idaho counties, **except** units 19A, 20A, 22, 23 and 26"; Area 2 = "Remainder of the state." | Upland PDF p. 7. | Area definitions need a **county ↔ GMU overlay** and a **partial-coverage** status (a unit can be partly in an area). |
 | **Supplemental proclamations** are published mid-year (`…supplemental-proclamation-2026-2.pdf`). | IDFG big-game page. | A license year can have multiple source documents; later ones override earlier ones. |
-| IDFG's online Hunt Planner (`fishandgame.idaho.gov/ifwis/huntplanner/hunt/<id>`) shows structured per-unit, per-season dates. | e.g. Unit 75 archery deer 8/30–9/30/2025. | Optional **cross-check** source to catch parser mistakes (Phase 3). |
+| IDFG's online Hunt Planner (`fishandgame.idaho.gov/ifwis/huntplanner/hunt/<id>`) shows structured per-unit, per-season dates. | e.g. Unit 75 archery deer 8/30–9/30/2025. | Optional, manual-run **spot-check** only. See the internal-ID caveat below. |
 | Idaho requires an **Archery Permit** for archery-only seasons and a **Muzzleloader Permit** for muzzleloader-only seasons. Elk **A/B zone tags** are valid only in their zone and only in that tag's seasons. Regular and White-tailed deer tags are separate. | Table titles: "General Archery Only Seasons – Archery Permit Required". | Tags and permits are both modeled. Eligibility = tag type + zone + permits + weapon. |
+| **Controlled-hunt tables parse cleanly.** Header `Hunt No. \| Controlled Hunt Areas \| Tags \| Season Dates \| Notes`. 2026 sections: deer pp. 22–31, elk pp. 51–59, pronghorn pp. 64–67, bear p. 73. Titles give class/weapon ("Antlered", "Antlerless", "Either Sex", "Archery Only", "Muzzleloader Only", "Youth Only", "Extra Antlerless", "Outfitter Allocation"). | `docs/spike_controlled_parser.py`: **469 hunts** (deer 188, elk 221, pronghorn 54, bear 6), 0 unparsed date cells, 0 duplicate hunt numbers. | Deterministic table parser (T-17a). |
+| **Superscript footnote markers are glued onto the hunt-area name** by naive extraction: `1-1a` is really Hunt Area `1-1` plus footnote **a** ("includes other units or parts of other units"), and `b` = "includes only a portion of this unit". Markers are 5.8 pt; body text is 10 pt. | `extract_words(extra_attrs=['size'])` on p. 22. The first footnote detector missed **92** markers; reading chars inside each cell's exact bbox fixed it (131 a / 77 b). It was caught **only because** the table path was compared with the raw-text path. | Extraction is **font-size aware** (§8.2). Footnotes become structured flags. Two-path agreement is mandatory (§8.7). |
+| **Header tag totals are a free checksum.** "2026 Controlled Deer Hunts (13,226 Tags Plus Unlimited Tags)". | Parsed Tags column sums: deer **13,226**, elk **18,670**, pronghorn **2,040**. All exact. | Checksum invariant on every import. A mismatch blocks publishing (§8.7). |
+| **Hunt numbers have real gaps** (elk 2214–2279, bear 8003–8500). These are numbering blocks, not missed rows. | None of the gap numbers appear anywhere in the PDF text. | The completeness check is "every hunt number printed on the page was parsed", **not** "no gaps". |
+| IDFG GIS **Controlled Hunts layer** (MapServer/4, 2,162 features: `BigGame`, `HuntArea`, `Year`) has a polygon per hunt area. **Big game is published through 2025 only** (2026 has turkey only). | **469/469** 2026 hunt areas match a 2025 GIS `HuntArea` once superscripts are stripped. | Unit coverage for controlled hunts comes from **polygon × GMU overlay**, not prose parsing (T-17b). If the current year's polygons aren't published yet, use the latest year and flag `geometry_year < license_year` for review. |
+| **Hunt-area description pages are two-column prose** (deer pp. 32–34, elk 60–62, pronghorn 68). Full-page `extract_text()` interleaves the columns. | p. 32 output mixed "Hunt Area 1-1" with text from the right column. | Detect the column gutter from word x-positions and extract each column separately. Descriptions are stored verbatim for display and to cross-check unit lists against the GIS overlay. |
+| **Rotated elk zone calendars are readable.** pdfplumber `extract_text(line_dir_rotated='ltr', char_dir_rotated='btt')` returns proper text ("Panhandle Zone (Units 1, 2, 3, 4, 4A, 5, 6, 7, 9)", "Aug 30 - Sep 30 Archery only — any elk", "A Tag"). | p. 38 test. | Elk A/B parsing is automatable. Assigning each label to its zone and its A/B row needs geometry clustering (T-12). Manual entry stays as the fallback only. |
+| **Printed page numbers ≠ PDF page indexes.** In-text references like "(See pg 31)" use the brochure's printed numbers, which are one less than the PDF page index in 2026. | p. 22 footer reads "idfg.idaho.gov 21"; the deer area descriptions referenced as "pg 31" are on PDF p. 32. | Store physical pages, map printed → physical from footers, and verify every reference resolves (`page_ref_resolves`). Page numbers elsewhere in this doc are **PDF page indexes**. |
+| IDFG Hunt Planner pages use **internal IDs, not hunt numbers** (`/hunt/1002` is a 2003 bear season), and much of the data is old. | Fetched p. 1002. | Not a dependable cross-check source. Optional only (T-20). |
 
 The spike output drives `docs/mockup.html`. For **Oct 17–18, 2026** with a Regular Deer tag and an archery permit, it shows **68 units open and 13 restricted**. This is spike output and hasn't been checked against the regs.
 
@@ -121,11 +140,17 @@ Idaho-Hunt-Planner/
 │       ├── pronghorn.py
 │       ├── bear_lion_wolf.py
 │       ├── upland.py           # forest grouse, pheasant, quail, partridge, etc.
-│       ├── controlled.py       # Phase 2
-│       └── supplemental.py     # Phase 2
+│       ├── controlled.py       # controlled-hunt tables (deer, elk, pronghorn, bear) — MVP
+│       ├── hunt_areas.py       # 2-column hunt-area descriptions + GIS polygon coverage — MVP
+│       ├── supplemental.py     # Phase 2
+│       └── checks/             # accuracy invariants (§8.7): two-path agreement, checksums,
+│           ├── __init__.py     #   completeness, token accounting, golden comparison
+│           └── *.py
 ├── scripts/
 │   ├── build_gmu_geometry.py   # IDFG GIS → static/data/gmu.json
-│   └── build_county_overlay.py # TIGER counties × GMUs → static/data/county_units.json
+│   ├── build_hunt_area_coverage.py # GIS MapServer/4 polygons × GMUs → data/hunt_area_coverage/<year>.json
+│   ├── build_county_overlay.py # TIGER counties × GMUs → static/data/county_units.json
+│   └── verify_golden.py        # compare an import against tests/golden/<year>/*.json
 ├── static/
 │   ├── index.html
 │   ├── css/theme.css           # tokens (§4)
@@ -135,11 +160,14 @@ Idaho-Hunt-Planner/
 ├── data/                       # git-ignored: planner.db, regs/
 ├── tests/
 │   ├── fixtures/               # small single-page PDFs cut from real brochures + expected JSON
-│   ├── test_dates.py  test_engine.py  test_common.py
-│   ├── test_deer_parser.py  test_elk_parser.py  test_upland_parser.py
+│   ├── golden/2026/            # hand-verified full-section truth data (§8.7): deer_general.json,
+│   │                           #   controlled_deer.json, controlled_elk.json, … (committed)
+│   ├── test_dates.py  test_engine.py  test_common.py  test_checks.py
+│   ├── test_deer_parser.py  test_controlled_parser.py  test_hunt_areas.py
+│   ├── test_elk_parser.py  test_upland_parser.py  test_golden.py
 │   └── test_api.py
 └── docs/
-    ├── DESIGN.md  mockup.html  spike_deer_parser.py
+    ├── DESIGN.md  mockup.html  spike_deer_parser.py  spike_controlled_parser.py
 ```
 
 ---
@@ -206,10 +234,10 @@ For each unit, take the set **S** of published seasons that pass the tag, permit
 | **untagged** (dashed gold outline) | S is empty, but seasons would exist if tag ownership were ignored. Only shown when the toggle is on. |
 
 ### 4.5 Other tabs
-- **🎟️ My Tags**: cards per license year. Add a tag by picking a tag type (Regular Deer, White-tailed Deer, Elk A, Elk B, Controlled hunt #, Pronghorn, Black Bear, Lion, Wolf, Upland/Hunting license…), plus zone (elk) or hunt number (controlled). There's a permits panel (Archery, Muzzleloader), Settings for youth/senior/DAV/resident status, and a "Copy last year's tags" button.
+- **🎟️ My Tags**: cards per license year. Add a tag by picking a tag type (Regular Deer, White-tailed Deer, Elk A, Elk B, **Controlled hunt**, Pronghorn, Black Bear, Lion, Wolf, Upland/Hunting license…), plus zone (elk) or hunt number (controlled). **Controlled:** type the 4-digit hunt number. The dialog looks it up in that year's published (or staged) controlled hunts and shows species, hunt area, dates, weapon, sex and the verbatim area description before saving. Unknown numbers are rejected. There's a permits panel (Archery, Muzzleloader), Settings for youth status, and a "Copy last year's tags" button (it **never** copies controlled tags, because hunt numbers are reused for different hunts each year).
 - **📅 Season Table**: a filterable and sortable table of **all** published seasons (species, tag, unit/zone, weapon, sex, dates, restrictions, source page). Clicking a row highlights its units on the map. CSV export.
-- **📥 Regulations**: an upload drop zone, a list of source documents by year (status: `parsing`, `needs review`, `published`, `superseded`), and the **Review screen** (§8.4).
-- **⚙️ Settings**: default species, weekend definition (Sat–Sun or Fri–Sun), resident vs. nonresident, youth/senior flags, DB backup/restore, and "Reset all data".
+- **📥 Regulations**: an upload drop zone, a list of source documents by year (status: `parsing`, `needs review`, `published`, `superseded`), and the **Review screen** (§8.4) with its **Accuracy panel** (§8.7).
+- **⚙️ Settings**: default species, weekend definition (Sat–Sun or Fri–Sun), youth flag, DB backup/restore, and "Reset all data". (No resident/nonresident setting. Residents only, D1.)
 
 ---
 
@@ -270,14 +298,18 @@ CREATE TABLE seasons (             -- staged AND published rows; status column s
   species_id     TEXT NOT NULL REFERENCES species(id),
   tag_type_id    TEXT NOT NULL REFERENCES tag_types(id),
   zone           TEXT,               -- elk zone for A/B seasons
-  hunt_number    TEXT,               -- controlled hunts
-  hunt_class     TEXT NOT NULL CHECK (hunt_class IN ('general','controlled','extra','youth','other')),
+  hunt_number    TEXT,               -- controlled hunts ('1001'); unique per (license_year, document) — numbers are REUSED across years
+  hunt_area      TEXT,               -- controlled hunt area id as printed WITHOUT footnote marker ('1-1', '36A-1X', '11A')
+  hunt_class     TEXT NOT NULL CHECK (hunt_class IN ('general','controlled','extra','youth','outfitter','other')),
   weapon         TEXT NOT NULL CHECK (weapon IN ('any','archery','muzzleloader','short_range','shotgun','falconry')),
   sex            TEXT NOT NULL CHECK (sex IN ('antlered','antlerless','either','any','male','na')),
   start_date     TEXT NOT NULL, end_date TEXT NOT NULL,
   restrictions   TEXT NOT NULL DEFAULT '[]', -- JSON array of codes (§5.1)
   bag_limit      TEXT, notes TEXT,
+  tag_quota      INTEGER,            -- controlled "Tags" column; NULL = unlimited. Used for checksums only, not shown (D1)
   source_page    INTEGER, source_text TEXT,  -- raw row/cell text for review
+  source_bbox    TEXT,               -- JSON [x0,top,x1,bottom] of the table row on source_page (review highlight)
+  extract_agree  INTEGER NOT NULL DEFAULT 0, -- 1 = table path and text path produced identical values (§8.7)
   confidence     REAL NOT NULL DEFAULT 1.0,  -- parser self-score 0..1
   supersedes_id  INTEGER REFERENCES seasons(id),
   reviewed_by_user INTEGER NOT NULL DEFAULT 0,
@@ -290,13 +322,41 @@ CREATE TABLE season_units (        -- where a season applies
   unit_id   TEXT NOT NULL REFERENCES units(id),
   coverage  TEXT NOT NULL DEFAULT 'full' CHECK (coverage IN ('full','partial')),
   coverage_note TEXT,               -- e.g. 'Portion of Unit 1 — see p.13'
+  coverage_frac REAL,               -- controlled hunts: fraction of the GMU's area inside the hunt-area polygon (T-17b)
   PRIMARY KEY (season_id, unit_id)
 );
 
+CREATE TABLE hunt_areas (           -- controlled hunt areas, per year & species (areas differ by species!)
+  license_year     INTEGER NOT NULL,
+  species_id       TEXT NOT NULL REFERENCES species(id),
+  area_id          TEXT NOT NULL,   -- '1-1', '36A-1X', '11A' (no footnote marker)
+  description      TEXT,            -- verbatim from the description pages (NULL for plain "All of Unit X" areas)
+  description_page INTEGER,
+  includes_other_units INTEGER NOT NULL DEFAULT 0,  -- footnote a
+  portion_only     INTEGER NOT NULL DEFAULT 0,      -- footnote b
+  geometry_year    INTEGER,         -- year of the GIS polygon used; < license_year ⇒ review flag
+  document_id      INTEGER NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
+  PRIMARY KEY (license_year, species_id, area_id, document_id)
+);
+
+CREATE TABLE import_checks (        -- results of every accuracy invariant for a document (§8.7)
+  id          INTEGER PRIMARY KEY,
+  document_id INTEGER NOT NULL REFERENCES source_documents(id) ON DELETE CASCADE,
+  section     TEXT NOT NULL,        -- 'deer_general', 'controlled_elk', …
+  check_name  TEXT NOT NULL,        -- 'two_path_agreement','tag_checksum','hunt_number_completeness',
+                                    -- 'date_token_accounting','unit_tokens_valid','golden_match','gis_area_match',
+                                    -- 'unit_coverage','yoy_diff'
+  status      TEXT NOT NULL CHECK (status IN ('pass','fail','warn','skipped')),
+  expected    TEXT, actual TEXT,    -- e.g. '13226' / '13226'
+  detail      TEXT,                 -- JSON list of offending rows/tokens with page numbers
+  waived_by_user INTEGER NOT NULL DEFAULT 0, waive_reason TEXT,
+  run_at      TEXT NOT NULL
+);
+
 -- ───────── user ─────────
-CREATE TABLE profile (               -- single row, id = 1
+CREATE TABLE profile (               -- single row, id = 1. Residents only (D1): no resident flag.
   id INTEGER PRIMARY KEY CHECK (id = 1),
-  resident INTEGER NOT NULL DEFAULT 1, youth INTEGER NOT NULL DEFAULT 0,
+  youth INTEGER NOT NULL DEFAULT 0,
   weekend_def TEXT NOT NULL DEFAULT 'sat_sun', default_species TEXT DEFAULT 'deer'
 );
 
@@ -316,7 +376,7 @@ CREATE TABLE my_tags (
 ```
 
 ### 5.1 Restriction codes (closed vocabulary)
-`whitetail_only`, `mule_deer_only`, `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`, `youth_only`, `private_land_only`, `portion_of_unit`, `cwd_testing`, `motorized_rule`, `second_tag_prohibited`, `see_notes`.
+`whitetail_only`, `mule_deer_only`, `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`, `youth_only`, `private_land_only`, `portion_of_unit`, `outfitter_only`, `cwd_testing`, `motorized_rule`, `second_tag_prohibited`, `see_notes`.
 Each code has a `severity`: **narrowing** codes (`*_only`, `portion_of_unit`, `youth_only` for adults) make a unit *restricted*. **Informational** codes (`cwd_testing`, `motorized_rule`, `second_tag_prohibited`) show as badges but don't change color. The mapping lives in `planner/engine.py::RESTRICTIONS` and is mirrored to the frontend via `/api/meta`.
 
 ### 5.2 Upland areas
@@ -341,8 +401,10 @@ Upland seasons attach to **areas**, which are resolved into `season_units` rows 
 | `POST /api/documents` (multipart `file`, optional `year`, `kind`) | Upload a PDF. Stores it, dedupes by sha256, and runs the import synchronously (it takes about 20 s, and the UI shows a spinner). Returns the document with counts. |
 | `GET /api/documents` · `GET /api/documents/<id>` · `GET /api/documents/<id>/pdf` | List, detail with staged rows, and the raw PDF (served inline so `#page=N` works). |
 | `PUT /api/documents/<id>/seasons/<sid>` | Edit, approve or reject a staged row. |
-| `POST /api/documents/<id>/approve-all?min_confidence=0.9` | Bulk approve. |
-| `POST /api/documents/<id>/publish` | Approved → published. Marks overlapping rows from lower-priority docs as superseded (§8.5). |
+| `POST /api/documents/<id>/approve-all` | Bulk approve **only** rows with `extract_agree = 1` in sections where every check passes. |
+| `GET /api/documents/<id>/checks` · `POST /api/documents/<id>/checks/<cid>/waive` (`{reason}`) | Accuracy results (§8.7) and the explicit waiver. |
+| `GET /api/hunts/<year>/<hunt_number>` | Controlled-hunt lookup for the Add Tag dialog: species, area, description, dates, weapon, sex, units with coverage. |
+| `POST /api/documents/<id>/publish` | Approved → published. Returns 409 if the §8.7 gate isn't satisfied. Marks overlapping rows from lower-priority docs as superseded (§8.5). |
 | `DELETE /api/documents/<id>` | Remove a document and its seasons. |
 | `GET /api/export.csv?year=` · `POST /api/import.csv` | Season CSV round-trip (manual fallback). |
 | `GET /api/backup` · `POST /api/restore` | Download or upload `planner.db`. |
@@ -387,6 +449,14 @@ Errors use `{error: {code, message, detail}}` with HTTP 4xx/5xx. The server bind
 7. days_open = count of days in [start,end] covered by the union of tag_ok seasons (for table sorting)
 ```
 
+**Controlled-hunt specifics (D2):**
+- A controlled tag matches **only** the season(s) with the same `hunt_number` **and** the same `license_year`. Hunt numbers are reused for different hunts in different years, so a 2025 tag `1001` must never match the 2026 hunt `1001`.
+- A controlled tag's species comes from its hunt, so a deer controlled tag shows up under 🦌 Deer.
+- The unit set comes from `season_units`, built by T-17b from the hunt-area polygon. A unit with `coverage_frac` < 0.98 is `partial` and shows as **restricted** with `portion_of_unit`, the verbatim hunt-area description, and its page link. It is never shown as plain green.
+- Weapon and permit rules are the same as general seasons. "Archery Only" controlled hunts still require the Archery Permit.
+- Seasons with `hunt_class = 'outfitter'` carry `outfitter_only` (narrowing) and are hidden unless the user holds that exact hunt number.
+- When the user holds a controlled tag **and** a general tag for the same species, the map shows the union. Each season in the tooltip is labeled with the tag that unlocks it.
+
 ### 7.3 Default date range (`planner/dates.py` and `static/js/dates.js`, which must agree)
 - `sat_sun` (default): if today is Sat, return [today, tomorrow]. If today is Sun, return [today, today]. Otherwise return the next Saturday and Sunday.
 - `fri_sun`: same idea with Friday as the start. If today is Fri, Sat or Sun, return [today, Sunday].
@@ -409,7 +479,10 @@ upload PDF ─► store (sha256) ─► classify(kind, year) ─► extract page
 
 ### 8.2 Extraction rules (`importer/extract.py`)
 - Open with `pdfplumber`. For each page, **crop 40 pt off the left and right** (side tabs), then `extract_tables()` and `extract_text()`.
-- Detect rotated layouts. If more than 30 % of a page's words appear reversed (they don't match a dictionary or a month/unit regex but their reverses do), set `page.rotated = True` and route the page to the rotated-layout handler (T-12).
+- **Font-size aware.** Characters smaller than 7 pt (body text is 10 pt) are superscript footnote markers. Remove them from the page with `page.filter(...)` before table extraction, then read them **separately from each cell's bbox on the unfiltered page** and store them as structured flags (`a` = includes other units, `b` = portion of unit only, plus any section-specific footnotes resolved from the legend at the bottom of the page). pdfplumber crops keep absolute coordinates, so bboxes from the filtered page apply directly to the original.
+- **Two-column prose pages** (hunt-area descriptions): find the gutter as the widest vertical band with no word boxes in the middle 40 % of the page width, then extract each column separately.
+- **Rotated pages** (elk zone calendars): `extract_text(line_dir_rotated='ltr', char_dir_rotated='btt')` for text, and `extract_words` with the same options for geometry.
+- Detect rotated layouts. If more than 30 % of a page's chars have `upright == False`, set `page.rotated = True` and route the page to the rotated-layout handler (T-12).
 - Cache per-page extraction as JSON in `data/cache/<sha256>/p<N>.json` so re-parsing after a parser fix is fast.
 
 ### 8.3 Common parsing (`importer/common.py`)
@@ -423,8 +496,9 @@ upload PDF ─► store (sha256) ─► classify(kind, year) ─► extract page
 - Rows grouped by species → table title → page. Columns: units (chips), tag, weapon, sex, dates, restriction badges, confidence (colored with `--sc1`…`--sc5`), source text.
 - The right pane shows the **PDF page** (embedded `<iframe src="/api/documents/<id>/pdf#page=N">`) for the selected row.
 - **Diff vs last published year**: each row is tagged `new`, `changed` (dates moved, with old→new shown) or `same`. There's also a "Removed since last year" list. The 2026 brochure's own "What's new" section is a great sanity check.
-- Inline edit of any field, approve/reject per row, "approve all ≥ 0.9", keyboard nav (j/k/a/r).
-- A "Publish" button is disabled until no rows remain `staged`.
+- Inline edit of any field, approve/reject per row, "approve all rows that pass every check" (there is **no** confidence-only bulk approve), keyboard nav (j/k/a/r).
+- An **Accuracy panel** at the top lists every `import_checks` result per section (✓ pass / ✗ fail / ⚠ warn) with expected vs. actual and links to the offending rows and pages.
+- The **Publish** button is disabled until (1) no rows remain `staged`, (2) every check is `pass`, or a `fail` has been explicitly **waived** with a typed reason (stored and shown on the document forever), and (3) every row with `extract_agree = 0` has been individually reviewed.
 
 ### 8.5 Supersession
 When publishing doc D (license year Y, priority P): for every published season from another doc of the same year with lower priority, the same (species, tag_type, zone/hunt, weapon, sex) and an overlapping unit set, mark it `superseded` and set `supersedes_id`. Uploading a new year never touches prior years. Prior years stay queryable for "last year vs this year".
@@ -432,7 +506,39 @@ When publishing doc D (license year Y, priority P): for every published season f
 ### 8.6 Fallbacks (the app must stay useful when a parser fails)
 1. **Manual season editor** (Season Table → "+ Add season").
 2. **CSV import** using the same columns as the export. A template is provided in `docs/seasons_template.csv`.
-3. Optional (off by default): an **LLM-assisted extractor** that sends one page's text to a user-configured model and returns rows in the CSV schema. These rows go to staging with `confidence ≤ 0.6` so they are always human-reviewed. Out of scope for v1 tickets; listed as a stretch goal.
+3. Optional (off by default): an **LLM-assisted extractor** that sends one page's text to a user-configured model and returns rows in the CSV schema. These rows go to staging with `confidence ≤ 0.6` and are **never** eligible for bulk approve. Each one must be hand-checked against the PDF page. Out of scope for v1 tickets; listed as a stretch goal.
+
+### 8.7 Accuracy strategy (D3: the most important section in this document)
+
+The app tells Josh where he can legally hunt, so a wrong date or unit is worse than no answer. Accuracy is enforced by **mechanical checks that block publishing**, not by hoping the parser is right. Every check writes a row to `import_checks`.
+
+**Principles**
+1. **Deterministic parsers only** produce publishable data. No LLM output is ever published without row-by-row human verification.
+2. **Never guess.** If a cell can't be fully explained, the row is staged as `fail`. It is never silently dropped or "best-effort" filled.
+3. **Two independent extraction paths must agree.** Path A is pdfplumber's ruled-table extraction (`find_tables`). Path B is the raw text layer (`extract_text` / word positions with superscripts kept inline), parsed with independent regexes. Every row's key fields (hunt number, area, footnote marks, dates, units, sex) are compared. Any disagreement makes that row `extract_agree = 0` and it must be reviewed by hand. *Evidence: this exact check caught 92 missed footnote markers in the spike (§2).*
+4. **Every number printed in the PDF must be accounted for.**
+5. **The truth is the PDF page.** Every row keeps `source_page`, `source_bbox` and `source_text`. Review shows the PDF page with the row highlighted.
+
+**Invariants (run automatically after every import, per section)**
+
+| Check | Rule | 2026 spike result |
+|---|---|---|
+| `two_path_agreement` | Table path == text path for every row's key fields. | Controlled: 0 disagreements / 469 |
+| `tag_checksum` | Σ Tags column == the "(N Tags Plus Unlimited Tags)" total in each section header. | Deer 13,226 ✓ · Elk 18,670 ✓ · Pronghorn 2,040 ✓ |
+| `hunt_number_completeness` | The set of 4-digit hunt numbers that start a line in the page text == the set parsed. (Gaps in numbering are legitimate.) | 468 in text, 469 parsed; the extra (2111) was confirmed as a merged text line, ✓ |
+| `no_duplicate_keys` | Hunt numbers unique per year. General seasons unique per (tag, weapon, sex, unit, dates). | 0 duplicates |
+| `date_token_accounting` | Every date-range token (`Mon D - Mon D`) inside a season table on the page is consumed by **exactly one** parsed season. Leftover tokens = fail, listed with page and text. | Controlled: 0 unparsed date cells |
+| `unit_tokens_valid` | Every unit token is a real GMU from `units`. Every hunt area resolves to ≥ 1 unit. | — |
+| `gis_area_match` | Every controlled hunt area exists in the GIS Controlled Hunts layer for `license_year` (fall back to the latest year with a warning). | 469/469 against 2025 GIS |
+| `general_coverage` | Every GMU (except `YNP`) has ≥ 1 general Regular deer season **or** appears in a controlled-only list that is confirmed in the page text. | 5 controlled-only: 44, 45, 52, 54, 68A |
+| `golden_match` | For every section with a committed `tests/golden/<year>/<section>.json`, the import matches it **exactly**. | Golden files are built in T-22 |
+| `yoy_diff` (warn) | Changes vs. last year's published data are listed for review. More than 25 % of rows changed in a section → warn. | — |
+
+**Golden dataset (T-22).** For the first year (2026), every row of every MVP section (general deer, all controlled deer/elk/pronghorn/bear) is **verified by hand against the PDF**, one page at a time, and committed as JSON. The parser must reproduce it with zero diffs. In later years the previous year's golden file is not truth for the new PDF, but it serves as a regression fixture: re-parsing the 2026 PDF after any parser change must still match 2026 golden exactly. New years are protected by the invariants plus the review gate.
+
+**Review gate.** Publishing requires every check to pass or be explicitly waived with a written reason, and every disagreeing row to be individually reviewed (§8.4). There's no bulk approve for rows that fail any check.
+
+**Display safety.** If a section has any waived check, every season from that section shows a ⚠ "manually verified" badge in tooltips. The app always links each season to its PDF page.
 
 ---
 
@@ -455,12 +561,12 @@ When publishing doc D (license year Y, priority P): for every published season f
 | Phase | Outcome | Tickets |
 |---|---|---|
 | **0 – Foundations** | Repo runs, themed shell, map renders | T-01 … T-05 |
-| **1 – MVP: Deer** | Upload the 2026 big-game PDF, review, publish, add a Regular Deer tag, and see this weekend's green units | T-06 … T-11, T-15, T-16 |
-| **2 – Elk & big game** | Elk A/B zones, pronghorn, bear, lion, wolf, supplements | T-12, T-13, T-18 |
+| **1 – MVP: Deer + all controlled hunts, accuracy-gated** | Upload the 2026 big-game PDF; general deer **and** every controlled deer/elk/pronghorn/bear hunt parse with every invariant passing and a 100 % golden match; review and publish; add a Regular Deer tag and/or a controlled tag by hunt number; see this weekend's green units | T-06 … T-11, T-15, T-16, **T-17a, T-17b, T-17c, T-22** |
+| **2 – Elk A/B & other general big game** | Elk A/B zones, pronghorn, bear, lion, wolf, supplements | T-12, T-13, T-18 |
 | **3 – Upland** | Forest grouse and other birds via county areas | T-14 |
-| **4 – Controlled hunts & polish** | Controlled hunt tags, cross-check, zoom, print | T-17, T-19, T-20, T-21 |
+| **4 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings | T-19, T-20, T-21 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → T-03 → T-07 ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17, T-18} ; T-11 → T-15 ; T-15 → T-16 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-19 spans all`.
 
 ---
 
@@ -471,9 +577,10 @@ Dependency graph: `T-01 → {T-02, T-04} ; T-02 → T-03 → T-07 ; T-04 → {T-
 | IDFG changes the PDF layout | Parsers are per-section and fixture-tested. The review screen catches drift. Manual/CSV fallback. Parser version is stored per document. |
 | Elk calendar pages are hard to parse | Spike first (T-12a). Worst case is manual entry: about 28 zones × 2 tags × a few seasons is roughly 150 rows, entered once a year. |
 | "Portion of unit" nuances | Shown as *restricted* with the verbatim note and page link. Never shown as plain green. |
-| Wrong data means an illegal hunt | Permanent disclaimer, source page on every season, a review gate before publish, and no auto-publish. |
+| Wrong data means an illegal hunt | Accuracy gate (§8.7): two-path agreement, checksums, completeness, golden match. Permanent disclaimer, source page on every season, no auto-publish. |
+| GIS hunt-area polygons lag a year behind the PDF (2026 big game not yet published) | Use the latest available year, flag `geometry_year < license_year`, and require review of each area whose description text changed vs. last year. If an area is new and has no polygon, fall back to the parsed description's unit list as `partial` with a warning. |
 | Upland county overlay is approximate | Partial coverage → restricted plus a note. |
-| **Open questions for Josh** | (1) Resident? (affects nonresident quota notes only). (2) Want turkey, moose/sheep/goat, waterfowl later? (3) Friday in the default weekend? (4) Any interest in land-ownership overlays (BLM/USFS/state) in a later phase? |
+| **Open questions for Josh (answers were lost, D4)** | (1) Turkey, moose/sheep/goat, waterfowl later? (2) Friday in the default weekend? (3) Land-ownership overlays (BLM/USFS/state) in a later phase? |
 
 ---
 
@@ -568,7 +675,7 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ### T-09 · My Tags & Permits (UI + API)
 **Depends on:** T-04, T-03 · **Size:** M
-**Description:** API per §6 (`/api/tags`, `/api/permits`, `/api/profile`, copy-year). Validation: `requires_zone` tag types must have a zone from `zone_units` for that year, and `requires_hunt_no` must have a hunt number. UI `#/tags`: a year selector (defaults to the current year), tag cards (species icon, label, zone/hunt #, filled toggle, delete), an "Add tag" dialog whose fields depend on tag type (zone dropdown for elk A/B, free-text hunt number for controlled), a permits panel, a profile panel (resident, youth, weekend definition, default species), and a "Copy tags from <year-1>" button (copies unfilled tag types but not filled status).
+**Description:** API per §6 (`/api/tags`, `/api/permits`, `/api/profile`, copy-year). Validation: `requires_zone` tag types must have a zone from `zone_units` for that year, and `requires_hunt_no` must have a hunt number. UI `#/tags`: a year selector (defaults to the current year), tag cards (species icon, label, zone/hunt #, filled toggle, delete), an "Add tag" dialog whose fields depend on tag type (zone dropdown for elk A/B; for controlled, a hunt-number field whose full lookup and preview is built in T-17c), a permits panel, a profile panel (youth, weekend definition, default species; **no resident/nonresident field**, D1), and a "Copy tags from <year-1>" button (copies unfilled tag types but not filled status, and **skips controlled tags** because hunt numbers are reused).
 **Acceptance criteria:**
 - CRUD round-trips with API tests, and validation errors show inline.
 - Marking a tag filled removes its units from the map immediately (the shared state invalidates availability).
@@ -593,23 +700,26 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ### T-11 · Deer general-season parser
 **Depends on:** T-10 · **Size:** M
-**Description:** `importer/deer.py`, generalized from `docs/spike_deer_parser.py`. Scope: all "Regular Deer Tag" and "White-tailed Deer Tag" **general** tables (Any Weapon, Archery Only, Muzzleloader Only, Short Range). Skip "Controlled" tables (T-17). Rules: crop sides; header row must be `Unit(s) | Antlered | Antlerless | Notes`; carry the title across pages; carry the unit list across continuation rows; each date range in the Antlered/Antlerless cells produces one season (`sex` = antlered/antlerless); qualifiers in the 60 chars after a date attach to that season; the Notes column parses to restriction codes plus `notes` text; "None" means no row. Map titles: Regular → `deer_regular`, White-tailed → `deer_whitetail` (implicitly add `whitetail_only` only for display, since the tag itself is WT-only). Set `source_page`, `source_text`.
+**Description:** `importer/deer.py`, generalized from `docs/spike_deer_parser.py`. Scope: all "Regular Deer Tag" and "White-tailed Deer Tag" **general** tables (Any Weapon, Archery Only, Muzzleloader Only, Short Range). Skip "Controlled" tables (T-17a). Rules: crop sides; header row must be `Unit(s) | Antlered | Antlerless | Notes`; carry the title across pages; carry the unit list across continuation rows; each date range in the Antlered/Antlerless cells produces one season (`sex` = antlered/antlerless); qualifiers in the 60 chars after a date attach to that season; the Notes column parses to restriction codes plus `notes` text; "None" means no row. Map titles: Regular → `deer_regular`, White-tailed → `deer_whitetail` (implicitly add `whitetail_only` only for display, since the tag itself is WT-only). Set `source_page`, `source_text`.
 **Fixtures:** cut pages 12–16 and 18–21 of the 2026 Big Game PDF into `tests/fixtures/bg2026_deer_pXX.pdf` (use `pypdf` to split) with hand-verified expected JSON for at least 4 pages.
 **Acceptance criteria:**
 - On the full 2026 PDF: ≥ 230 rows. Every GMU except {44, 45, 52, 54, 68A, YNP} has at least one Regular-tag general season. Fixture expectations match exactly.
 - Spot checks: Unit 39 Regular any-weapon antlered **Oct 10–Oct 31**; Units 1, 2, 3, 4A, 5, 6 antlered Oct 10–31 carries `whitetail_only`; Unit 22 antlered carries `two_point_only`.
+- Implements a **text-path twin** for these tables and the `two_path_agreement`, `date_token_accounting`, `unit_tokens_valid` and `general_coverage` checks from §8.7 for section `deer_general`. All pass on the 2026 PDF.
+- **Matches `tests/golden/2026/deer_general.json` exactly** (produced in T-22).
 
 ---
 
 ### T-12 · Elk A/B zone parser (with spike)
 **Depends on:** T-10 · **Size:** L
 **Description:**
-**T-12a (spike, time-box 4 h):** elk zone pages (2026 PDF pp. ~38–50) are rotated calendar graphics. Evaluate, in order: (1) `page.rotation` / derotating chars (pdfplumber `chars` transformed by -90° and re-clustered into words); (2) `pdftotext -layout` after rotating the page with `pypdf` (`page.rotate(90)`); (3) reading the per-zone tables in the general information or "Elk Zone" summary pages if present. Write findings in `docs/elk_parser_notes.md` and pick an approach.
+**T-12a (spike, time-box 4 h):** elk zone pages (2026 PDF pp. 37–50) are rotated calendar graphics. **Already known:** text is recoverable with `extract_text(line_dir_rotated='ltr', char_dir_rotated='btt')`, e.g. p. 38 gives "Panhandle Zone (Units 1, 2, 3, 4, 4A, 5, 6, 7, 9)", "Aug 30 - Sep 30 Archery only — any elk", "A Tag". The spike must work out how to assign each label to its zone block and A/B row: use `extract_words` with the same rotation options, then cluster by the rotated y-coordinate (zone bands) and by the horizontal rules or colored bars (`page.rects`, `page.lines`) separating the A and B rows. Write the findings in `docs/elk_parser_notes.md`.
 **T-12b:** implement `importer/elk.py`. Output per zone × tag (A/B) × weapon window: `tag_type` = `elk_zone_a|elk_zone_b`, `zone` = the zone name normalized to the GIS `Elk_Zone` values (keep a mapping table for spelling differences, e.g. "Smoky – Bennett"), `sex` (`antlered`/`either`/`antlerless`), restrictions (`spike_only`, `brow_tined`, `portion_of_unit` with note). `season_units` = units of that zone from `zone_units` (also parse zone→unit lists from the PDF's zone table, and if it differs from GIS, update `zone_units` for that year and flag a warning).
 **Acceptance criteria:**
 - All 28 zones present for both A and B tags where the regs offer them. A zone with only one tag type is acceptable if the PDF says so.
 - Fixture tests for at least 3 zones are hand-verified against the PDF.
 - If the automated approach yields confidence < 0.8 for a zone, rows are still staged (flagged) rather than dropped.
+- Accuracy: every date token on each zone page is consumed exactly once (`date_token_accounting`), and the zone→unit list printed in each zone header matches GIS `Elk_Zone` membership, with differences listed as `fail`. Hand-verified golden file `tests/golden/2026/elk_zones.json` for all zones (added to T-22's scope when this ticket starts).
 
 ---
 
@@ -628,9 +738,9 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 ---
 
 ### T-15 · Regulations tab: upload & review & publish UI
-**Depends on:** T-10, T-11 (for real data), T-03 · **Size:** L
-**Description:** `#/regs` per §8.4: a drag-and-drop upload card (shows sha/dup warnings, a spinner, then the result counts), a documents table by year with status badges, and a review screen at `#/regs/<docId>` with a grouped row list, confidence coloring (`--sc1`…`--sc5`), inline editors (unit chip editor with autocomplete from units, date inputs, selects for tag/weapon/sex, restriction multi-select), an embedded PDF iframe synced to the selected row's page, a diff vs prior published year (API: `GET /api/documents/<id>/diff`, implemented here, matching on species+tag+zone+weapon+sex+unit set), approve/reject per row, approve-all ≥ threshold, keyboard shortcuts (j/k/a/r/e), and a Publish button (§8.5 supersession implemented in `api.py`/`db.py` here) with a confirmation modal summarizing counts.
-**Acceptance criteria:** end-to-end test: upload the 2026 deer fixture, approve all, publish, and `/api/availability` returns open units. Publishing a supplement supersedes the matching rows. The UI prevents publishing while staged rows remain.
+**Depends on:** T-10, T-11 (for real data), T-22 (checks + publish gate), T-03 · **Size:** L
+**Description:** `#/regs` per §8.4: a drag-and-drop upload card (shows sha/dup warnings, a spinner, then the result counts), a documents table by year with status badges, and a review screen at `#/regs/<docId>` with a grouped row list, confidence coloring (`--sc1`…`--sc5`), inline editors (unit chip editor with autocomplete from units, date inputs, selects for tag/weapon/sex, restriction multi-select), an embedded PDF iframe synced to the selected row's page, a diff vs prior published year (API: `GET /api/documents/<id>/diff`, implemented here, matching on species+tag+zone+weapon+sex+unit set), approve/reject per row, approve-all-passing (only rows with `extract_agree = 1` in sections whose checks all pass), keyboard shortcuts (j/k/a/r/e), and a Publish button (§8.5 supersession implemented in `api.py`/`db.py` here) with a confirmation modal summarizing counts.
+**Acceptance criteria:** end-to-end test: upload the 2026 deer fixture, approve all, publish, and `/api/availability` returns open units. Publishing a supplement supersedes the matching rows. The UI prevents publishing while staged rows remain. **The Accuracy panel (§8.4, §8.7) renders every `import_checks` row. Publish is blocked (UI and API both return 409) while any check is `fail` and not waived, or any `extract_agree = 0` row is unreviewed. Waiving requires a typed reason, which is stored and displayed.**
 
 ---
 
@@ -641,10 +751,67 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 
 ---
 
-### T-17 · Controlled hunts (Phase 2)
-**Depends on:** T-10, T-09 · **Size:** L
-**Description:** Parse the controlled-hunt tables (deer, elk, pronghorn, bear) in the Big Game PDF: hunt number, area description/units, dates, weapon, sex, tags, notes. Units: parse "All of Unit X" / "Units X, Y" / "That portion of Unit X …" (→ `partial` + note). Optionally enrich boundaries from the GIS **Controlled Hunts** layer (MapServer/4) by hunt number: if the layer has a polygon, compute GMU coverage fractions like §5.2. `tag_type='controlled'`, `hunt_number` set, `species_id` from the table. In My Tags, adding a controlled tag validates the hunt number against published or staged seasons for the year and shows its description.
-**Acceptance criteria:** with a controlled tag for one known 2026 hunt number, only that hunt's units light up for its dates; hunt numbers reused across years don't leak (filtered by license_year).
+### T-17a · Controlled-hunt table parser (MVP)
+**Depends on:** T-10 · **Size:** L
+**Description:** `importer/controlled.py`, productionized from `docs/spike_controlled_parser.py` (read it first; it runs on the real PDF and prints every invariant). Scope: every controlled-hunt table in the Big Game PDF: deer, elk, pronghorn, bear (2026: pp. 22–31, 51–59, 64–67, 73). **Locate pages by content** (`"Hunt No."` in page text), never by hard-coded page numbers.
+- Columns: `Hunt No. | Controlled Hunt Areas | Tags | Season Dates | Notes`.
+- **Superscripts:** filter chars < 7 pt before `find_tables()`, then read `a`/`b` markers from each area cell's bbox on the unfiltered page (§8.2). Resolve marker meanings from the footnote legend at the bottom of the page, not a hard-coded map. Fail the row if a marker has no legend entry. 2026 legend: `a` = "This hunt includes other units or parts of other units", `b` = "This hunt includes only a portion of this unit".
+- `(See pg N)` → `hunt_areas.description_page`. **N is the brochure's printed page number, which is PDF page index − 1 in 2026** ("See pg 31" → PDF page 32). Build a printed→physical map from each page's footer ("…idfg.idaho.gov 21" on PDF p. 22) and store **physical** pages everywhere (`source_page`, `description_page`), keeping the printed number only for display. Add check `page_ref_resolves`: every "See pg N" must map to a page containing the referenced hunt area's `Hunt Area <id> —` entry.
+- **Title carry-forward:** a table that starts with the `Hunt No.` header inherits the previous title. Map titles → (`species_id`, `hunt_class`, `weapon`, `sex`, restrictions): "Antlered" → antlered; "Antlerless" / "Extra Antlerless" → antlerless (+`hunt_class='extra'`); "Either Sex" → either; "Doe or Fawn Pronghorn" → antlerless; "Archery Only … Archery Permit Required" → archery; "Muzzleloader Only" → muzzleloader; "Short Range Weapon" → short_range; "Youth Only" → +`youth_only`; "Outfitter Allocation" → `hunt_class='outfitter'` +`outfitter_only`. **An unrecognized title is a `fail`, not a default.**
+- **Year resolution:** the year printed in the title wins ("**2027** Controlled Hunts — Extra Antlerless Elk" → 2027 dates). Spring bear tables (application period "January 15 – February 15, 2027") → 2027 dates. If the end is before the start, the end rolls into the next year. `license_year` = the calendar year of the start date. Every row whose year differs from the document year gets a `yoy`-style review flag.
+- Tags column → `tag_quota` (`Unlimited` → NULL). Notes column → restriction codes + `notes`. "See Note N, Page P" is stored verbatim and the referenced note text is attached.
+- Writes `seasons` (`tag_type_id='controlled'`, `hunt_number`, `hunt_area`) and `hunt_areas` rows. Units come from T-17b. Until T-17b runs, the area's base unit (the leading `\d+[A-C]?` of the area id) is staged as `partial`.
+- Implements checks for each section `controlled_<species>`: `two_path_agreement` (text-layer regex twin, as in the spike), `tag_checksum`, `hunt_number_completeness`, `no_duplicate_keys`, `date_token_accounting`.
+**Acceptance criteria (2026 Big Game PDF):**
+- Exactly **469** controlled hunts: deer **188** (1001–1188, no gaps), elk **221**, pronghorn **54** (4001–4054), bear **6**. 0 duplicates, 0 unparsed date cells.
+- `tag_checksum` passes: deer **13,226**, elk **18,670**, pronghorn **2,040**.
+- `two_path_agreement`: 0 disagreements. Footnote counts **131 `a` / 77 `b`**.
+- Spot checks: **1001** area `1-1`, footnote a, Aug 30–Dec 1, antlered, "See pg 31" → physical description page 32; **1002** area `11`, no footnote, Oct 10–Nov 3, 50 tags; **1028** area `38-1`, footnote b, Oct 10–Nov 24; **2032** elk antlered, area `51`, Nov 1–Nov 30; **2111** elk either-sex, area `30A-1`, footnote b, Aug 1–Aug 29 (its text-layer line is merged with a neighbor; the table path must still get it); **4014** pronghorn either-sex, area `50`, Sep 25–Oct 24, "See pg 67" → physical page 68; **8501** fall bear, area `1-1`, footnote b, Sep 15–Oct 9.
+- Matches `tests/golden/2026/controlled_{deer,elk,pronghorn,bear}.json` exactly (T-22).
+
+---
+
+### T-17b · Hunt-area descriptions & unit coverage (MVP)
+**Depends on:** T-17a, T-02 · **Size:** L
+**Description:**
+1. `scripts/build_hunt_area_coverage.py --year YYYY`: download GIS `MapServer/4` features (`BigGame`, `HuntArea`, `Year`, geometry, `outSR=4326`) for the year, falling back to the latest year that has big-game polygons (2025 as of today) and recording `geometry_year`. Project to EPSG:8826, intersect each hunt-area polygon with each GMU, and write `data/hunt_area_coverage/<year>.json`: `{"deer":{"1-1":{"geometry_year":2025,"units":{"1":1.0,"2":1.0,…}}}}`, where each value is the fraction of the **GMU's** area inside the hunt area. Drop slivers < 0.5 % (boundary noise from simplification).
+2. `importer/hunt_areas.py`: parse the description pages (deer pp. 32–34, elk 60–62, pronghorn 68 in 2026; locate by the heading "CONTROLLED HUNT AREA DESCRIPTIONS"). These are **two-column**: split at the gutter (§8.2). Entries start with `Hunt Area <id> —`. Store the full verbatim text in `hunt_areas.description`. Also extract the unit tokens mentioned ("All of Units 1, 2, 3…", "That portion of Unit 48…").
+3. Build `season_units`: units with fraction ≥ 0.98 → `full`; 0.005–0.98 → `partial` with `coverage_frac`; `coverage_note` = the first sentence of the description plus `(see p. N)`.
+4. Checks for each section `hunt_areas_<species>`: `gis_area_match` (every area id has a polygon; fail otherwise); `unit_coverage` (the unit tokens in the description text must equal the set of GIS units with fraction ≥ 0.02; any difference is `fail` with both lists shown); footnote consistency (footnote `b` ⇒ at least one unit `partial`; footnote `a` ⇒ ≥ 2 units **or** described units ≠ the base unit; no footnote ⇒ exactly one unit at ≥ 0.98, i.e. "All of Unit X"). `geometry_year < license_year` → `warn` on every affected area.
+**Acceptance criteria:**
+- 2026: 469/469 hunt areas resolve to ≥ 1 unit, using 2025 geometry with warnings.
+- Area `1-1` (deer) covers units 1, 2, 3, 4, 4A, 5, 6, 7, 9 (per its description, p. 32).
+- Area `11` (hunt 1002) → exactly unit 11, `full`.
+- Area `38-1` (hunt 1028, footnote b) → unit 38 `partial`.
+- The description of deer `1-1X` begins "That portion of Unit 1 within Boundary County east of the Selkirk Mountains crest" (verifies the column split didn't interleave).
+- All three consistency checks pass, or any exception is listed with page references for review.
+
+---
+
+### T-17c · Controlled tags in My Tags + engine wiring (MVP)
+**Depends on:** T-17b, T-09, T-06 · **Size:** M
+**Description:** `GET /api/hunts/<year>/<hunt_number>` returns the hunt (species, class, weapon, sex, dates, area, verbatim description, page, units with coverage). Add Tag → Controlled: type a 4-digit number, then a live lookup previews the hunt card. Save is disabled for unknown numbers or numbers whose seasons are only `rejected`. Tag cards show "Controlled #1002 · Deer · Unit 11 · Oct 10–Nov 3". The engine applies §7.2's controlled-hunt rules: matching by hunt number **and** license year, partial coverage → restricted, archery/muzzleloader permit requirements, and outfitter hunts hidden unless held.
+**Acceptance criteria:**
+- With only controlled tag 2026 **#1002** and dates Oct 17–18 2026: exactly unit **11** is green. Nothing else lights up.
+- With **#1028** on Oct 17–18: unit 38 is **yellow** (`portion_of_unit`) and the tooltip shows the verbatim area description and page.
+- A 2025 tag #1002 does **not** light up anything for 2026 dates.
+- Controlled + Regular deer tag together: the union shows, and each tooltip season names the tag that unlocks it.
+- Archery-only controlled hunt without the Archery Permit → not shown (and the reason appears with include_untagged on).
+
+---
+
+### T-22 · Accuracy harness, golden dataset & publish gate (MVP — highest priority)
+**Depends on:** T-10 · **Size:** L
+**Description:** Implements §8.7 end to end.
+1. `importer/checks/`: a check registry (`@check(section_glob, name)`), each check returning `CheckResult(status, expected, actual, detail)`, all persisted to `import_checks` at the end of `run_import`. Shared implementations: two-path comparison helper, `date_token_accounting` (scan page text inside each table's bbox for `Mon D - Mon D` tokens and require that each maps to exactly one season by `source_bbox`), `unit_tokens_valid`, `no_duplicate_keys`, `general_coverage`, `golden_match`, `yoy_diff`.
+2. **Golden dataset for 2026.** `scripts/make_golden.py` dumps a section's parsed rows to `tests/golden/2026/<section>.json` in a canonical sorted form. A human then **verifies every row against the PDF page by page** and records it in `tests/golden/2026/VERIFICATION.md` (a table of page, rows on page, verified-by, date, and corrections made). MVP sections: `deer_general`, `controlled_deer`, `controlled_elk`, `controlled_pronghorn`, `controlled_bear`, `hunt_areas_*`. Golden files are **only** committed after verification. A row the parser got wrong is fixed in the golden file and becomes a failing test until the parser is fixed.
+3. `tests/test_golden.py`: re-parses the 2026 PDF (downloaded once to a cache dir; skipped with a clear message if offline) and asserts an exact match for every golden section. CI runs it with the PDF cached by URL hash.
+4. Publish gate in `api.py` (§8.4): `POST /publish` → 409 with the list of blocking checks and rows unless the gate is satisfied. Waiver endpoint requires a non-empty reason.
+**Acceptance criteria:**
+- All checks implemented with unit tests, including a deliberately corrupted fixture for each (e.g. drop one table row → `hunt_number_completeness` and `tag_checksum` fail; strip superscript filtering → `two_path_agreement` fails on 1001).
+- `VERIFICATION.md` covers every page of every MVP section, with no unverified pages.
+- `pytest -q` passes with golden match = 0 diffs on 2026.
+- Publish is impossible via the API while any unwaived `fail` exists (API test).
 
 ---
 
