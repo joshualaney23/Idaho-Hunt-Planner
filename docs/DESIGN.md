@@ -978,12 +978,45 @@ Each ticket is self-contained for a coding agent. **Every agent should read §2�
 - **Hand-off lives in the repo, not in chat:** each ticket ends with a PR whose description lists what was built, check results, and any deviation from this doc. If the design changes, update `DESIGN.md` in the same PR.
 - **Golden-data verification (T-22) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
 
+**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
+
+| Ticket | Issue | Title |
+|---|---|---|
+| T-01 | [#1](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/1) | Repository scaffold & dev environment |
+| T-02 | [#2](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/2) | GMU geometry build script |
+| T-03 | [#3](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/3) | Theme & app shell (static UI) |
+| T-04 | [#4](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/4) | Database schema, migrations & seed |
+| T-05 | [#5](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/5) | Date utilities (Python + JS twins) |
+| T-06 | [#6](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/6) | Availability engine + `/api/availability` |
+| T-07 | [#7](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/7) | SVG map component + filter bar wiring |
+| T-08 | [#8](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/8) | Results table, Unit Brief drawer, map zoom |
+| T-09 | [#9](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/9) | My Tags & Permits (UI + API) |
+| T-10 | [#10](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/10) | PDF ingest framework (upload, store, classify, extract, stage) |
+| T-11 | [#11](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/11) | Deer general-season parser |
+| T-12 | [#12](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/12) | Elk A/B zone parser (with spike) |
+| T-13 | [#13](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/13) | Pronghorn, black bear, mountain lion, wolf parsers |
+| T-14 | [#14](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/14) | Upland bird parser + county overlay |
+| T-15 | [#15](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/15) | Regulations tab: upload & review & publish UI |
+| T-16 | [#16](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/16) | Season Table, manual editor, CSV import/export |
+| T-17a | [#17](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/17) | Controlled-hunt table parser (MVP) |
+| T-17b | [#18](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/18) | Hunt-area descriptions & unit coverage (MVP) |
+| T-17c | [#19](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/19) | Controlled tags in My Tags + engine wiring (MVP) |
+| T-18 | [#20](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/20) | Supplemental proclamations |
+| T-19 | [#21](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/21) | Test fixtures, regression suite & data QA report |
+| T-20 | [#22](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/22) | IDFG Hunt Planner cross-check (optional) |
+| T-21 | [#23](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/23) | Settings, backup/restore, docs |
+| T-22 | [#24](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/24) | Accuracy harness, golden dataset & publish gate (MVP — highest priority) |
+| T-23 | [#25](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/25) | Wild turkey: general + controlled hunts |
+| T-24 | [#26](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/26) | Small game, furbearer hunting, predatory/unprotected, falconry |
+| T-25 | [#27](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/27) | Moose, bighorn sheep & mountain goat brochure |
+| T-26 | [#28](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/28) | Migratory game birds brochure |
+
 **Kickoff prompt template:**
 ```
 Repo: ~/git/Idaho-Hunt-Planner (remote github.com/joshualaney23/Idaho-Hunt-Planner).
-Implement ticket T-XX from docs/DESIGN.md. Read §0 (decisions), §2–§9, and §8.7 (accuracy) first,
-then the ticket. Stack/conventions are in §12's header. Work on branch t-xx-<slug>, run `pytest -q`
-until green, push, and open a PR titled "T-XX: <title>" whose description lists every acceptance
+Implement ticket T-XX (GitHub issue #N, `gh issue view N`) from docs/DESIGN.md. Read §0 (decisions),
+§2–§9, and §8.7 (accuracy) first, then the ticket. Stack/conventions are in §12's header. Work on branch t-xx-<slug>, run `pytest -q`
+until green, push, and open a PR titled "T-XX: <title>" (body includes "Closes #N") whose description lists every acceptance
 criterion with its evidence (command output, spot-check values, screenshots). Don't change
 behavior outside the ticket's scope; if the design is wrong, say so in the PR and update DESIGN.md.
 ```
