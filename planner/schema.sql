@@ -1,0 +1,1 @@
+-- Canonical schema, DESIGN.md §5. Populated in T-04.
