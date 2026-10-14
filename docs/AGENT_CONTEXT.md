@@ -30,9 +30,14 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 | `docs/tools/issue_map.json` | Ticket → GitHub issue number. Numbers match through T-16, then shift by one (T-17a = #17, T-18 = #20, T-22 = #24). |
 | `docs/tools/make_issues.py` | Re-syncs issue bodies from §12 (`--link`) after a ticket is edited |
 | `docs/tools/section.py` | Prints one DESIGN.md section or ticket |
+| `docs/images/` | PR evidence renders (`t-02-gmu-render.png`, `t-02-gmu-zoom.png`) |
+| `scripts/build_gmu_geometry.py` | T-02: IDFG MapServer/3 → EPSG:8826 → 300 m coverage-simplify → `static/data/gmu.json` + `units_seed.json`. `--check` (stale exit 1), `--input FILE` (offline). |
+| `scripts/render_gmu_svg.py` | T-02: renders `gmu.json` to a stroke-free SVG for visual gap checks (`--crop X Y SIZE`) |
+| `static/data/gmu.json` | T-02 geometry: 100 units, 139 KB, `viewBox` `0 0 430 690`. `d` is `M<abs> l<relative deltas> Z` (1 decimal, 1 svg unit ≈ 1.1 km); `YNP` is `"closed": true`. |
+| `static/data/units_seed.json` | T-02: `[{id, sort_key, elk_zone, area_acres}]` in map order; T-04 seeds the `units` table from it |
 | `planner/` | T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `GET /api/health` (`api.py`), `__version__` in `__init__.py`. Other modules are docstring stubs for their tickets. |
 | `static/index.html` | Placeholder page with disclaimer; T-03 replaces it with the app shell |
-| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port) |
+| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port), `test_build_gmu_geometry.py` (T-02: decodes the committed paths with an independent SVG number parser and asserts the units tile Idaho with no gaps; `fixtures/gmu_sample.geojson` is its offline 3-unit input) |
 | `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` on 3.11 and 3.12 for pushes to main and PRs |
 | `pyproject.toml` | ruff + pytest config (`docs/` excluded from ruff) |
 
@@ -52,6 +57,12 @@ pytest -q && ruff check . && ruff format --check .   # must pass before a PR (CI
 
 ruff format .                                # formatter (config in pyproject.toml)
 PLANNER_PORT=6060 python -m planner          # alternate port; omit --no-browser to open browser
+
+# Map geometry (T-02; regenerate only when IDFG updates the units)
+python scripts/build_gmu_geometry.py         # fetch + rewrite static/data/gmu.json + units_seed.json
+python scripts/build_gmu_geometry.py --check # exit 1 if the committed files are stale
+python scripts/render_gmu_svg.py /tmp/gmu.svg --crop 150 330 120   # visual gap check (no strokes)
+qlmanage -t -s 1400 -o /tmp /tmp/gmu.svg     # SVG -> PNG on macOS, no extra tooling
 # .gitignore anchors /data/ to the repo root so static/data/ stays committed.
 
 # Source PDFs (go in data/regs/, git-ignored; base URL https://idfg.idaho.gov/sites/default/files/)
