@@ -1,10 +1,35 @@
-// A tiny DOM stand-in so node can test static/js/ui.js without a browser or
-// npm packages. It implements only what ui.js uses; extend it when ui.js grows.
+// A tiny DOM stand-in so node can test static/js/ui.js (and T-07's map.js /
+// filters.js) without a browser or npm packages. It implements only what those
+// modules use; extend it when they grow.
 // The real-browser check lives in the T-03 PR (puppeteer + Lighthouse).
 
+// A text node, so `el.append("text", child)` works like the real DOM.
+class FakeText {
+  constructor(text) {
+    this.textContent = String(text);
+    this.parentNode = null;
+    this.tagName = "#text";
+    this.children = [];
+  }
+  remove() {
+    if (!this.parentNode) return;
+    const sib = this.parentNode.children;
+    sib.splice(sib.indexOf(this), 1);
+    this.parentNode = null;
+  }
+  *walk() {
+    yield this;
+  }
+}
+
 class FakeElement {
-  constructor(tag) {
-    this.tagName = tag.toUpperCase();
+  constructor(tag, ns = null) {
+    this.tagName = ns ? tag : tag.toUpperCase(); // SVG keeps its case, like browsers
+    this.namespaceURI = ns;
+    this.style = {};
+    this.value = "";
+    this.checked = false;
+    this.hidden = false;
     this.children = [];
     this.parentNode = null;
     this.attributes = new Map();
@@ -37,6 +62,7 @@ class FakeElement {
     return this.attributes.has(k);
   }
   appendChild(c) {
+    if (typeof c === "string") c = new FakeText(c);
     if (c.parentNode) c.remove();
     c.parentNode = this;
     this.children.push(c);
@@ -68,6 +94,35 @@ class FakeElement {
   addEventListener(type, fn) {
     (this.listeners[type] ||= []).push(fn);
   }
+  /** Fire `type` listeners with a minimal event; returns the event. */
+  dispatch(type, init = {}) {
+    const ev = { type, target: this, defaultPrevented: false, ...init };
+    ev.preventDefault = () => {
+      ev.defaultPrevented = true;
+    };
+    for (const fn of this.listeners[type] || []) fn(ev);
+    return ev;
+  }
+  focus() {
+    globalThis.document.activeElement = this;
+    this.dispatch("focus");
+  }
+  contains(other) {
+    for (const e of this.walk()) if (e === other) return true;
+    return false;
+  }
+  /** Only bare tag selectors ("button") and "#id" are supported. */
+  querySelectorAll(sel) {
+    const out = [];
+    for (const e of this.walk()) {
+      if (e === this) continue;
+      if (sel.startsWith("#") ? e.id === sel.slice(1) : e.tagName.toLowerCase() === sel) out.push(e);
+    }
+    return out;
+  }
+  querySelector(sel) {
+    return this.querySelectorAll(sel)[0] || null;
+  }
   click() {
     // Browsers never dispatch click on a disabled <button>.
     if (this.tagName === "BUTTON" && this.disabled) return;
@@ -83,7 +138,9 @@ export function installFakeDom() {
   const body = new FakeElement("body");
   const document = {
     body,
+    activeElement: null,
     createElement: (tag) => new FakeElement(tag),
+    createElementNS: (ns, tag) => new FakeElement(tag, ns),
     getElementById: (id) => {
       for (const e of body.walk()) if (e.id === id) return e;
       return null;

@@ -1,17 +1,32 @@
-// App shell entry point (T-03): disclaimer, header version, hash-routed tabs,
-// placeholder cards for tabs that later tickets fill in, and a static shell of
-// the Where Can I Hunt filter bar. T-07 replaces the filter shell with
-// filters.js + state.js wired to /api/availability.
+// App shell entry point (T-03): disclaimer, header version, hash-routed tabs and
+// placeholder cards for tabs that later tickets fill in. T-07 mounts the Where Can I
+// Hunt tab: filters.js (filter bar) + state.js (URL-synced state, debounced
+// /api/availability) + map.js (SVG map, tooltip, legend).
 //
 // T-09 mounts the My Tags tab (tags.js) and subscribes the map tab to
 // TAGS_CHANGED, so filling or deleting a tag updates the tag filter and the
 // breadcrumb at once (the shared state that invalidates availability).
 
-import { card, chipGroup, textEl } from "./ui.js";
+import { card, textEl, toast } from "./ui.js";
 import { TABS, parseRoute, tabHash } from "./router.js";
-import { defaultRange, fmtShort, localToday, parseISO, presets, toISO } from "./dates.js";
-import { TAGS_CHANGED, activeTags, initTags, tagChipLabel, tagsSummary } from "./tags.js";
-import { getJSON } from "./api.js";
+import { localToday } from "./dates.js";
+import { PERMITS_CHANGED, TAGS_CHANGED, initTags } from "./tags.js";
+import { getJSON, putJSON } from "./api.js";
+import {
+  availabilityPath,
+  createFetcher,
+  createStore,
+  defaultState,
+  hasFilterKeys,
+  rangeYears,
+  stateFromQuery,
+  toQuery,
+} from "./state.js";
+import { MAP_PERMITS, createFilters, renderViewing } from "./filters.js";
+import { createMap, placeTip, renderLegend, tooltipContent } from "./map.js";
+
+/** Fired when a unit is clicked or Enter is pressed on it; T-08's drawer listens. */
+export const UNIT_OPEN = "ihp:unit-open";
 
 const DISCLAIMER_KEY = "ihp.disclaimerDismissed";
 
@@ -81,223 +96,252 @@ function renderPlaceholder(tab) {
   panel.appendChild(wrap);
 }
 
-// ---- Where Can I Hunt: breadcrumb + filter-bar shell -------------------------
-const SPECIES = [
-  ["deer", "Deer", "🦌"],
-  ["elk", "Elk", "🫎"],
-  ["pronghorn", "Pronghorn", "🦌"],
-  ["black_bear", "Bear", "🐻"],
-  ["mountain_lion", "Lion", "🐆"],
-  ["wolf", "Wolf", "🐺"],
-  ["forest_grouse", "Grouse", "🐦"],
-  ["quail", "Quail", "🐦"],
-  ["chukar", "Chukar", "🐦"],
-  ["gray_partridge", "Partridge", "🐦"],
-  ["pheasant", "Pheasant", "🐦"],
-  ["turkey", "Turkey", "🦃"],
-];
-const BIG_GAME_COUNT = 6; // a separator follows Wolf, as in §4.2
-const WEAPONS = [
-  ["all", "All legal weapons"],
-  ["rifle", "Rifle"],
-  ["archery", "Archery"],
-  ["muzzleloader", "Muzzleloader"],
-];
-const PERMITS = [
-  ["archery", "🏹 Archery"],
-  ["muzzleloader", "Muzzleloader"],
-];
-const PRESETS = [
-  ["thisWeekend", "This weekend"],
-  ["nextWeekend", "Next weekend"],
-  ["today", "Today"],
-  ["next7", "Next 7 days"],
-];
+// ---- Where Can I Hunt: filters + map (T-07) ------------------------------------
+// The store (state.js) is the single source of truth. Every change: rewrite the URL
+// query (replaceState, so filters don't flood history), repaint the filter bar and the
+// breadcrumb at once, and schedule a debounced /api/availability fetch (150 ms).
+let mapTab = null;
 
-function filterGroup(labelText, id, ...content) {
-  const fg = document.createElement("div");
-  fg.className = "fg";
-  const l = textEl("span", labelText, "l");
-  l.id = `${id}-label`;
-  fg.append(l, ...content);
-  return fg;
-}
-
-function initMapTab() {
+async function initMapTab() {
   const today = localToday();
-  const [d1, d2] = defaultRange(today);
-  const shell = {
-    species: "deer",
-    weapon: "all",
-    permits: [],
-    start: toISO(d1),
-    end: toISO(d2),
-    year: today.getFullYear(),
-    tags: [],
-  };
+  const [meta, gmu] = await Promise.all([
+    getJSON("/api/meta"),
+    fetch("/static/data/gmu.json").then((r) => r.json()),
+  ]);
+  const profile = meta.profile || {};
+  const defaults = defaultState({ profile, today });
+  const speciesIds = meta.species.map((s) => s.id);
+  const route0 = parseRoute(location.hash);
+  const initial =
+    route0.tab === "map" ? stateFromQuery(route0.query, defaults, { speciesIds }) : defaults;
+  const store = createStore(initial);
+  const labels = { restrictions: meta.restrictions, reasons: meta.reasons };
 
-  const viewing = document.getElementById("viewing");
-  function renderViewing() {
-    const sp = SPECIES.find(([k]) => k === shell.species);
-    const weapon = WEAPONS.find(([k]) => k === shell.weapon)[1];
-    const range = `${fmtShort(parseISO(shell.start))} – ${fmtShort(parseISO(shell.end))}`;
-    viewing.replaceChildren(
-      "Viewing ",
-      textEl("b", `${sp[2]} ${sp[1]}`),
-      " · ",
-      textEl("b", tagsSummary(shell.tags)),
-      " · ",
-      textEl("b", weapon),
-      " · ",
-      textEl("b", range),
+  const tagsByYear = {}; // license year → tags (filled included; filters drop them)
+  const permitsByYear = {}; // license year → permit codes held
+  let availability = null;
+  let selected = null;
+  let repaints = 0;
+
+  // ---- layout: map card (svg + legend) and the brief/results card ----
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.id = "gmu-map";
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  legend.id = "legend";
+  const mapCard = card("Open Units Map", svg, legend);
+  mapCard.id = "map-card";
+  const summaryEl = textEl("h2", "Open units");
+  summaryEl.id = "results-title";
+  const brief = document.createElement("div");
+  brief.id = "brief";
+  brief.setAttribute("aria-live", "polite");
+  const sideCard = document.createElement("section");
+  sideCard.className = "card";
+  sideCard.id = "side-card";
+  sideCard.append(summaryEl, brief);
+  document.getElementById("map-wrap").replaceChildren(mapCard, sideCard);
+
+  const map = createMap(svg, gmu);
+  const tip = document.createElement("div");
+  tip.className = "tip";
+  tip.id = "tip";
+  tip.hidden = true;
+  document.body.appendChild(tip);
+
+  map.onHover((id, point) => {
+    if (!id || !point) {
+      tip.hidden = true;
+      return;
+    }
+    tip.replaceChildren(
+      ...tooltipContent(id, availability?.units?.[id], gmu.units[id], labels),
     );
+    tip.hidden = false;
+    const { left, top } = placeTip(
+      point.x,
+      point.y,
+      tip.offsetWidth,
+      tip.offsetHeight,
+      window.innerWidth,
+      window.innerHeight,
+    );
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
+  });
+  map.onClick((id) => {
+    selected = id;
+    renderSide();
+    window.dispatchEvent(new CustomEvent(UNIT_OPEN, { detail: { unit: id, state: store.get() } }));
+  });
+
+  // ---- side card: summary + the unit brief stub (the drawer itself is T-08) ----
+  function renderSide() {
+    const sum = availability?.summary;
+    summaryEl.textContent = sum
+      ? `${sum.open} open · ${sum.restricted} restricted${
+          store.get().includeUntagged ? ` · ${sum.untagged} untagged` : ""
+        }`
+      : "Open units";
+    if (!selected) {
+      brief.replaceChildren(
+        textEl(
+          "p",
+          "Hover a unit for its seasons; click it (or Tab to it and press Enter) for the unit brief. " +
+            "The results table and the full brief drawer arrive in T-08.",
+          "placeholder",
+        ),
+      );
+      return;
+    }
+    const geo = gmu.units[selected];
+    const unit = availability?.units?.[selected];
+    const close = textEl("button", "×", "icon-btn");
+    close.type = "button";
+    close.setAttribute("aria-label", `Close the unit ${selected} brief`);
+    close.addEventListener("click", () => {
+      const back = map.paths[selected];
+      selected = null;
+      renderSide();
+      back?.focus();
+    });
+    const head = document.createElement("div");
+    head.className = "brief-head";
+    head.append(textEl("h3", `📄 Unit ${selected} brief`), close);
+    brief.replaceChildren(head, ...tooltipContent(selected, unit, geo, labels).slice(1));
   }
 
-  const species = chipGroup({
-    id: "f-species",
-    items: SPECIES.map(([k, label]) => [k, label]),
-    value: shell.species,
-    labelledBy: "f-species-label",
-    onChange: (v) => {
-      shell.species = v;
-      renderViewing();
+  // ---- filter bar ----
+  const viewing = document.getElementById("viewing");
+  const untaggedBox = document.getElementById("include-untagged");
+  const filters = createFilters(document.getElementById("filters"), {
+    species: meta.species,
+    state: store.get(),
+    today,
+    weekendDef: profile.weekend_def,
+    untaggedBox,
+    onChange: (patch) => store.set(patch),
+    onPermits: (codes) => savePermits(codes),
+  });
+
+  const yearsOf = (s) => rangeYears(s);
+  const tagsInRange = (s) => yearsOf(s).flatMap((y) => tagsByYear[y] || []);
+  const ctxFor = (s) => {
+    const year = yearsOf(s)[0];
+    return { tags: tagsInRange(s), permits: permitsByYear[year] || [], year };
+  };
+  function paintFilters() {
+    const s = store.get();
+    filters.update(s, ctxFor(s));
+    renderViewing(viewing, s, meta.species, tagsInRange(s));
+  }
+
+  async function loadYears(s) {
+    const missing = yearsOf(s).filter((y) => !(y in tagsByYear));
+    if (!missing.length) return false;
+    await Promise.all(
+      missing.map(async (y) => {
+        const [t, p] = await Promise.all([
+          getJSON(`/api/tags?year=${y}`),
+          getJSON(`/api/permits?year=${y}`),
+        ]);
+        tagsByYear[y] = t.tags;
+        permitsByYear[y] = p.permits;
+      }),
+    );
+    return true;
+  }
+
+  async function savePermits(codes) {
+    const s = store.get();
+    const year = yearsOf(s)[0];
+    const others = (permitsByYear[year] || []).filter(
+      (p) => !MAP_PERMITS.some(([k]) => k === p),
+    );
+    try {
+      const saved = await putJSON(`/api/permits?year=${year}`, { permits: [...others, ...codes] });
+      permitsByYear[year] = saved.permits;
+      window.dispatchEvent(new CustomEvent(PERMITS_CHANGED, { detail: { ...saved, source: "map" } }));
+      paintFilters();
+      fetcher.schedule(availabilityPath(store.get()));
+    } catch (e) {
+      toast(e.message || String(e), "error");
+      paintFilters(); // revert the chips to what the server holds
+    }
+  }
+
+  // ---- availability ----
+  const fetcher = createFetcher(getJSON, {
+    onStart: () => mapCard.setAttribute("aria-busy", "true"),
+    onResult: (data) => {
+      mapCard.removeAttribute("aria-busy");
+      availability = data;
+      const statuses = Object.fromEntries(
+        Object.entries(data.units).map(([id, u]) => [id, u.status]),
+      );
+      map.setStatuses(statuses);
+      renderLegend(legend, data.summary, data.include_untagged);
+      renderSide();
+      // Test hooks: the query the map shows, and a counter that ticks on every repaint.
+      document.body.dataset.availability = availabilityPath(store.get());
+      document.body.dataset.availabilitySeq = String(++repaints);
+    },
+    onError: (err) => {
+      mapCard.removeAttribute("aria-busy");
+      toast(err.message || String(err), "error");
     },
   });
-  const sep = document.createElement("span");
-  sep.className = "chip-sep";
-  sep.setAttribute("aria-hidden", "true");
-  species.insertBefore(sep, species.children[BIG_GAME_COUNT]);
 
-  // My tags: filled tags are dropped here the moment tags.js reports a change,
-  // which is what invalidates the availability query (T-07 wires the map itself).
-  const tagsRow = document.createElement("div");
-  tagsRow.className = "chips";
-  tagsRow.id = "f-tags-row";
-  function renderTagsRow() {
-    const active = activeTags(shell.tags);
-    const chips = active.map((t) => {
-      const chip = textEl("span", tagChipLabel(t), "chip tagchip");
-      // A static list, not a toggle: no aria-pressed on a span (it isn't allowed
-      // without a widget role, and the chips aren't clickable yet — T-07 owns that).
-      chip.dataset.tagId = String(t.id);
-      return chip;
-    });
-    const manage = textEl("a", active.length ? "Manage tags" : "No tags yet → add one", "chip");
-    manage.href = "#/tags";
-    tagsRow.replaceChildren(...chips, manage);
+  function syncUrl() {
+    if (parseRoute(location.hash).tab !== "map") return;
+    const hash = `#/map?${toQuery(store.get())}`;
+    if (location.hash !== hash) history.replaceState(null, "", hash);
   }
-  renderTagsRow();
+
+  store.subscribe((s, prev) => {
+    syncUrl();
+    paintFilters();
+    fetcher.schedule(availabilityPath(s));
+    if (s.start !== prev.start || s.end !== prev.end) {
+      loadYears(s)
+        .then((loaded) => loaded && paintFilters())
+        .catch(() => {});
+    }
+  });
 
   window.addEventListener(TAGS_CHANGED, (e) => {
-    if (!e.detail || e.detail.year !== shell.year) return;
-    shell.tags = e.detail.tags;
-    renderTagsRow();
-    renderViewing();
+    if (!e.detail) return;
+    tagsByYear[e.detail.year] = e.detail.tags;
+    paintFilters();
+    fetcher.schedule(availabilityPath(store.get()));
   });
-  getJSON(`/api/tags?year=${shell.year}`)
-    .then(({ tags }) => {
-      shell.tags = tags;
-      renderTagsRow();
-      renderViewing();
-    })
-    .catch(() => {
-      // offline: keep the empty tag row
-    });
+  window.addEventListener(PERMITS_CHANGED, (e) => {
+    if (!e.detail || e.detail.source === "map") return;
+    permitsByYear[e.detail.year] = e.detail.permits;
+    paintFilters();
+    fetcher.schedule(availabilityPath(store.get()));
+  });
 
-  const weapon = chipGroup({
-    id: "f-weapon",
-    items: WEAPONS.map(([k, label]) => [k, k === "all" ? "All" : label]),
-    value: shell.weapon,
-    labelledBy: "f-weapon-label",
-    onChange: (v) => {
-      shell.weapon = v;
-      renderViewing();
+  await loadYears(store.get()).catch(() => {});
+  paintFilters();
+  renderLegend(legend, {}, store.get().includeUntagged);
+  renderSide();
+  syncUrl();
+  await fetcher.now(availabilityPath(store.get()));
+
+  mapTab = {
+    /** A `#/map?...` route arrived (paste, bookmark, back/forward): adopt its filters. */
+    applyRoute(query) {
+      if (!hasFilterKeys(query)) {
+        syncUrl(); // bare #/map (the tab link): keep the current filters
+        return;
+      }
+      store.set(stateFromQuery(query, defaults, { speciesIds }));
     },
-  });
-
-  const permits = chipGroup({
-    id: "f-permits",
-    items: PERMITS,
-    multi: true,
-    value: shell.permits,
-    labelledBy: "f-permits-label",
-    onChange: (v) => {
-      shell.permits = v;
-    },
-  });
-
-  const dates = document.createElement("div");
-  dates.className = "dates";
-  const in1 = document.createElement("input");
-  const in2 = document.createElement("input");
-  for (const [inp, name] of [
-    [in1, "Start date"],
-    [in2, "End date"],
-  ]) {
-    inp.type = "date";
-    inp.setAttribute("aria-label", name);
-  }
-  dates.append(in1, textEl("span", "→"), in2);
-
-  const presetRanges = () => {
-    const p = presets(today);
-    return Object.fromEntries(PRESETS.map(([k]) => [k, p[k].map(toISO)]));
+    store,
+    map,
   };
-  const matchingPreset = () => {
-    const ranges = presetRanges();
-    const hit = PRESETS.find(([k]) => ranges[k][0] === shell.start && ranges[k][1] === shell.end);
-    return hit ? hit[0] : null;
-  };
-  const presetChips = chipGroup({
-    id: "f-presets",
-    items: PRESETS,
-    value: matchingPreset(),
-    label: "Date presets",
-    onChange: (k) => {
-      [shell.start, shell.end] = presetRanges()[k];
-      syncDates();
-    },
-  });
-
-  function syncDates() {
-    in1.value = shell.start;
-    in2.value = shell.end;
-    presetChips.setValue(matchingPreset());
-    renderViewing();
-  }
-  in1.addEventListener("change", () => {
-    if (!in1.value) return;
-    shell.start = in1.value;
-    if (shell.end < shell.start) shell.end = shell.start;
-    syncDates();
-  });
-  in2.addEventListener("change", () => {
-    if (!in2.value) return;
-    shell.end = in2.value;
-    if (shell.end < shell.start) shell.start = shell.end;
-    syncDates();
-  });
-
-  document
-    .getElementById("filters")
-    .replaceChildren(
-      filterGroup("Species", "f-species", species),
-      filterGroup(`My tags (${today.getFullYear()})`, "f-tags", tagsRow),
-      filterGroup("Weapon", "f-weapon", weapon),
-      filterGroup("Permits", "f-permits", permits),
-      filterGroup("Dates", "f-dates", dates, presetChips),
-    );
-  syncDates();
-
-  document
-    .getElementById("map-wrap")
-    .replaceChildren(
-      card(
-        "Open Units Map",
-        "The GMU map arrives in T-07: green = open, yellow = restricted or partial, grey = closed.",
-      ),
-      card("Open units", "The results table (unit, status, overlapping seasons, source page) arrives in T-08."),
-    );
+  document.body.dataset.mapReady = "1";
 }
 
 // ---- tabs + hash routing -----------------------------------------------------
@@ -324,6 +368,7 @@ function route({ focus = false } = {}) {
     history.replaceState(null, "", tabHash(r.tab));
   }
   activate(r.tab, { focus });
+  if (r.tab === "map" && mapTab) mapTab.applyRoute(r.query);
 }
 
 function initTabs() {
@@ -347,6 +392,8 @@ function initTabs() {
 }
 
 initDisclaimer();
-initMapTab();
 initTabs();
 initVersion();
+initMapTab().catch((e) => {
+  toast(`The map failed to load: ${e.message || e}`, "error");
+});

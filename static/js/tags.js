@@ -12,6 +12,9 @@ import { ApiError, deleteJSON, getJSON, postJSON, putJSON } from "./api.js";
 import { card, textEl, toast } from "./ui.js";
 
 export const TAGS_CHANGED = "ihp:tags-changed";
+// Permits saved from either side (this tab or the map's permit chips, T-07):
+// detail `{year, permits, source}` where source is "tags" or "map".
+export const PERMITS_CHANGED = "ihp:permits-changed";
 
 const WEEKEND_DEFS = [
   ["fri_sun", "Fri – Sun (default)"],
@@ -318,6 +321,9 @@ function permitsCard() {
       try {
         const saved = await putJSON(`/api/permits?year=${state.year}`, { permits: wanted });
         state.permits = saved.permits;
+        window.dispatchEvent(
+          new CustomEvent(PERMITS_CHANGED, { detail: { ...saved, source: "tags" } }),
+        );
         toast("Permits saved.", "success");
       } catch (e) {
         box.checked = !box.checked;
@@ -430,6 +436,15 @@ export async function initTags(panel = document.getElementById("panel-tags")) {
     dlg.addEventListener("close", () => dlg.remove());
     dlg.showModal();
   }
+
+  // Keep the checkboxes in step with permits toggled from the map's filter bar.
+  window.addEventListener(PERMITS_CHANGED, (e) => {
+    if (!e.detail || e.detail.source === "tags" || e.detail.year !== state.year) return;
+    state.permits = e.detail.permits;
+    for (const box of panel.querySelectorAll("#permits input")) {
+      box.checked = state.permits.includes(box.value);
+    }
+  });
 
   try {
     const { profile } = await getJSON("/api/profile");
