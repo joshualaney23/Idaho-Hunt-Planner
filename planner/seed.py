@@ -18,8 +18,9 @@ from planner import db
 REPO_ROOT = Path(__file__).resolve().parent.parent
 UNITS_SEED_PATH = REPO_ROOT / "static" / "data" / "units_seed.json"
 
-# (id, label, icon, grp): the §5 / §5.3 species list. Icons: 🦌 deer-like, 🫎 elk/moose,
-# 🐻 bear, 🐆 mountain lion, 🐺 wolf, 🦃 turkey, 🐾 other mammals, 🐦 other birds.
+# (id, label, icon, grp): the §5 / §5.3 species list. Each icon is the animal itself or its
+# nearest emoji (🦌 also covers pronghorn, 🐈 bobcat, 🦝 predatory & unprotected, 🐓 pheasant);
+# 🐦 covers birds with no emoji of their own (grouse, quail, chukar, partridge, snipe, coot, crane).
 SPECIES: list[tuple[str, str, str, str]] = [
     # Big Game brochure
     ("deer", "Deer", "🦌", "big_game"),
@@ -35,30 +36,30 @@ SPECIES: list[tuple[str, str, str, str]] = [
     ("gray_partridge", "Gray partridge", "🐦", "upland_bird"),
     ("sage_grouse", "Sage-grouse", "🐦", "upland_bird"),
     ("sharptail", "Sharp-tailed grouse", "🐦", "upland_bird"),
-    ("pheasant", "Pheasant", "🐦", "upland_bird"),
+    ("pheasant", "Pheasant", "🐓", "upland_bird"),
     ("turkey", "Wild turkey", "🦃", "turkey"),
-    ("cottontail", "Cottontail rabbit", "🐾", "upland_animal"),
-    ("snowshoe_hare", "Snowshoe hare", "🐾", "upland_animal"),
-    ("red_squirrel", "Red squirrel", "🐾", "upland_animal"),
-    ("badger", "Badger", "🐾", "furbearer"),
-    ("bobcat", "Bobcat", "🐾", "furbearer"),
-    ("red_fox", "Red fox", "🐾", "furbearer"),
-    ("predatory_unprotected", "Predatory & unprotected", "🐾", "predatory"),
+    ("cottontail", "Cottontail rabbit", "🐇", "upland_animal"),
+    ("snowshoe_hare", "Snowshoe hare", "🐇", "upland_animal"),
+    ("red_squirrel", "Red squirrel", "🐿️", "upland_animal"),
+    ("badger", "Badger", "🦡", "furbearer"),
+    ("bobcat", "Bobcat", "🐈", "furbearer"),
+    ("red_fox", "Red fox", "🦊", "furbearer"),
+    ("predatory_unprotected", "Predatory & unprotected", "🦝", "predatory"),
     # Moose, Bighorn Sheep & Mountain Goat brochure (controlled only)
     ("moose", "Moose", "🫎", "big_game"),
-    ("bighorn_rocky", "Rocky Mountain bighorn sheep", "🐾", "big_game"),
-    ("bighorn_california", "California bighorn sheep", "🐾", "big_game"),
-    ("mountain_goat", "Mountain goat", "🐾", "big_game"),
+    ("bighorn_rocky", "Rocky Mountain bighorn sheep", "🐏", "big_game"),
+    ("bighorn_california", "California bighorn sheep", "🐏", "big_game"),
+    ("mountain_goat", "Mountain goat", "🐐", "big_game"),
     # Migratory Game Bird brochure
-    ("duck", "Ducks & mergansers", "🐦", "migratory"),
-    ("goose_canada", "Canada goose", "🐦", "migratory"),
-    ("goose_whitefronted", "White-fronted goose", "🐦", "migratory"),
-    ("goose_light", "Light geese", "🐦", "migratory"),
-    ("swan", "Tundra swan", "🐦", "migratory"),
+    ("duck", "Ducks & mergansers", "🦆", "migratory"),
+    ("goose_canada", "Canada goose", "🪿", "migratory"),
+    ("goose_whitefronted", "White-fronted goose", "🪿", "migratory"),
+    ("goose_light", "Light geese", "🪿", "migratory"),
+    ("swan", "Tundra swan", "🦢", "migratory"),
     ("snipe", "Wilson's snipe", "🐦", "migratory"),
     ("coot", "American coot", "🐦", "migratory"),
-    ("dove", "Mourning & white-winged dove", "🐦", "migratory"),
-    ("crow", "American crow", "🐦", "migratory"),
+    ("dove", "Mourning & white-winged dove", "🕊️", "migratory"),
+    ("crow", "American crow", "🐦‍⬛", "migratory"),
     ("sandhill_crane", "Sandhill crane", "🐦", "migratory"),
 ]
 

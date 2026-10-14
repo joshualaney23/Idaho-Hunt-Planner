@@ -142,7 +142,12 @@ def test_species_ids_match_design():
     assert {s[3] for s in seed.SPECIES} <= grps
     icons = {s[0]: s[2] for s in seed.SPECIES}
     assert (icons["turkey"], icons["mountain_lion"]) == ("🦃", "🐆")
-    assert {s[2] for s in seed.SPECIES} == {"🦌", "🫎", "🐻", "🐆", "🐺", "🦃", "🐾", "🐦"}
+    assert (icons["bighorn_rocky"], icons["bighorn_california"], icons["mountain_goat"]) == (
+        "🐏",
+        "🐏",
+        "🐐",
+    )
+    assert "🐾" not in {s[2] for s in seed.SPECIES}  # every species gets an animal, not a track
 
 
 def test_tag_types_match_design(seeded):
