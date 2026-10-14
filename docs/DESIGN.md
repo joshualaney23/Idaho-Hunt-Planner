@@ -100,7 +100,7 @@ A purely static page can't reliably parse PDF tables, and `localStorage` is frag
 │  └─ review.js     Regulation import → review → publish                     │
 └──────────────▲─────────────────────────────────────────────────────────────┘
                │ JSON over fetch()
-┌──────────────┴──────────── Python 3.11+ · Flask (single process) ──────────┐
+┌──────────────┴──────────── Python 3.12 · Flask (single process) ───────────┐
 │  api.py            REST endpoints                                          │
 │  engine.py         availability engine (pure functions, unit-tested)       │
 │  importer/         pdfplumber extraction + per-section parsers → staging   │
@@ -397,7 +397,7 @@ CREATE TABLE my_tags (
 
 ### 5.1 Restriction codes (closed vocabulary)
 `whitetail_only`, `mule_deer_only`, `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`, `youth_only`, `private_land_only`, `portion_of_unit`, `outfitter_only`, `cwd_testing`, `motorized_rule`, `second_tag_prohibited`, `see_notes`.
-Each code has a `severity`: **narrowing** codes (`*_only`, `portion_of_unit`, `youth_only` for adults) make a unit *restricted*. **Informational** codes (`cwd_testing`, `motorized_rule`, `second_tag_prohibited`) show as badges but don't change color. The mapping lives in `planner/engine.py::RESTRICTIONS` and is mirrored to the frontend via `/api/meta`.
+Each code has a `severity`: **narrowing** codes (`whitetail_only`, `mule_deer_only`, `youth_only` for adults, `private_land_only`, `portion_of_unit`, `outfitter_only`, and `see_notes`: unexplained conditions stay yellow, never green — D3) make a unit *restricted*. **Informational** codes (`cwd_testing`, `motorized_rule`, `second_tag_prohibited`, plus the animal-limit codes `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`: they limit which animal may be taken, but the unit is still open to hunt) show as badges but don't change color. The mapping lives in `planner/engine.py::RESTRICTIONS` and is mirrored to the frontend via `/api/meta`.
 
 ### 5.2 Upland areas
 Upland seasons attach to **areas**, which are resolved into `season_units` rows with `full`/`partial` coverage at import time using `static/data/county_units.json` (precomputed percentage of each GMU inside each county). Rules:
@@ -649,7 +649,7 @@ Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-0
 ## 12. Tickets
 
 Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGENT_CONTEXT.md` first**, then the sections the ticket cites. Shared conventions:
-- Python 3.11+, `ruff` formatting, type hints, no ORM.
+- Python 3.12, `ruff` formatting, type hints, no ORM.
 - Frontend: vanilla ES modules, no build step, no framework, CSS variables from `theme.css` only (no hard-coded colors).
 - All tests via `pytest -q` from the repo root. A ticket isn't done until its tests pass and `python -m planner` still starts.
 - Never commit `data/` (DB, PDFs, cache). Do commit `static/data/*.json` and `tests/fixtures/*`.
@@ -659,7 +659,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ### T-01 · Repository scaffold & dev environment
 **Depends on:** none · **Size:** S
-**Description:** Create the layout in §3.3 with empty or minimal modules. Add `requirements.txt` (`flask>=3`, `pdfplumber>=0.11`), `requirements-dev.txt` (`pytest`, `ruff`, `shapely>=2`, `pyproj`, `requests`), and a `.gitignore` covering `/data/` (anchored to the repo root so `static/data/` stays committed), `.venv/`, `__pycache__/`, `*.db`. Make `planner/__main__.py` start Flask on `127.0.0.1:5050` (port overridable via `PLANNER_PORT`), create `data/` if missing, and open the default browser unless `--no-browser` is passed. `app.py` exposes `create_app(db_path=None)` and serves `static/index.html` at `/`. Add `GET /api/health` → `{"ok":true,"version":…}`. README covers setup (`python -m venv .venv`, install, run) and the disclaimer. Add a GitHub Actions workflow running `ruff check` and `pytest` on 3.11 and 3.12.
+**Description:** Create the layout in §3.3 with empty or minimal modules. Add `requirements.txt` (`flask>=3`, `pdfplumber>=0.11`), `requirements-dev.txt` (`pytest`, `ruff`, `shapely>=2`, `pyproj`, `requests`), and a `.gitignore` covering `/data/` (anchored to the repo root so `static/data/` stays committed), `.venv/`, `__pycache__/`, `*.db`. Make `planner/__main__.py` start Flask on `127.0.0.1:5050` (port overridable via `PLANNER_PORT`), create `data/` if missing, and open the default browser unless `--no-browser` is passed. `app.py` exposes `create_app(db_path=None)` and serves `static/index.html` at `/`. Add `GET /api/health` → `{"ok":true,"version":…}`. README covers setup (`python -m venv .venv`, install, run) and the disclaimer. Add a GitHub Actions workflow running `ruff check` and `pytest` on 3.12.
 **Acceptance criteria:**
 - `python -m planner --no-browser` serves `/` (placeholder page) and `/api/health`.
 - `pytest` passes with at least one smoke test using Flask's test client.
@@ -689,7 +689,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ### T-04 · Database schema, migrations & seed
 **Depends on:** T-01 (T-02 for unit seed data) · **Size:** M
-**Description:** Implement `planner/schema.sql` exactly as §5 and `planner/db.py` with `connect(path)` (`PRAGMA foreign_keys=ON`, `journal_mode=WAL`, `row_factory=sqlite3.Row`), `migrate()` (applies `schema.sql` at version 1; future migrations live in `planner/migrations/NNN_*.sql` and are applied in order), and small helpers `q(sql, *args)`, `q1`, `exec`, `tx()` context manager. `planner/seed.py` inserts species (§5 list with icons 🦌 🫎 🐻 🐾 🐺 🐦), tag types (§5), units from `units_seed.json`, and default `zone_units` for the current year from GIS `Elk_Zone`. Seeding is idempotent (`INSERT OR IGNORE`). Also define `RESTRICTIONS` (code → {label, severity}) per §5.1 in `planner/engine.py` as a constant (engine logic comes in T-06).
+**Description:** Implement `planner/schema.sql` exactly as §5 and `planner/db.py` with `connect(path)` (`PRAGMA foreign_keys=ON`, `journal_mode=WAL`, `row_factory=sqlite3.Row`), `migrate()` (applies `schema.sql` at version 1; future migrations live in `planner/migrations/NNN_*.sql` and are applied in order), and small helpers `q(sql, *args)`, `q1`, `exec`, `tx()` context manager. `planner/seed.py` inserts species (§5 list; each icon is the animal or its nearest emoji, never a generic 🐾 track: e.g. turkey 🦃, mountain lion 🐆, bighorn sheep 🐏, mountain goat 🐐, 🐦 only for birds with no emoji of their own), tag types (§5), units from `units_seed.json`, and default `zone_units` for the current year from GIS `Elk_Zone`. Seeding is idempotent (`INSERT OR IGNORE`). Also define `RESTRICTIONS` (code → {label, severity}) per §5.1 in `planner/engine.py` as a constant (engine logic comes in T-06).
 **Acceptance criteria:**
 - A fresh DB is created on first run. Re-running doesn't duplicate rows.
 - Tests cover migrate on a temp DB, seed counts (≥ 100 units, ≥ 11 tag types), and FK enforcement (inserting a season_unit with an unknown unit fails).
