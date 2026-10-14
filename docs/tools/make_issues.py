@@ -36,10 +36,9 @@ PHASE_OF["T-24"] = 4
 for t in ["T-25", "T-26"]: PHASE_OF[t] = 5
 for t in ["T-19", "T-20", "T-21"]: PHASE_OF[t] = 6
 
-BUILD_ORDER = [["T-01", "T-04", "T-05"], ["T-02", "T-03", "T-10"], ["T-22"], ["T-11", "T-17a"], ["T-17b"], ["T-06"],
-               ["T-09", "T-15"], ["T-07", "T-08"], ["T-17c"], ["T-16"]]
-GROUPS = [["T-01", "T-04", "T-05"], ["T-17a", "T-17b"], ["T-07", "T-08"]]
-SEPARATE_PARSERS = {"T-11", "T-17a", "T-12", "T-14", "T-23", "T-24", "T-25", "T-26"}
+BUILD_ORDER = [["T-01"], ["T-02", "T-03", "T-05"], ["T-04"], ["T-10"], ["T-22"], ["T-11", "T-17a"],
+               ["T-17b"], ["T-06"], ["T-09", "T-15"], ["T-07"], ["T-08"], ["T-17c"], ["T-16"]]
+SEPARATE_PARSERS = {"T-11", "T-17a", "T-17b", "T-12", "T-14", "T-23", "T-24", "T-25", "T-26"}
 
 AREA = {  # area labels
     "T-01": ["infra"], "T-02": ["gis"], "T-03": ["frontend"], "T-04": ["backend"],
@@ -184,7 +183,6 @@ def render(t, tickets, conventions, issue_map):
     ref = lambda x: f"#{issue_map[x]} ({x})" if x in issue_map else f"{x}"
     blocks = [o["id"] for o in tickets if t["id"] in o["deps"]]
     ph = PHASE_OF[t["id"]]
-    group = next((g for g in GROUPS if t["id"] in g), None)
     num = issue_map.get(t["id"])
     lines = []
     lines.append(f"> **{t['id']}** from [`docs/DESIGN.md` §12]({BLOB}/docs/DESIGN.md#{anchor(t['heading'])}) · "
@@ -195,17 +193,14 @@ def render(t, tickets, conventions, issue_map):
         dep_line += f"  _(as written in the doc: {t['dep_text']})_"
     lines.append(f"> **Depends on:** {dep_line}")
     lines.append(f"> **Blocks:** {', '.join(ref(b) for b in blocks) or 'none'}")
-    if group:
-        others = [g for g in group if g != t["id"]]
-        lines.append(f"> **Session grouping (§14):** implement together with {', '.join(ref(o) for o in others)} in one agent session.")
-    elif t["id"] in SEPARATE_PARSERS:
-        lines.append("> **Session grouping (§14):** parser ticket — give it its own fresh agent session.")
+    if t["id"] in SEPARATE_PARSERS:
+        lines.append("> **Session (§14):** one fresh agent session and one PR for this ticket (parser ticket, the hardest kind). Start only after its dependencies are merged.")
     else:
-        lines.append("> **Session grouping (§14):** one fresh agent session for this ticket.")
+        lines.append("> **Session (§14):** one fresh agent session and one PR for this ticket. Start only after its dependencies are merged.")
     step = next((i + 1 for i, g in enumerate(BUILD_ORDER) if t["id"] in g), None)
     if step:
         par = [x for x in BUILD_ORDER[step - 1] if x != t["id"]]
-        lines.append(f"> **Build order (§14):** step {step} of {len(BUILD_ORDER)} (MVP path)" + (f", alongside {', '.join(ref(x) for x in par)}" if par else ""))
+        lines.append(f"> **Build order (§14):** step {step} of {len(BUILD_ORDER)} (MVP path)" + (f"; can run in parallel with {', '.join(ref(x) for x in par)}" if par else ""))
     else:
         lines.append(f"> **Build order (§14):** after the MVP path ({PHASES[PHASE_OF[t['id']]][0]})")
     lines.append("")
