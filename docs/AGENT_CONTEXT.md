@@ -35,10 +35,11 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 | `scripts/render_gmu_svg.py` | T-02: renders `gmu.json` to a stroke-free SVG for visual gap checks (`--crop X Y SIZE`) |
 | `static/data/gmu.json` | T-02 geometry: 100 units, 139 KB, `viewBox` `0 0 430 690`. `d` is `M<abs> l<relative deltas> Z` (1 decimal, 1 svg unit ≈ 1.1 km); `YNP` is `"closed": true`. |
 | `static/data/units_seed.json` | T-02: `[{id, sort_key, elk_zone, area_acres}]` in map order; T-04 seeds the `units` table from it |
-| `planner/` | T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `GET /api/health` (`api.py`), `__version__` in `__init__.py`. Other modules are docstring stubs for their tickets. |
+| `planner/` | T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `GET /api/health` (`api.py`), `__version__` in `__init__.py`. `dates.py` (T-05): `default_range`, `overlap`, `days`, `parse_iso`, `to_iso`, `fmt_short`, presets (`presets()` returns all five). Other modules are docstring stubs for their tickets. |
+| `static/js/dates.js` | T-05 JS twin of `planner/dates.py` (local-noon `Date`s; camelCase + snake_case aliases). `dates.test.mjs` runs `node --test`. |
 | `static/index.html` | Placeholder page with disclaimer; T-03 replaces it with the app shell |
-| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port), `test_build_gmu_geometry.py` (T-02: decodes the committed paths with an independent SVG number parser and asserts the units tile Idaho with no gaps; `fixtures/gmu_sample.geojson` is its offline 3-unit input) |
-| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` on 3.11 and 3.12 for pushes to main and PRs |
+| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port), `test_dates.py` (also runs the JS twin under 4 time zones when node is installed; `fixtures/dates_cases.json` is the shared Python/JS date contract: change it, not just one twin), `test_build_gmu_geometry.py` (T-02: decodes the committed paths with an independent SVG number parser and asserts the units tile Idaho with no gaps; `fixtures/gmu_sample.geojson` is its offline 3-unit input) |
+| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + `node --test static/js/*.test.mjs` (TZ=America/Boise) on 3.11 and 3.12 for pushes to main and PRs |
 | `pyproject.toml` | ruff + pytest config (`docs/` excluded from ruff) |
 
 ## Commands
@@ -56,6 +57,7 @@ pytest -q && ruff check . && ruff format --check .   # must pass before a PR (CI
                                              #   tests/test_startup.py boots `python -m planner`)
 
 ruff format .                                # formatter (config in pyproject.toml)
+TZ=America/Boise node --test static/js/*.test.mjs   # JS tests (node 22+; pytest also runs them)
 PLANNER_PORT=6060 python -m planner          # alternate port; omit --no-browser to open browser
 
 # Map geometry (T-02; regenerate only when IDFG updates the units)

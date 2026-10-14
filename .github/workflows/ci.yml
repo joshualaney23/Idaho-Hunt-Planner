@@ -24,4 +24,11 @@ jobs:
       - run: pip install -r requirements.txt -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - run: pytest -q
+      # JS twins of Python modules (T-05). Boise time zone so DST bugs surface.
+      - run: node --test static/js/*.test.mjs
+        env:
+          TZ: America/Boise
