@@ -165,7 +165,7 @@ Idaho-Hunt-Planner/
 │   ├── index.html
 │   ├── css/theme.css           # tokens (§4)
 │   ├── css/app.css
-│   ├── js/{main,api,state,map,filters,results,drawer,tags,review,seasons,dates}.js
+│   ├── js/{main,ui,router,api,state,map,filters,results,drawer,tags,review,seasons,dates}.js
 │   └── data/{gmu.json,county_units.json}
 ├── data/                       # git-ignored: planner.db, regs/
 ├── tests/
@@ -201,6 +201,8 @@ Reference: Treeline Hunt Research IQ. Working mockup: **`docs/mockup.html`** (op
 body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
 /* headings: "Bebas Neue", letter-spacing .06em; numerics & unit IDs: "DM Mono" */
 ```
+- `--text3` on `--bg` is only 3.96:1, below WCAG AA (4.5:1) for small text, so the app uses `--text2` for small labels (filter labels, version, breadcrumb) where the mockup used `--text3`. Keep `--text3` for large or decorative text (T-03, Lighthouse a11y).
+- `static/css/theme.css` is the only file with color literals. It also names the mockup's translucent tints (`--chip-on-bg`, `--badge-*`, `--map-label`, `--shadow`) and the font stacks with system fallbacks (`--font-body/display/mono`). `tests/test_static_shell.py` checks that the tokens match this block and that no other file has a literal color.
 
 ### 4.2 Layout (desktop ≥ 1100 px)
 

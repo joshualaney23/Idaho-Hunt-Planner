@@ -3,13 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Local planner for Idaho hunting seasons, tags and open units, built from the official IDFG regulations.">
   <title>Idaho Hunt Planner</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script type="module" src="/static/js/main.js"></script>
 </head>
 <body>
-  <h1>Idaho Hunt Planner</h1>
-  <p>Placeholder page. The app shell arrives in T-03.</p>
-  <p><strong>VERIFY:</strong> This is a planning aid, not legal advice. Always verify seasons,
-    units, and rules against the official
-    <a href="https://idfg.idaho.gov/rules">Idaho Fish and Game regulations</a> before you hunt.</p>
+  <aside class="banner" id="disclaimer" aria-label="Disclaimer">
+    <p><b>VERIFY</b> · This is a planning aid, not legal advice. Seasons are parsed from IDFG PDFs and
+      can be wrong. Always confirm against the official
+      <a href="https://idfg.idaho.gov/rules" target="_blank" rel="noopener">Idaho Fish and Game regulations</a>
+      before you hunt.</p>
+    <button type="button" class="icon-btn" id="disclaimer-dismiss" aria-label="Dismiss disclaimer for this session">×</button>
+  </aside>
+
+  <header class="app-header">
+    <h1>IDAHO <span>HUNT</span> PLANNER</h1>
+    <span class="ver" id="ver">v0.1.0 · no regs published</span>
+    <span class="sub">Where can I hunt this weekend?</span>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <a role="tab" id="tab-map" href="#/map" aria-controls="panel-map" aria-selected="true">🗺️ Where Can I Hunt</a>
+    <a role="tab" id="tab-tags" href="#/tags" aria-controls="panel-tags" aria-selected="false" tabindex="-1">🎟️ My Tags</a>
+    <a role="tab" id="tab-seasons" href="#/seasons" aria-controls="panel-seasons" aria-selected="false" tabindex="-1">📅 Season Table</a>
+    <a role="tab" id="tab-regs" href="#/regs" aria-controls="panel-regs" aria-selected="false" tabindex="-1">📥 Regulations</a>
+    <a role="tab" id="tab-settings" href="#/settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">⚙️ Settings</a>
+  </nav>
+
+  <main>
+    <section role="tabpanel" id="panel-map" aria-labelledby="tab-map">
+      <div class="viewing" id="viewing" aria-live="polite">Viewing …</div>
+      <!-- Filter-bar container. T-03 renders a static shell; T-07 (filters.js) owns it. -->
+      <div class="filters" id="filters"></div>
+      <label class="checkline"><input type="checkbox" id="include-untagged"> Also show seasons I don't hold a tag for (gold dashed outline)</label>
+      <div class="wrap" id="map-wrap"></div>
+    </section>
+    <section role="tabpanel" id="panel-tags" aria-labelledby="tab-tags" hidden></section>
+    <section role="tabpanel" id="panel-seasons" aria-labelledby="tab-seasons" hidden></section>
+    <section role="tabpanel" id="panel-regs" aria-labelledby="tab-regs" hidden></section>
+    <section role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" hidden></section>
+  </main>
+
+  <footer class="app-footer">
+    Planning aid only. Verify every season against the official
+    <a href="https://idfg.idaho.gov/rules" target="_blank" rel="noopener">IDFG regulations</a>.
+  </footer>
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 </body>
 </html>

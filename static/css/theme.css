@@ -1,0 +1,95 @@
+/* Design tokens, DESIGN.md §4.1 (taken from the Treeline stylesheet).
+ *
+ * This is the ONLY file allowed to contain literal colors. Everything else
+ * (app.css, inline styles set from JS) references these variables, and
+ * tests/test_static_shell.py enforces that.
+ */
+:root {
+  /* surfaces */
+  --bg: #0c0e0d;
+  --bg2: #131613;
+  --bg3: #1a1d1a;
+  --bg4: #232723;
+  --bg5: #2b302b;
+  /* text */
+  --text: #e8ebd9;
+  --text2: #9aa68f;
+  --text3: #6a7460;
+  /* brand */
+  --gold: #d4b15e;
+  --gold2: #e8c878;
+  --tl-green: #7a9a3e;
+  --tl-green2: #a8c860;
+  /* scale */
+  --sc1: #c44040;
+  --sc2: #c47830;
+  --sc3: #c4b840;
+  --sc4: #8ab840;
+  --sc5: #3aaa78;
+  /* weapons */
+  --bow: #b8a038;
+  --rifle: #4a7fa0;
+  /* trend */
+  --up: #2d7a4a;
+  --dn: #7a3030;
+  --flat: #5a6a3a;
+  /* semantic (map status, §4.4) */
+  --open: var(--sc5);
+  --restricted: var(--sc3);
+  --closed: var(--bg4);
+  --notag: transparent;
+
+  /* Translucent tints used by docs/mockup.html, named here so app.css stays
+     literal-free. */
+  --chip-on-bg: rgba(122, 154, 62, 0.18); /* --tl-green @ 18% */
+  --badge-any-bg: rgba(74, 127, 160, 0.25); /* --rifle @ 25% */
+  --badge-any-fg: #8fc0dd;
+  --badge-archery-bg: rgba(184, 160, 56, 0.22); /* --bow @ 22% */
+  --badge-muzzleloader-bg: rgba(196, 120, 48, 0.22); /* --sc2 @ 22% */
+  --badge-muzzleloader-fg: #e0a060;
+  --badge-restricted-bg: rgba(196, 184, 64, 0.18); /* --sc3 @ 18% */
+  --badge-error-bg: rgba(196, 64, 64, 0.2); /* --sc1 @ 20% */
+  --badge-ok-bg: rgba(58, 170, 120, 0.2); /* --sc5 @ 20% */
+  --map-label: rgba(12, 14, 13, 0.75); /* --bg @ 75%, unit IDs on filled units */
+  --shadow: rgba(0, 0, 0, 0.5);
+
+  /* type: Google Fonts first, system fallbacks when offline */
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Bebas Neue", Impact, "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+
+a {
+  color: var(--gold2);
+}
+
+/* Visible keyboard focus ring in --gold2 (T-03 acceptance criterion). */
+:focus-visible {
+  outline: 2px solid var(--gold2);
+  outline-offset: 2px;
+}
