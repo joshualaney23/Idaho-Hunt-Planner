@@ -51,6 +51,7 @@
   --badge-error-bg: rgba(196, 64, 64, 0.2); /* --sc1 @ 20% */
   --badge-ok-bg: rgba(58, 170, 120, 0.2); /* --sc5 @ 20% */
   --map-label: rgba(12, 14, 13, 0.75); /* --bg @ 75%, unit IDs on filled units */
+  --err-text: #e58a8a; /* T-09 inline form errors: --sc1 is only 3.7:1 on --bg2, this is 7.3:1 */
   --shadow: rgba(0, 0, 0, 0.5);
 
   /* type: Google Fonts first, system fallbacks when offline */

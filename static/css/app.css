@@ -163,6 +163,12 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+/* Map filter bar: the tags you hold, listed (T-09). --text keeps AA on the tint. */
+.chip.tagchip {
+  background: var(--chip-on-bg);
+  border-color: var(--tl-green);
+  color: var(--text);
+}
 .chip-sep {
   width: 1px;
   align-self: stretch;
@@ -330,4 +336,141 @@ input[type="date"] {
     margin-left: 0;
     width: 100%;
   }
+}
+
+
+/* ---- My Tags tab (T-09) -------------------------------------------------- */
+.tagbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 14px 20px 0;
+  flex-wrap: wrap;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.field > label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text2);
+}
+.field[hidden] {
+  display: none;
+}
+.field .muted {
+  margin: 0;
+}
+select,
+input[type="text"] {
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  max-width: 320px;
+}
+.err {
+  margin: 0;
+  font-size: 12px;
+  color: var(--err-text);
+}
+.err[hidden] {
+  display: none;
+}
+[aria-invalid="true"] {
+  border-color: var(--err-text);
+}
+
+.taglist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tagrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.tagrow.is-filled {
+  background: var(--bg2);
+  border-style: dashed;
+}
+.tagrow.is-filled .tmain b {
+  color: var(--text2);
+  font-weight: 400;
+}
+/* The "on" state keeps --text for the label: the green chip foreground is only
+   3.5:1 on this background (WCAG AA needs 4.5 for 13 px). */
+.chip.filltoggle[aria-pressed="true"] {
+  background: var(--badge-ok-bg);
+  border-color: var(--sc5);
+  color: var(--text);
+}
+.tagrow .tmain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tagrow .tmain b {
+  color: var(--text);
+  font-weight: 500;
+}
+.cardfoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.checklist .checkline {
+  /* 18 px box + 7 px padding keeps pointer targets ≥ 24 px apart (WCAG 2.5.8). */
+  padding: 7px 0;
+  min-height: 24px;
+}
+.checklist input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+dialog {
+  background: var(--bg2);
+  border: 1px solid var(--bg5);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 16px;
+  min-width: min(420px, 90vw);
+}
+dialog::backdrop {
+  background: var(--shadow);
+}
+dialog h2 {
+  font-size: 20px;
+  margin: 0 0 12px;
+  color: var(--gold2);
 }
