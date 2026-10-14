@@ -18,15 +18,15 @@ from planner import db
 REPO_ROOT = Path(__file__).resolve().parent.parent
 UNITS_SEED_PATH = REPO_ROOT / "static" / "data" / "units_seed.json"
 
-# (id, label, icon, grp): the §5 / §5.3 species list. Icons are the §12 T-04 set
-# 🦌 🫎 🐻 🐾 🐺 🐦 (deer-like, moose/elk, bear, other mammals, wolf, birds).
+# (id, label, icon, grp): the §5 / §5.3 species list. Icons: 🦌 deer-like, 🫎 elk/moose,
+# 🐻 bear, 🐆 mountain lion, 🐺 wolf, 🦃 turkey, 🐾 other mammals, 🐦 other birds.
 SPECIES: list[tuple[str, str, str, str]] = [
     # Big Game brochure
     ("deer", "Deer", "🦌", "big_game"),
     ("elk", "Elk", "🫎", "big_game"),
     ("pronghorn", "Pronghorn", "🦌", "big_game"),
     ("black_bear", "Black bear", "🐻", "big_game"),
-    ("mountain_lion", "Mountain lion", "🐾", "big_game"),
+    ("mountain_lion", "Mountain lion", "🐆", "big_game"),
     ("wolf", "Gray wolf", "🐺", "big_game"),
     # Upland Game, Turkey & Furbearer brochure
     ("forest_grouse", "Forest grouse", "🐦", "upland_bird"),
@@ -36,7 +36,7 @@ SPECIES: list[tuple[str, str, str, str]] = [
     ("sage_grouse", "Sage-grouse", "🐦", "upland_bird"),
     ("sharptail", "Sharp-tailed grouse", "🐦", "upland_bird"),
     ("pheasant", "Pheasant", "🐦", "upland_bird"),
-    ("turkey", "Wild turkey", "🐦", "turkey"),
+    ("turkey", "Wild turkey", "🦃", "turkey"),
     ("cottontail", "Cottontail rabbit", "🐾", "upland_animal"),
     ("snowshoe_hare", "Snowshoe hare", "🐾", "upland_animal"),
     ("red_squirrel", "Red squirrel", "🐾", "upland_animal"),

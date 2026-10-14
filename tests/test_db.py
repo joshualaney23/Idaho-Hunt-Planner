@@ -140,7 +140,9 @@ def test_species_ids_match_design():
     assert {s[0] for s in seed.SPECIES} == design_ids
     grps = set(re.findall(r"'([a-z_]+)'", comment.split("grp:")[1]))
     assert {s[3] for s in seed.SPECIES} <= grps
-    assert {s[2] for s in seed.SPECIES} == {"🦌", "🫎", "🐻", "🐾", "🐺", "🐦"}
+    icons = {s[0]: s[2] for s in seed.SPECIES}
+    assert (icons["turkey"], icons["mountain_lion"]) == ("🦃", "🐆")
+    assert {s[2] for s in seed.SPECIES} == {"🦌", "🫎", "🐻", "🐆", "🐺", "🦃", "🐾", "🐦"}
 
 
 def test_tag_types_match_design(seeded):
