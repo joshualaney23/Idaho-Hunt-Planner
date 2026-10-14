@@ -1,0 +1,333 @@
+/* App shell layout and components (DESIGN.md §4.2, docs/mockup.html).
+ * Colors come only from the variables in theme.css; no literals here.
+ */
+
+/* ---- disclaimer banner ------------------------------------------------ */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--bg5);
+  color: var(--text2);
+  font-size: 12px;
+  padding: 6px 20px;
+}
+.banner b {
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+.banner p {
+  margin: 0;
+  flex: 1;
+}
+.banner[hidden] {
+  display: none;
+}
+.icon-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text2);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  color: var(--gold2);
+  border-color: var(--bg5);
+}
+
+/* ---- header ------------------------------------------------------------ */
+.app-header {
+  padding: 16px 20px 6px;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.app-header h1 {
+  font-size: 34px;
+  margin: 0;
+  color: var(--text);
+  line-height: 1.1;
+}
+.app-header h1 span {
+  color: var(--gold);
+}
+.app-header .ver {
+  font-family: var(--font-mono);
+  color: var(--text2);
+  font-size: 12px;
+}
+.app-header .sub {
+  color: var(--text2);
+  font-size: 13px;
+  margin-left: auto;
+}
+
+/* ---- tab bar ----------------------------------------------------------- */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--bg5);
+  overflow-x: auto;
+}
+.tabs a {
+  color: var(--text2);
+  padding: 10px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.tabs a:hover {
+  color: var(--text);
+}
+.tabs a[aria-selected="true"] {
+  color: var(--gold2);
+  border-bottom-color: var(--gold);
+}
+.tabs a:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ---- "Viewing …" breadcrumb --------------------------------------------- */
+.viewing {
+  margin: 14px 20px 0;
+  font-size: 12px;
+  color: var(--text2);
+}
+.viewing b {
+  color: var(--gold2);
+  font-weight: 500;
+}
+
+/* ---- filter bar -------------------------------------------------------- */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 10px 20px 14px;
+  align-items: flex-end;
+}
+.fg {
+  min-width: 0;
+  max-width: 100%;
+}
+.fg .l {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text2);
+  margin-bottom: 4px;
+}
+.fg .dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text2);
+}
+.fg .dates + .chips {
+  margin-top: 4px;
+}
+.chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.chip {
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  color: var(--text2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.chip:hover:not(:disabled) {
+  color: var(--text);
+}
+.chip[aria-pressed="true"] {
+  background: var(--chip-on-bg);
+  border-color: var(--tl-green);
+  color: var(--tl-green2);
+}
+.chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.chip-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--bg5);
+  margin: 0 4px;
+}
+input[type="date"] {
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  color-scheme: dark;
+}
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text2);
+  font-size: 13px;
+  padding: 0 20px 14px;
+}
+.checkline input {
+  accent-color: var(--gold);
+}
+
+/* ---- two-column card layout --------------------------------------------- */
+.wrap {
+  display: grid;
+  grid-template-columns: minmax(420px, 620px) 1fr;
+  gap: 20px;
+  padding: 0 20px 30px;
+}
+.wrap.single {
+  grid-template-columns: 1fr;
+  padding-top: 20px;
+}
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--bg5);
+  border-radius: 8px;
+  padding: 14px;
+  min-width: 0;
+}
+.card h2 {
+  font-size: 20px;
+  margin: 0 0 8px;
+  color: var(--gold2);
+}
+.placeholder {
+  color: var(--text2);
+  font-size: 13px;
+  margin: 0;
+}
+.placeholder + .placeholder {
+  margin-top: 6px;
+}
+.muted {
+  color: var(--text2);
+  font-size: 12px;
+}
+.u {
+  font-family: var(--font-mono);
+  color: var(--gold2);
+}
+
+/* ---- badges ------------------------------------------------------------ */
+.badge {
+  display: inline-block;
+  font-size: 10.5px;
+  padding: 0 6px;
+  border-radius: 3px;
+  margin: 1px 3px 1px 0;
+  font-family: var(--font-mono);
+  background: var(--bg5);
+  color: var(--text2);
+}
+.b-any {
+  background: var(--badge-any-bg);
+  color: var(--badge-any-fg);
+}
+.b-archery {
+  background: var(--badge-archery-bg);
+  color: var(--bow);
+}
+.b-muzzleloader {
+  background: var(--badge-muzzleloader-bg);
+  color: var(--badge-muzzleloader-fg);
+}
+.b-short-range {
+  background: var(--bg5);
+  color: var(--text2);
+}
+.b-r,
+.b-restricted,
+.b-warn {
+  background: var(--badge-restricted-bg);
+  color: var(--sc3);
+}
+.b-open,
+.b-ok {
+  background: var(--badge-ok-bg);
+  color: var(--sc5);
+}
+.b-error {
+  background: var(--badge-error-bg);
+  color: var(--sc1);
+}
+
+/* ---- toasts ------------------------------------------------------------ */
+.toasts {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 20;
+  max-width: min(380px, calc(100vw - 40px));
+}
+.toast {
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-size: 13px;
+  box-shadow: 0 6px 20px var(--shadow);
+}
+.toast-success {
+  border-left-color: var(--sc5);
+}
+.toast-warn {
+  border-left-color: var(--sc3);
+}
+.toast-error {
+  border-left-color: var(--sc1);
+}
+
+/* ---- always-on footer disclaimer ---------------------------------------- */
+.app-footer {
+  padding: 0 20px 24px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+/* ---- responsive (§4.2) -------------------------------------------------- */
+@media (max-width: 1099px) {
+  .wrap {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 699px) {
+  .fg {
+    width: 100%;
+  }
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .app-header .sub {
+    margin-left: 0;
+    width: 100%;
+  }
+}

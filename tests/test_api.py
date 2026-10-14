@@ -10,10 +10,11 @@ def test_health(client):
     assert resp.get_json() == {"ok": True, "version": __version__}
 
 
-def test_index_serves_placeholder(client):
+def test_index_serves_app_shell(client):
     resp = client.get("/")
     assert resp.status_code == 200
     assert b"Idaho Hunt Planner" in resp.data
+    assert b"/static/js/main.js" in resp.data
 
 
 def test_create_app_db_path(app, tmp_path):
