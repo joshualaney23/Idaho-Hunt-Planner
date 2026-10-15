@@ -34,7 +34,7 @@
   --dn: #7a3030;
   --flat: #5a6a3a;
   /* semantic (map status, §4.4) */
-  --open: var(--sc5);
+  --open: #238636; /* GitHub Primer dark "Merge pull request" green (--button-primary-bgColor-rest) */
   --restricted: var(--sc3);
   --closed: var(--bg4);
   --notag: transparent;
