@@ -648,9 +648,9 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
-| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter | T-19, T-20, T-21, T-27 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, "Get latest regs" button | T-19, T-20, T-21, T-27, T-28 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; T-22b → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; T-22b → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15, T-18} → T-28 ; T-19 spans all`.
 
 ---
 
@@ -1046,6 +1046,26 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ---
 
+### T-28 · "Get latest regs" button (check IDFG for new regulations)
+**Depends on:** T-10, T-15, T-18 · **Size:** M
+**Description:** A **Get latest regs** button on the 📥 Regulations tab that checks IDFG's website for newly posted regulation PDFs and, when it finds any, downloads them and runs them through the normal import pipeline. Post-MVP; not needed for phase 1.
+- **Never auto-publish.** The button only *fetches and stages*. New documents land in `needs_review` and go through the same Review screen and §8.7 accuracy gate as a manual upload. "Update the database" means "stage the new version for review"; publishing stays an explicit human step (§8.5, §11).
+- **Discovery (`planner/importer/fetch_idfg.py`):** read the IDFG rules/seasons pages (Big Game, Upland/Turkey/Furbearer, Moose/Sheep/Goat, Migratory Game Bird, and the supplemental-proclamation links) and collect every regulation-PDF link (`seasons-rules-*.pdf`, `supplemental-proclamation-*.pdf`). Source page URLs live in one config constant so a site change is a one-line fix. Infer `kind` and `year` from the filename and let T-10's classifier confirm.
+- **New-vs-known:** a link is *new* if its sha256 is not already in `source_documents`. Download to a temp file, hash it, and skip duplicates (the same 409 dedupe as `POST /api/documents`). A same-named PDF whose hash changed (a silent IDFG correction) counts as new: stage it as a new version with `priority` above the old one and show "replaces <title>" on the review screen.
+- **API (§6):** `POST /api/documents/check-updates` runs the check and returns `{checked_at, sources:[{url, status:'ok'|'error', error?}], found:[{url, filename, kind, year, state:'new'|'changed'|'known'}], imported:[document ids]}`. Imports run synchronously, as the T-10 upload does. `GET /api/documents/check-updates` returns the last result (stored in a small `fetch_log` table) so the UI can show "Last checked 3 days ago".
+- **UI (§4.5):** a **Get latest regs** button beside the upload drop zone. It shows a spinner, then a result summary ("2 new documents staged for review", "Up to date", or per-source errors) with links to the new documents. A failure on one source never hides the others.
+- **Politeness & safety:** a custom User-Agent, 1 request per 2 seconds, `https` only, only `fishandgame.idaho.gov` hosts accepted, a 50 MB cap and `%PDF` magic check (same as upload), and a 60-second per-request timeout. Manual click only: no background polling, and nothing in CI touches the network.
+**Acceptance criteria:**
+- Against recorded IDFG HTML fixtures, discovery finds every PDF link and classifies `kind` and `year` correctly for each of the four brochures plus a supplement.
+- A known sha256 is reported `known` and not re-imported. A new sha256 is staged as `needs_review` and never as `published`. A same-filename PDF with a new hash is `changed`, and its document is linked to the one it replaces.
+- A source that errors (timeout, 404, non-PDF) is reported in `sources` with `status:'error'`, and the other sources still complete.
+- A non-IDFG host, a non-`https` link, an over-size file, or a non-PDF payload is rejected.
+- Zero network calls in the test suite (HTTP is injected and fixtures are recorded). Clicking the button in Chrome against a stubbed endpoint shows the spinner and then the summary, and the page's Lighthouse accessibility score is unchanged.
+
+---
+
+---
+
 ---
 
 ## 13. Annual workflow (what using it looks like)
@@ -1078,7 +1098,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 - **Golden-data verification (T-22d–f) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
 - **Split a ticket that won't fit one session.** T-22 was one Size-L ticket bundling the check registry, the publish gate, the golden harness and the hand-verification of ~470 controlled hunts and 235 deer date ranges; it is now T-22a–f (§12). When a ticket looks bigger than one session, split it in §12 first, re-run `docs/tools/make_issues.py`, and close the old issue pointing at the new ones.
 
-**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward; later additions take the next free number instead (T-27 = #36, T-22a–f = #45–#50). The original T-22 (#24) was closed as superseded when it was split into T-22a–f. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
+**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward; later additions take the next free number instead (T-27 = #36, T-22a–f = #45–#50, T-28 = #54). The original T-22 (#24) was closed as superseded when it was split into T-22a–f. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
 
 | Ticket | Issue | Title |
 |---|---|---|
@@ -1116,6 +1136,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 | T-25 | [#27](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/27) | Moose, bighorn sheep & mountain goat brochure |
 | T-26 | [#28](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/28) | Migratory game birds brochure |
 | T-27 | [#36](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/36) | Multi-species intersection filter |
+| T-28 | [#54](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/54) | "Get latest regs" button (check IDFG for new regulations) |
 
 **Kickoff prompt template:**
 ```
