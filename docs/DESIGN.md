@@ -400,6 +400,12 @@ CREATE TABLE my_tags (
 );
 ```
 
+**Migrations.** The block above is schema **version 1** (`planner/schema.sql`, copied verbatim). Every later change is a numbered file in `planner/migrations/` applied in order on startup, and is listed here:
+
+| # | File | Change |
+|---|---|---|
+| 002 | `002_publish_gate.sql` | T-22b review gate: `seasons.section` (the §8.7 section the row came from — the gate groups by it and §8.7 display safety flags a waived section's seasons), `seasons.reviewed_at`, and `import_checks.waived_by` / `waived_at` (a waiver keeps the reason, who typed it and when, forever). |
+
 ### 5.1 Restriction codes (closed vocabulary)
 `whitetail_only`, `mule_deer_only`, `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`, `youth_only`, `private_land_only`, `portion_of_unit`, `outfitter_only`, `cwd_testing`, `motorized_rule`, `second_tag_prohibited`, `see_notes`.
 Each code has a `severity`: **narrowing** codes (`whitetail_only`, `mule_deer_only`, `youth_only` for adults, `private_land_only`, `portion_of_unit`, `outfitter_only`, and `see_notes`: unexplained conditions stay yellow, never green — D3) make a unit *restricted*. **Informational** codes (`cwd_testing`, `motorized_rule`, `second_tag_prohibited`, plus the animal-limit codes `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`: they limit which animal may be taken, but the unit is still open to hunt) show as badges but don't change color. The mapping lives in `planner/engine.py::RESTRICTIONS` and is mirrored to the frontend via `/api/meta`.
@@ -460,7 +466,7 @@ Species with no hunting season are never shown. That includes closed species (e.
 | `GET/PUT /api/permits?year=2026` · `GET/PUT /api/profile` | Permits and profile. |
 | `POST /api/documents` (multipart `file`, optional `year`, `kind`) | Upload a PDF. Stores it, dedupes by sha256, and runs the import synchronously (it takes about 20 s, and the UI shows a spinner). Returns the document with counts. |
 | `GET /api/documents` · `GET /api/documents/<id>` · `GET /api/documents/<id>/pdf` | List, detail with staged rows, and the raw PDF (served inline so `#page=N` works). |
-| `PUT /api/documents/<id>/seasons/<sid>` | Edit, approve or reject a staged row. |
+| `PUT /api/documents/<id>/seasons/<sid>` | Approve or reject a staged row (`{status}`); sets `reviewed_by_user`. Inline field edits land with the review UI (T-15). |
 | `POST /api/documents/<id>/approve-all` | Bulk approve **only** rows with `extract_agree = 1` in sections where every check passes. |
 | `GET /api/documents/<id>/checks` · `POST /api/documents/<id>/checks/<cid>/waive` (`{reason}`) | Accuracy results (§8.7) and the explicit waiver. |
 | `GET /api/hunts/<year>/<hunt_number>` | Controlled-hunt lookup for the Add Tag dialog: species, area, description, dates, weapon, sex, units with coverage. |
@@ -580,9 +586,10 @@ check, never a failed import.
 - Inline edit of any field, approve/reject per row, "approve all rows that pass every check" (there is **no** confidence-only bulk approve), keyboard nav (j/k/a/r).
 - An **Accuracy panel** at the top lists every `import_checks` result per section (✓ pass / ✗ fail / ⚠ warn) with expected vs. actual and links to the offending rows and pages.
 - The **Publish** button is disabled until (1) no rows remain `staged`, (2) every check is `pass`, or a `fail` has been explicitly **waived** with a typed reason (stored and shown on the document forever), and (3) every row with `extract_agree = 0` has been individually reviewed.
+- Gate details (T-22b, `POST /api/documents/<id>/publish`): a `warn` blocks exactly like a `fail` until it is waived — a waiver is cheap, a wrong season isn't (D3) — while a `skipped` check measured nothing and never blocks. A waiver is a human override, not a pass, so a section with a waived check is **never** eligible for bulk approve: its rows are approved one at a time. Rejecting a row counts as reviewing it. Waiving stores the reason, who waived it and when (`waive_reason`, `waived_by`, `waived_at`); an empty reason is a 400 `missing_reason`, and a blocked publish is a 409 `publish_blocked` naming every blocking check and row id.
 
 ### 8.5 Supersession
-When publishing doc D (license year Y, priority P): for every published season from another doc of the same year with lower priority, the same (species, tag_type, zone/hunt, weapon, sex) and an overlapping unit set, mark it `superseded` and set `supersedes_id`. Uploading a new year never touches prior years. Prior years stay queryable for "last year vs this year".
+When publishing doc D (license year Y, priority P): for every published season from another doc of the same year with lower priority, the same (species, tag_type, zone/hunt, weapon, sex) and an overlapping unit set, mark it `superseded` and set `supersedes_id` **on the superseded row**, pointing at the row that replaced it (one new row may supersede several old ones). Uploading a new year never touches prior years. Prior years stay queryable for "last year vs this year".
 
 ### 8.6 Fallbacks (the app must stay useful when a parser fails)
 1. **Manual season editor** (Season Table → "+ Add season").
@@ -888,7 +895,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ### T-22a · Check registry & shared invariant checks
 **Depends on:** T-10, T-11, T-17a · **Size:** M
-**Description:** Part 1 of §8.7's harness. (T-22 was one Size-L ticket; it is split into T-22a–f so each fits one agent session — see §14.) `planner/importer/checks/`: a check registry `@check(section_glob, name)`; each check takes the finalize context and returns `CheckResult(status, expected, actual, detail)`; `run_import` runs every registered check whose glob matches the section and persists all of them to `import_checks`. Move the inline `finalize` checks of `deer.py` and `controlled.py` into the registry **unchanged** (same check names, same statuses on the 2026 brochure), so every later parser inherits them instead of re-implementing them. Shared implementations live in the registry, not in a parser: a two-path comparison helper (so `two_path_agreement` is one function), `date_token_accounting` (scan the page text inside each table's bbox for `Mon D - Mon D` tokens and require that each is consumed by **exactly one** parsed season, matched by `source_bbox`), `unit_tokens_valid`, `no_duplicate_keys`, `general_coverage`, `yoy_diff` (warn). `golden_match` is T-22c; the publish gate that consumes these rows is T-22b.
+**Description:** Part 1 of §8.7's harness. (T-22 was one Size-L ticket; it is split into T-22a–f so each fits one agent session — see §14.) `planner/importer/checks/`: a check registry `@check(section_glob, name)`; each check takes the finalize context and returns `CheckResult(status, expected, actual, detail)`; `run_import` runs every registered check whose glob matches the section and persists all of them to `import_checks`. Move the inline `finalize` checks of `deer.py` and `controlled.py` into the registry **unchanged** (same check names, same statuses on the 2026 brochure), so every later parser inherits them instead of re-implementing them. Shared implementations live in the registry, not in a parser: a two-path comparison helper (so `two_path_agreement` is one function), `date_token_accounting` (every `Mon D - Mon D` token printed in a table's date cell is consumed by **exactly one** parsed season — the parser reports each cell as a `DateCell` carrying the cell text, the number of seasons it produced, any leftover date text and the row bbox that is staged as `source_bbox`), `unit_tokens_valid`, `no_duplicate_keys`, `general_coverage`, `yoy_diff` (warn). `golden_match` is T-22c; the publish gate that consumes these rows is T-22b.
 **Acceptance criteria:**
 - Every check above is registered, unit-tested, and has a deliberately corrupted fixture that makes it fail (e.g. drop one table row → `hunt_number_completeness` and `tag_checksum` fail; strip superscript filtering → `two_path_agreement` fails on 1001).
 - Importing `tests/fixtures/bg2026_controlled.pdf` and the deer fixtures yields the same check names and statuses as before the refactor; the before/after table is in the PR.

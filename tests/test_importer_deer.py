@@ -20,6 +20,7 @@ import pytest
 from planner import db, importer
 from planner.dates import to_iso
 from planner.importer import ParseContext, common, deer
+from planner.importer.checks import run_checks
 from planner.importer.extract import Page, Word, iter_pages
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -134,7 +135,7 @@ def test_spot_checks_from_the_ticket() -> None:
 def test_checks_report_the_section_invariants() -> None:
     ctx = context()
     parse(DEER_PAGES, ctx)
-    checks = {c.name: c for c in deer.finalize(ctx)}
+    checks = {c.name: c for c in run_checks(ctx, deer.SECTION, deer.finalize(ctx))}
     assert checks["two_path_agreement"].status == "pass"
     assert checks["date_token_accounting"].status == "pass"
     assert checks["unit_tokens_valid"].status == "pass"

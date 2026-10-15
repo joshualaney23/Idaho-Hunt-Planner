@@ -19,6 +19,7 @@ import pytest
 from planner import db, importer
 from planner.dates import to_iso
 from planner.importer import ParseContext, controlled
+from planner.importer.checks import run_checks
 from planner.importer.controlled import BIG_GAME, DateLine, HuntRow
 from planner.importer.extract import Page, Word, iter_pages
 
@@ -61,6 +62,12 @@ def parsed(app):
 
 def hunts(rows: list[importer.ParsedSeason], number: str) -> list[importer.ParsedSeason]:
     return [s for s in rows if s.hunt_number == number]
+
+
+def section_checks(ctx: ParseContext, species: str) -> list[importer.CheckResult]:
+    """The §8.7 checks the registry runs for one `controlled_<species>` section (T-22a)."""
+    facts = controlled.finalize(ctx, spec=BIG_GAME, species=species)
+    return run_checks(ctx, BIG_GAME.section(species), facts)
 
 
 # ───────── the fixture pages ─────────
@@ -170,7 +177,7 @@ def test_notes_are_recovered_and_turned_into_restriction_codes(parsed) -> None:
 def test_checks_report_the_section_invariants(parsed) -> None:
     ctx, _ = parsed
     for species in FIXTURE_HUNTS:
-        checks = {c.name: c for c in controlled.finalize(ctx, spec=BIG_GAME, species=species)}
+        checks = {c.name: c for c in section_checks(ctx, species)}
         assert checks["two_path_agreement"].status == "pass", species
         assert checks["hunt_number_completeness"].status == "pass", species
         assert checks["no_duplicate_keys"].status == "pass", species
@@ -178,19 +185,19 @@ def test_checks_report_the_section_invariants(parsed) -> None:
         assert checks["page_ref_resolves"].status == "pass", species
         assert checks["footnote_legend"].status == "pass", species
     # Both printed bear totals add up on the excerpt, which holds every bear hunt.
-    bear = {c.name: c for c in controlled.finalize(ctx, spec=BIG_GAME, species="black_bear")}
+    bear = {c.name: c for c in section_checks(ctx, "black_bear")}
     assert bear["tag_checksum"].status == "pass"
     assert bear["tag_checksum"].expected == "240, 150"
     # The 2027 spring hunts are flagged for review, not silently published.
     assert bear["yoy_diff"].status == "warn"
     # The excerpt holds only part of the deer tables, so their 13,226 total must not add
     # up — a checksum that passed on a subset would be meaningless.
-    deer = {c.name: c for c in controlled.finalize(ctx, spec=BIG_GAME, species="deer")}
+    deer = {c.name: c for c in section_checks(ctx, "deer")}
     assert deer["tag_checksum"].status == "fail"
     assert deer["tag_checksum"].expected == "13226"
     # The elk/pronghorn totals are printed on pages the excerpt leaves out, so the check
     # reports "no total found" rather than silently passing.
-    elk = {c.name: c for c in controlled.finalize(ctx, spec=BIG_GAME, species="elk")}
+    elk = {c.name: c for c in section_checks(ctx, "elk")}
     assert elk["tag_checksum"].status == "fail"
     assert elk["tag_checksum"].actual == "no total found"
 
