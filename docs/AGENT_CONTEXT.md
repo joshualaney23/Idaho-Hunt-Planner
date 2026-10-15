@@ -101,7 +101,7 @@ python scripts/build_gmu_geometry.py --check   # committed geometry stale? (same
   `seasons-rules-big-game-2026.pdf` · `seasons-rules-upland-game-2026-2027.pdf` · `seasons-rules-moose-sheep-goat-2025-26.pdf` · `migratorygame2026-2027_web.pdf`
 - **GIS:** `https://gisportal-idfg.idaho.gov/hosting/rest/services/Hunting/MapServer` (layer 3 = GMUs, 4 = controlled hunt areas).
 - **2026 Big Game brochure:** 125 pages; pages 38–50 and 85 are rotated (elk calendars); 62 pages have tables, 24 contain `Hunt No.`; general-deer tables on pp. 12–21 → 132 unit rows / 235 date ranges; controlled tables → 469 hunts. Cold extraction ~35 s, warm (page cache) ~0.02 s, so re-importing while iterating is cheap.
-- **Issue numbers ≠ ticket numbers.** They match through T-16, shift by one from T-17a (T-17a = #17, T-18 = #20), and later additions take the next free number (T-27 = #36, T-22a–f = #45–#50). The original T-22 (#24) was split into T-22a–f and closed as superseded. Read `issue_map.json`; never guess.
+- **Issue numbers ≠ ticket numbers.** They match through T-16, shift by one from T-17a (T-17a = #17, T-18 = #20), and later additions take the next free number (T-27 = #36, T-22a–f = #45–#50, T-15a–c = #57–#59). The originals T-22 (#24) and T-15 (#15) were split (into T-22a–f and T-15a/b/c) and closed as superseded. Read `issue_map.json`; never guess.
 - **IDFG Hunt Planner URLs use internal ids**, not unit numbers (`unit.aspx?ID=5` is unit 4A) — mapping in `static/data/idfg_units.json`.
 - The map shows no color without **published** seasons: seed a temp DB (as `tests/test_api_availability.py` does, or from `docs/mockup.html`'s `DATA.seasons`) before any visual check.
 

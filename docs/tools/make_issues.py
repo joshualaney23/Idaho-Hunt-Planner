@@ -29,7 +29,8 @@ PHASES = {
 }
 PHASE_OF = {}
 for t in ["T-01", "T-02", "T-03", "T-04", "T-05"]: PHASE_OF[t] = 0
-for t in ["T-06", "T-07", "T-08", "T-09", "T-10", "T-11", "T-15", "T-16", "T-17a", "T-17b", "T-17c",
+for t in ["T-06", "T-07", "T-08", "T-09", "T-10", "T-11", "T-15a", "T-15b", "T-15c", "T-16",
+          "T-17a", "T-17b", "T-17c",
           "T-22a", "T-22b", "T-22c", "T-22d", "T-22e", "T-22f"]: PHASE_OF[t] = 1
 for t in ["T-12", "T-13", "T-18"]: PHASE_OF[t] = 2
 for t in ["T-14", "T-23"]: PHASE_OF[t] = 3
@@ -38,8 +39,8 @@ for t in ["T-25", "T-26"]: PHASE_OF[t] = 5
 for t in ["T-19", "T-20", "T-21", "T-27", "T-28"]: PHASE_OF[t] = 6
 
 BUILD_ORDER = [["T-01"], ["T-02", "T-03", "T-05"], ["T-04"], ["T-10"], ["T-11", "T-17a"], ["T-22a"],
-               ["T-22b", "T-22c"], ["T-22d", "T-22e"], ["T-17b"], ["T-22f"], ["T-06"], ["T-09", "T-15"],
-               ["T-07"], ["T-08"], ["T-17c"], ["T-16"]]
+               ["T-22b", "T-22c"], ["T-22d", "T-22e"], ["T-17b"], ["T-22f"], ["T-06"],
+               ["T-09", "T-15a", "T-15b"], ["T-15c"], ["T-07"], ["T-08"], ["T-17c"], ["T-16"]]
 SEPARATE_PARSERS = {"T-11", "T-17a", "T-17b", "T-12", "T-14", "T-23", "T-24", "T-25", "T-26"}
 GOLDEN_TICKETS = {"T-22d", "T-22e", "T-22f"}  # human page-by-page verification (§8.7)
 
@@ -48,7 +49,8 @@ AREA = {  # area labels
     "T-05": ["backend", "frontend"], "T-06": ["backend"], "T-07": ["frontend"],
     "T-08": ["frontend"], "T-09": ["backend", "frontend"], "T-10": ["importer"],
     "T-11": ["importer", "accuracy"], "T-12": ["importer", "accuracy"], "T-13": ["importer"],
-    "T-14": ["importer", "gis", "accuracy"], "T-15": ["frontend", "backend", "accuracy"],
+    "T-14": ["importer", "gis", "accuracy"], "T-15a": ["backend"],
+    "T-15b": ["frontend"], "T-15c": ["frontend", "backend", "accuracy"],
     "T-16": ["frontend", "backend"], "T-17a": ["importer", "accuracy"],
     "T-17b": ["importer", "gis", "accuracy"], "T-17c": ["backend", "frontend"],
     "T-18": ["importer"], "T-19": ["accuracy"], "T-20": ["accuracy"],

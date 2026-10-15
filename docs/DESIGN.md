@@ -466,7 +466,8 @@ Species with no hunting season are never shown. That includes closed species (e.
 | `GET/PUT /api/permits?year=2026` · `GET/PUT /api/profile` | Permits and profile. |
 | `POST /api/documents` (multipart `file`, optional `year`, `kind`) | Upload a PDF. Stores it, dedupes by sha256, and runs the import synchronously (it takes about 20 s, and the UI shows a spinner). Returns the document with counts. |
 | `GET /api/documents` · `GET /api/documents/<id>` · `GET /api/documents/<id>/pdf` | List, detail with staged rows, and the raw PDF (served inline so `#page=N` works). |
-| `PUT /api/documents/<id>/seasons/<sid>` | Approve or reject a staged row (`{status}`); sets `reviewed_by_user`. Inline field edits land with the review UI (T-15). |
+| `GET /api/documents/<id>/diff` | Diff vs. the last published license year: each of this document's rows tagged `new`, `changed` (with the prior row's values) or `same`, matched on species + tag type + zone/hunt number + weapon + sex + unit set, plus a `removed` list of prior-year rows with no match (T-15a). |
+| `PUT /api/documents/<id>/seasons/<sid>` | Approve or reject a staged row (`{status}`); sets `reviewed_by_user`. Inline field edits land with the review UI (T-15c). |
 | `POST /api/documents/<id>/approve-all` | Bulk approve **only** rows with `extract_agree = 1` in sections where every check passes. |
 | `GET /api/documents/<id>/checks` · `POST /api/documents/<id>/checks/<cid>/waive` (`{reason}`) | Accuracy results (§8.7) and the explicit waiver. |
 | `GET /api/hunts/<year>/<hunt_number>` | Controlled-hunt lookup for the Add Tag dialog: species, area, description, dates, weapon, sex, units with coverage. |
@@ -650,14 +651,14 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | Phase | Outcome | Tickets |
 |---|---|---|
 | **0 – Foundations** | Repo runs, themed shell, map renders | T-01 … T-05 |
-| **1 – MVP: Deer + all controlled hunts, accuracy-gated** | Upload the 2026 big-game PDF; general deer **and** every controlled deer/elk/pronghorn/bear hunt parse with every invariant passing and a 100 % golden match; review and publish; add a Regular Deer tag and/or a controlled tag by hunt number; see this weekend's green units | T-06 … T-11, T-15, T-16, **T-17a, T-17b, T-17c, T-22a … T-22f** |
+| **1 – MVP: Deer + all controlled hunts, accuracy-gated** | Upload the 2026 big-game PDF; general deer **and** every controlled deer/elk/pronghorn/bear hunt parse with every invariant passing and a 100 % golden match; review and publish; add a Regular Deer tag and/or a controlled tag by hunt number; see this weekend's green units | T-06 … T-11, **T-15a, T-15b, T-15c**, T-16, **T-17a, T-17b, T-17c, T-22a … T-22f** |
 | **2 – Elk A/B & other general big game** | Elk A/B zones, pronghorn, bear, lion, wolf, supplements | T-12, T-13, T-18 |
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
 | **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, "Get latest regs" button | T-19, T-20, T-21, T-27, T-28 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; T-22b → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15, T-18} → T-28 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; T-15c → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; T-19 spans all`.
 
 ---
 
@@ -829,15 +830,29 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ---
 
-### T-15 · Regulations tab: upload & review & publish UI
-**Depends on:** T-10, T-11 (for real data), T-22a (checks), T-22b (publish gate), T-03 · **Size:** L
-**Description:** `#/regs` per §8.4: a drag-and-drop upload card (shows sha/dup warnings, a spinner, then the result counts), a documents table by year with status badges, and a review screen at `#/regs/<docId>` with a grouped row list, confidence coloring (`--sc1`…`--sc5`), inline editors (unit chip editor with autocomplete from units, date inputs, selects for tag/weapon/sex, restriction multi-select), an embedded PDF iframe synced to the selected row's page, a diff vs prior published year (API: `GET /api/documents/<id>/diff`, implemented here, matching on species+tag+zone+weapon+sex+unit set), approve/reject per row, approve-all-passing (only rows with `extract_agree = 1` in sections whose checks all pass), keyboard shortcuts (j/k/a/r/e), and a Publish button (§8.5 supersession implemented in `api.py`/`db.py` here) with a confirmation modal summarizing counts.
-**Acceptance criteria:** end-to-end test: upload the 2026 deer fixture, approve all, publish, and `/api/availability` returns open units. Publishing a supplement supersedes the matching rows. The UI prevents publishing while staged rows remain. **The Accuracy panel (§8.4, §8.7) renders every `import_checks` row. Publish is blocked (UI and API both return 409) while any check is `fail` and not waived, or any `extract_agree = 0` row is unreviewed. Waiving requires a typed reason, which is stored and displayed.**
+### T-15a · Year-over-year diff API
+**Depends on:** T-10, T-11 (for real data), T-22b (review/publish API) · **Size:** S
+**Description:** `GET /api/documents/<id>/diff`, the data behind §8.4's "diff vs last published year" (the UI consumes it in T-15c). For the document's own rows (staged, approved and published), find the matching row in the **most recent earlier license year that has published rows**, matching on `(species, tag_type, zone, hunt_number, weapon, sex, unit set)` — the unit set compared as a set, order-independent. Tag each row `new` (no prior match), `changed` (matched, but dates, restrictions, coverage or notes differ — the prior values are returned so the UI can show old→new) or `same`. Also return a `removed` list: prior-year published rows with no match in this document, and a `summary` with the four counts. Pure SQL + Python, deterministic, no parsing and no writes; a document whose year has no earlier published year returns every row `new` with an empty `removed`.
+**Acceptance criteria:** on a two-year synthetic DB, a row whose dates moved comes back `changed` with both the old and the new dates, an added unit set comes back `new`, a prior-year row with no counterpart appears in `removed`, and an untouched row is `same`. Unit-set matching ignores order and duplicates. A document for the earliest year returns all `new`, `removed: []`. 404 `unknown_document` for a missing id. `summary` counts equal the row tallies.
+
+---
+
+### T-15b · Regulations tab: upload card & documents table
+**Depends on:** T-03 (shell), T-10 (upload API), T-22b (document status) · **Size:** M
+**Description:** The `#/regs` tab shell per §8.4, without the review screen: a drag-and-drop upload card that posts to `POST /api/documents` (drop or file picker; shows the sha, a spinner while the ~35 s import runs, then the result counts; a 409 `duplicate_document` renders as a "already uploaded" warning linking to the existing document, and any other `{error:{code,message}}` renders inline), and below it a documents table grouped by license year with status badges (`uploaded`, `parsing`, `needs_review`, `published`, `failed`), title, kind, page/row counts and upload date, each row linking to `#/regs/<docId>`. New `static/js/regs.js` (+ `regs.test.mjs` twin) and the router entries for `#/regs` and `#/regs/<docId>`; `#/regs/<docId>` may render a placeholder detail panel that T-15c fills in. Colors from `theme.css` vars only.
+**Acceptance criteria:** the node twin test covers the upload card's four states (idle, uploading, success with counts, duplicate/error) and the year grouping + badge class per status. Dropping a file and picking one take the same code path. `#/regs` is reachable from the tablist, deep-links on reload, and back/forward works (verified in real Chrome). Lighthouse accessibility ≥ 95 on `#/regs`. No color literals (`test_static_shell.py` stays green).
+
+---
+
+### T-15c · Regulations review screen: rows, editors, accuracy panel & publish
+**Depends on:** T-15a (diff), T-15b (tab shell), T-22a (checks), T-22b (publish gate), T-11 (real rows) · **Size:** L
+**Description:** `#/regs/<docId>` per §8.4. An **Accuracy panel** at the top rendering every `import_checks` row per section (✓ pass / ✗ fail / ⚠ warn / – skipped) with expected vs. actual, links to the offending rows and pages, the ⚠ "manually verified" badge on sections with a waived check, and a waive dialog that requires a typed reason (`POST …/checks/<cid>/waive`, empty reason → 400 `missing_reason`) and then shows the stored reason, who waived it and when. Below it the grouped row list (species → table title → page) with confidence coloring (`--sc1`…`--sc5`), restriction badges, source text, and the `new`/`changed`/`same` diff badge from T-15a (old→new on `changed`, plus the "Removed since last year" list). Inline editors for any field (unit chip editor with autocomplete from `/api/units`, date inputs, selects for tag/weapon/sex, restriction multi-select) saved through `PUT /api/documents/<id>/seasons/<sid>` — extend that endpoint to accept field edits here. Approve/reject per row, approve-all-passing (`POST …/approve-all`), keyboard shortcuts `j`/`k`/`a`/`r`/`e`, an embedded `<iframe src="/api/documents/<id>/pdf#page=N">` synced to the selected row's page, and a Publish button that is disabled while the §8.4 gate blocks (staged rows left, an unwaived `fail`/`warn`, or an unreviewed `extract_agree = 0` row), with a confirmation modal summarizing the counts and surfacing a 409 `publish_blocked` naming every blocking check and row.
+**Acceptance criteria:** end-to-end test: upload the 2026 deer fixture, approve all, publish, and `/api/availability` returns open units. Publishing a supplement supersedes the matching rows. The UI prevents publishing while staged rows remain. **The Accuracy panel (§8.4, §8.7) renders every `import_checks` row. Publish is blocked (UI and API both return 409) while any check is `fail` and not waived, or any `extract_agree = 0` row is unreviewed. Waiving requires a typed reason, which is stored and displayed.** Keyboard shortcuts move, approve, reject and edit the focused row without the mouse, and the PDF iframe follows the selection (verified in real Chrome).
 
 ---
 
 ### T-16 · Season Table, manual editor, CSV import/export
-**Depends on:** T-06, T-15 · **Size:** M
+**Depends on:** T-06, T-15c · **Size:** M
 **Description:** `#/seasons`: a filterable (year, species, tag, weapon, unit search, status) and sortable table of seasons; clicking a row highlights its units on the map (switch to the map tab with highlight). "+ Add season" opens the same editor as review; rows are saved under an auto-created `manual` source document for the year, published immediately but badged "manual". CSV export/import with columns `license_year,species,tag_type,zone,hunt_number,hunt_class,weapon,sex,start_date,end_date,units,restrictions,notes,source_page` (units and restrictions `;`-separated). Imported CSV rows go to staging under a `manual` doc for review. Ship `docs/seasons_template.csv` with 3 example rows.
 **Acceptance criteria:** CSV round-trip is lossless (export → import → export is identical); invalid rows report line numbers.
 
@@ -905,7 +920,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ### T-22b · Publish gate & waiver API
 **Depends on:** T-22a · **Size:** M
-**Description:** The §8.4 review gate, API-side only (T-15 builds the UI on top of it). `POST /api/documents/<id>/publish` publishes a document's staged rows only when (1) no row is still unreviewed, (2) every `import_checks` row is `pass` or explicitly waived, and (3) every row with `extract_agree = 0` has been individually reviewed; otherwise **409 `publish_blocked`** with the list of blocking checks and row ids. `POST /api/documents/<id>/checks/<check_id>/waive` requires a non-empty `reason` (400 `missing_reason`); the reason, who waived it and when are stored on the check forever and returned by `GET /api/documents/<id>`. Add the per-row review endpoints the gate needs (approve/reject a staged row; bulk approve is allowed **only** for rows that pass every check — there is no confidence-only bulk approve). §8.7 display safety: the document payload flags each section that has a waived check, so the UI can show the ⚠ "manually verified" badge.
+**Description:** The §8.4 review gate, API-side only (T-15c builds the UI on top of it). `POST /api/documents/<id>/publish` publishes a document's staged rows only when (1) no row is still unreviewed, (2) every `import_checks` row is `pass` or explicitly waived, and (3) every row with `extract_agree = 0` has been individually reviewed; otherwise **409 `publish_blocked`** with the list of blocking checks and row ids. `POST /api/documents/<id>/checks/<check_id>/waive` requires a non-empty `reason` (400 `missing_reason`); the reason, who waived it and when are stored on the check forever and returned by `GET /api/documents/<id>`. Add the per-row review endpoints the gate needs (approve/reject a staged row; bulk approve is allowed **only** for rows that pass every check — there is no confidence-only bulk approve). §8.7 display safety: the document payload flags each section that has a waived check, so the UI can show the ⚠ "manually verified" badge.
 **Acceptance criteria:**
 - API test: publishing is impossible while an unwaived `fail` exists, and the 409 body names every blocking check and row.
 - API test: an empty waiver reason is a 400; a waiver with a reason unblocks publish, and the reason survives a re-read of the document.
@@ -1006,7 +1021,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 ---
 
 ### T-18 · Supplemental proclamations
-**Depends on:** T-10, T-15 · **Size:** S
+**Depends on:** T-10, T-15c · **Size:** S
 **Description:** `importer/supplemental.py`: classify `kind='supplemental'`, `priority = 10 + n`. Parse whatever tables or "change" statements it contains, using the T-11/T-13 parsers on matching tables plus a generic "Unit X … season … dates" text pattern. Everything stages at confidence ≤ 0.8 so it is always reviewed. Publishing applies §8.5.
 **Acceptance criteria:** a test with a synthetic supplement that changes one deer season's end date supersedes exactly that row.
 
@@ -1054,7 +1069,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 ---
 
 ### T-28 · "Get latest regs" button (check IDFG for new regulations)
-**Depends on:** T-10, T-15, T-18 · **Size:** M
+**Depends on:** T-10, T-15c, T-18 · **Size:** M
 **Description:** A **Get latest regs** button on the 📥 Regulations tab that checks IDFG's website for newly posted regulation PDFs and, when it finds any, downloads them and runs them through the normal import pipeline. Post-MVP; not needed for phase 1.
 - **Never auto-publish.** The button only *fetches and stages*. New documents land in `needs_review` and go through the same Review screen and §8.7 accuracy gate as a manual upload. "Update the database" means "stage the new version for review"; publishing stays an explicit human step (§8.5, §11).
 - **Discovery (`planner/importer/fetch_idfg.py`):** read the IDFG rules/seasons pages (Big Game, Upland/Turkey/Furbearer, Moose/Sheep/Goat, Migratory Game Bird, and the supplemental-proclamation links) and collect every regulation-PDF link (`seasons-rules-*.pdf`, `supplemental-proclamation-*.pdf`). Source page URLs live in one config constant so a site change is a one-line fix. Infer `kind` and `year` from the filename and let T-10's classifier confirm.
@@ -1100,7 +1115,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 - **No grouping.** Every ticket gets its own session and its own PR, including small, closely related ones (e.g. T-01/T-04/T-05, T-07/T-08). Context is handed off through the repo: merged code, the PR description, and `AGENT_CONTEXT.md`. This matters most for the parser tickets (T-11, T-17a, T-17b, T-12, T-14, T-23, T-24, T-25, T-26), which are the hardest and need the most room in the context.
 - **Merge before you build on it.** Start a ticket only after its dependencies' PRs are merged into `main`.
-- **Order** (every step's dependencies are in earlier steps): T-01 → T-02, T-03, T-05 (in parallel) → T-04 → T-10 → T-11 and T-17a (in parallel) → **T-22a** → **T-22b, T-22c** (in parallel) → **T-22d, T-22e** (in parallel) → T-17b → **T-22f** → T-06 → T-09, T-15 (in parallel) → T-07 → T-08 → T-17c → T-16 → Phase 2+. The golden-data tickets (T-22d–f) are human-paced; once T-22c is merged they can run in parallel with the UI steps that follow.
+- **Order** (every step's dependencies are in earlier steps): T-01 → T-02, T-03, T-05 (in parallel) → T-04 → T-10 → T-11 and T-17a (in parallel) → **T-22a** → **T-22b, T-22c** (in parallel) → **T-22d, T-22e** (in parallel) → T-17b → **T-22f** → T-06 → T-09, T-15a, T-15b (in parallel) → T-15c → T-07 → T-08 → T-17c → T-16 → Phase 2+. The golden-data tickets (T-22d–f) are human-paced; once T-22c is merged they can run in parallel with the UI steps that follow.
 - **Hand-off lives in the repo, not in chat:** each ticket ends with a PR whose description lists what was built, check results, and any deviation from this doc. If the design changes, update `DESIGN.md` in the same PR.
 - **Golden-data verification (T-22d–f) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
 - **Split a ticket that won't fit one session.** T-22 was one Size-L ticket bundling the check registry, the publish gate, the golden harness and the hand-verification of ~470 controlled hunts and 235 deer date ranges; it is now T-22a–f (§12). When a ticket looks bigger than one session, split it in §12 first, re-run `docs/tools/make_issues.py`, and close the old issue pointing at the new ones.
@@ -1123,7 +1138,9 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 | T-12 | [#12](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/12) | Elk A/B zone parser (with spike) |
 | T-13 | [#13](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/13) | Pronghorn, black bear, mountain lion, wolf parsers |
 | T-14 | [#14](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/14) | Upland bird parser + county overlay |
-| T-15 | [#15](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/15) | Regulations tab: upload & review & publish UI |
+| T-15a | [#57](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/57) | Year-over-year diff API |
+| T-15b | [#58](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/58) | Regulations tab: upload card & documents table |
+| T-15c | [#59](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/59) | Regulations review screen: rows, editors, accuracy panel & publish |
 | T-16 | [#16](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/16) | Season Table, manual editor, CSV import/export |
 | T-17a | [#17](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/17) | Controlled-hunt table parser (MVP) |
 | T-17b | [#18](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/18) | Hunt-area descriptions & unit coverage (MVP) |
