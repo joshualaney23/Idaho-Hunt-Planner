@@ -607,4 +607,4 @@ def _null_context() -> Iterator[None]:
 
 # Importing the parser modules registers them (§8.1 section router). Kept last so the
 # registry API above is fully defined when they import it.
-from planner.importer import deer  # noqa: E402,F401  (import for its side effect)
+from planner.importer import controlled, deer  # noqa: E402,F401  (import for the side effect)

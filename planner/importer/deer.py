@@ -29,6 +29,27 @@ from dataclasses import dataclass, field
 from planner.dates import to_iso
 from planner.importer import CheckResult, ParseContext, ParsedSeason, UnitRef, common, parser
 from planner.importer.extract import Page, Table, Word
+from planner.importer.textlayer import (
+    COLUMN_GUTTER_PT,
+    ROW_GAP_PT,
+    TextLine,
+    column_blocks,
+    column_of,
+    group_lines,
+    join_words,
+    split_bands,
+)
+
+__all__ = [
+    "COLUMN_GUTTER_PT",
+    "ROW_GAP_PT",
+    "TextLine",
+    "column_blocks",
+    "column_of",
+    "group_lines",
+    "join_words",
+    "split_bands",
+]
 
 #: `import_checks.section` and `seasons.section` for everything this module parses.
 SECTION = "deer_general"
@@ -40,11 +61,6 @@ HEADER_CELLS = ("unit(s)", "antlered", "antlerless", "notes")
 SEX_COLUMNS: tuple[tuple[str, str], ...] = (("antlered", "antlered"), ("antlerless", "antlerless"))
 #: Characters after a date range that may qualify it (§12 T-11). Clamped to the next range.
 QUALIFIER_WINDOW = 60
-#: Vertical gap (pt) between text lines that starts a new row band in path B.
-#: Measured on the 2026 brochure: within a row ≤ 1.2 pt (lines overlap), between rows ≥ 6.3 pt.
-ROW_GAP_PT = 4.0
-#: Horizontal whitespace (pt) that separates two columns in path B.
-COLUMN_GUTTER_PT = 6.0
 #: Unit that is closed to hunting and therefore exempt from `general_coverage` (§8.7).
 CLOSED_UNIT = "YNP"
 
@@ -184,72 +200,6 @@ def _is_general_deer(info: common.TitleInfo) -> bool:
 # ───────── path B: the text layer's word positions ─────────
 
 
-@dataclass(frozen=True)
-class TextLine:
-    """Words that sit on one printed line, in reading order."""
-
-    words: list[Word]
-
-    @property
-    def top(self) -> float:
-        return min(w.top for w in self.words)
-
-    @property
-    def bottom(self) -> float:
-        return max(w.bottom for w in self.words)
-
-    @property
-    def text(self) -> str:
-        return " ".join(w.text for w in sorted(self.words, key=lambda w: w.x0))
-
-
-def group_lines(words: Sequence[Word], tolerance: float = 2.0) -> list[TextLine]:
-    """Words → printed lines, by vertical overlap of their boxes."""
-    lines: list[list[Word]] = []
-    bounds: list[tuple[float, float]] = []
-    for word in sorted(words, key=lambda w: (w.top, w.x0)):
-        for i, (top, bottom) in enumerate(bounds):
-            if word.top < bottom - tolerance and word.bottom > top + tolerance:
-                lines[i].append(word)
-                bounds[i] = (min(top, word.top), max(bottom, word.bottom))
-                break
-        else:
-            lines.append([word])
-            bounds.append((word.top, word.bottom))
-    return [TextLine(ws) for ws in lines]
-
-
-def split_bands(lines: Sequence[TextLine], gap: float = ROW_GAP_PT) -> list[list[TextLine]]:
-    """Lines → row bands, split wherever `gap` points of whitespace separate them.
-
-    Unit cells are printed vertically centred, so a row's lines overlap each other while
-    consecutive rows are always separated — this is path B's row geometry (no ruled lines).
-    """
-    bands: list[list[TextLine]] = []
-    reach = 0.0
-    for line in sorted(lines, key=lambda ln: ln.top):
-        if not bands or line.top - reach >= gap:
-            bands.append([line])
-            reach = line.bottom
-        else:
-            bands[-1].append(line)
-            reach = max(reach, line.bottom)
-    return bands
-
-
-def column_blocks(
-    words: Sequence[Word], gutter: float = COLUMN_GUTTER_PT
-) -> list[tuple[float, float]]:
-    """Horizontal text blocks, i.e. the columns, found from the whitespace gutters."""
-    blocks: list[tuple[float, float]] = []
-    for word in sorted(words, key=lambda w: w.x0):
-        if blocks and word.x0 - blocks[-1][1] < gutter:
-            blocks[-1] = (blocks[-1][0], max(blocks[-1][1], word.x1))
-        else:
-            blocks.append((word.x0, word.x1))
-    return blocks
-
-
 def assign_unit_labels(bands: Sequence[tuple[bool, float, float]]) -> list[int]:
     """Which unit label owns each row band — path B's answer to merged unit cells.
 
@@ -290,24 +240,13 @@ def assign_unit_labels(bands: Sequence[tuple[bool, float, float]]) -> list[int]:
     return owners
 
 
-def _column_of(x: float, blocks: Sequence[tuple[float, float]]) -> int:
-    for i, (x0, x1) in enumerate(blocks):
-        if x0 <= x <= x1:
-            return i
-    return min(
-        range(len(blocks)),
-        key=lambda i: min(abs(x - blocks[i][0]), abs(x - blocks[i][1])),
-        default=-1,
-    )
-
-
 def _name_blocks(header: TextLine, blocks: Sequence[tuple[float, float]]) -> dict[int, str] | None:
     """Block index → column name, by which header word's centre falls inside it."""
     names: dict[int, str] = {}
     for word in header.words:
         label = word.text.lower().rstrip(".")
         if label in HEADER_CELLS:
-            index = _column_of(word.cx, blocks)
+            index = column_of(word.cx, blocks)
             if index >= 0:
                 names[index] = label
     if "unit(s)" not in names.values() or "antlered" not in names.values():
@@ -318,23 +257,6 @@ def _name_blocks(header: TextLine, blocks: Sequence[tuple[float, float]]) -> dic
 def _is_header_line(line: TextLine) -> bool:
     labels = [w.text.lower().rstrip(".") for w in sorted(line.words, key=lambda w: w.x0)]
     return labels[:3] == ["unit(s)", "antlered", "antlerless"]
-
-
-def _join_words(items: Sequence[Word]) -> str:
-    """Words of one cell in reading order, re-joining words hyphenated across lines.
-
-    Lines are re-clustered inside the cell: a page-wide line grouping chains words
-    across columns, and a raw `top` sort scrambles a wrapped sentence (2026 p. 12:
-    "Second deer tag may **not** be used…").
-    """
-    parts: list[str] = []
-    for line in sorted(group_lines(items), key=lambda ln: ln.top):
-        text = line.text
-        if parts and len(parts[-1]) > 1 and parts[-1].endswith("-") and text[:1].islower():
-            parts[-1] = parts[-1][:-1] + text
-        else:
-            parts.append(text)
-    return " ".join(parts)
 
 
 def tables_from_text(page: Page, carried: common.TitleInfo | None) -> list[DeerTable]:
@@ -361,10 +283,10 @@ def tables_from_text(page: Page, carried: common.TitleInfo | None) -> list[DeerT
             cells: dict[str, list[Word]] = {}
             for line in band:
                 for word in line.words:
-                    name = names.get(_column_of(word.cx, blocks))
+                    name = names.get(column_of(word.cx, blocks))
                     if name:
                         cells.setdefault(name, []).append(word)
-            text = {name: _join_words(items) for name, items in cells.items()}
+            text = {name: join_words(items) for name, items in cells.items()}
             bbox = (
                 min(w.x0 for ln in band for w in ln.words),
                 min(ln.top for ln in band),

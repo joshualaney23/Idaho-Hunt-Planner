@@ -12,6 +12,15 @@
 
 Two independent views of each page are kept on purpose (§8.7): `tables` is pdfplumber's
 ruled-table path, `text` is the raw text layer. Parsers compare them.
+
+Controlled-hunt tables (T-17a) need two more things, so every page also carries
+
+* `cell_tables` — the same ruled tables, but extracted from the page **without its
+  superscript chars** (a footnote marker glues onto the cell text otherwise: `1-1a`)
+  and with each cell's bbox, and
+* `small_chars` — every char below the superscript cutoff **of the whole page**, with
+  its position, so a parser can read the markers back per cell and resolve the footnote
+  legend (whose marker is printed left of the `SIDE_CROP_PT` crop).
 """
 
 from __future__ import annotations
@@ -31,8 +40,11 @@ SIDE_CROP_PT = 40.0
 ROTATED_SHARE = 0.30
 #: Superscript cutoff: chars below this share of the page's median font size (§8.2).
 SUPERSCRIPT_SHARE = 0.75
+#: Height (pt) of the bottom band kept as `Page.footer`. The brochure prints its own page
+#: number there, in the margin the side crop removes (T-17a printed → physical map).
+FOOTER_BAND_PT = 40.0
 #: Bumped whenever the cached shape changes, which invalidates older cache files.
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 Table = list[list[str | None]]
 
@@ -66,6 +78,38 @@ class Word:
 
 
 @dataclass(frozen=True)
+class Cell:
+    """One ruled-table cell: its text plus where it sits on the page.
+
+    The bbox is what a parser applies back to the *unfiltered* page to read the
+    superscript markers that were filtered out of `text` (crops and filters keep
+    absolute coordinates). `text` is None for a cell pdfplumber found no content in.
+    """
+
+    text: str | None
+    x0: float
+    top: float
+    x1: float
+    bottom: float
+
+    @property
+    def bbox(self) -> tuple[float, float, float, float]:
+        return (self.x0, self.top, self.x1, self.bottom)
+
+    def to_json(self) -> list[Any]:
+        return [self.text, self.x0, self.top, self.x1, self.bottom]
+
+    @classmethod
+    def from_json(cls, data: Sequence[Any]) -> Cell:
+        text, x0, top, x1, bottom = data
+        return cls(None if text is None else str(text), *(float(v) for v in (x0, top, x1, bottom)))
+
+
+#: One ruled table as rows of cells (`None` where the table has no cell at all).
+CellTable = list[list[Cell | None]]
+
+
+@dataclass(frozen=True)
 class Page:
     """One extracted page: both extraction paths plus the geometry parsers need."""
 
@@ -77,6 +121,12 @@ class Page:
     height: float = 0.0
     font_size: float = 0.0  # median body font size, for superscript detection
     words: list[Word] = field(default_factory=list)  # text path geometry (§8.7)
+    #: `tables` again, read without superscripts and with each cell's bbox (T-17a).
+    cell_tables: list[CellTable] = field(default_factory=list)
+    #: Chars below the superscript cutoff, uncropped: footnote markers and legend keys.
+    small_chars: list[Word] = field(default_factory=list)
+    #: The uncropped bottom band, which carries the brochure's printed page number.
+    footer: str = ""
 
     @property
     def lines(self) -> list[str]:
@@ -93,6 +143,12 @@ class Page:
             "height": self.height,
             "font_size": self.font_size,
             "words": [w.to_json() for w in self.words],
+            "cell_tables": [
+                [[c.to_json() if c else None for c in row] for row in table]
+                for table in self.cell_tables
+            ],
+            "small_chars": [w.to_json() for w in self.small_chars],
+            "footer": self.footer,
         }
 
     @classmethod
@@ -106,6 +162,12 @@ class Page:
             height=float(data["height"]),
             font_size=float(data.get("font_size") or 0.0),
             words=[Word.from_json(w) for w in data.get("words") or ()],
+            cell_tables=[
+                [[Cell.from_json(c) if c else None for c in row] for row in table]
+                for table in data.get("cell_tables") or ()
+            ],
+            small_chars=[Word.from_json(w) for w in data.get("small_chars") or ()],
+            footer=str(data.get("footer") or ""),
         )
 
 
@@ -159,6 +221,50 @@ def crop_sides(page: Any, margin: float = SIDE_CROP_PT) -> Any:
     return page.crop((margin, 0, page.width - margin, page.height))
 
 
+def small_chars(page: Any, body_size: float | None = None) -> list[Word]:
+    """Every char below the superscript cutoff, with its position (uncropped).
+
+    Footnote markers *and* the legend keys that explain them, which are printed in the
+    margin outside `SIDE_CROP_PT` — so this reads the whole page, never the crop.
+    """
+    size = body_size if body_size is not None else median_font_size(page)
+    if not size:
+        return []
+    cutoff = size * SUPERSCRIPT_SHARE
+    return [
+        Word(
+            text=c["text"],
+            x0=round(float(c["x0"]), 2),
+            top=round(float(c["top"]), 2),
+            x1=round(float(c["x1"]), 2),
+            bottom=round(float(c["bottom"]), 2),
+        )
+        for c in page.chars
+        if c["text"].strip() and float(c.get("size", size)) < cutoff
+    ]
+
+
+def footer_text(page: Any, band: float = FOOTER_BAND_PT) -> str:
+    """The page's bottom band, **uncropped**: the printed page number lives in the margin."""
+    if page.height <= band:
+        return ""
+    strip = page.crop((0, page.height - band, page.width, page.height))
+    return strip.extract_text() or ""
+
+
+def table_cells(table: Any) -> CellTable:
+    """One pdfplumber table as `Cell`s: its extracted text joined to its geometry."""
+    rows = table.extract()
+    out: CellTable = []
+    for row, geometry in zip(rows, table.rows, strict=False):
+        cells: list[Cell | None] = []
+        for index, bbox in enumerate(geometry.cells):
+            value = row[index] if index < len(row) else None
+            cells.append(None if bbox is None else Cell(value, *(float(v) for v in bbox)))
+        out.append(cells)
+    return out
+
+
 def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Page:
     """Build a `Page` from a pdfplumber page (no caching)."""
     body = page.dedupe_chars(tolerance=1)
@@ -167,7 +273,15 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
     cropped = crop_sides(body, margin)
     opts: dict[str, Any] = {"line_dir_rotated": "ltr", "char_dir_rotated": "btt"} if rotated else {}
     text = cropped.extract_text(**opts) or ""
-    tables: list[Table] = [] if rotated else [list(t) for t in cropped.extract_tables()]
+    small = small_chars(body, size)
+    found = [] if rotated else list(cropped.find_tables())
+    tables: list[Table] = [list(t.extract()) for t in found]
+    # Superscript markers glue onto cell text, so the cell view is read from the page
+    # without them — but only where the crop actually holds a superscript, because a
+    # second `find_tables` pass is the most expensive thing this module does (§8.2).
+    if found and any(margin <= w.x0 <= page.width - margin for w in small):
+        found = list(crop_sides(without_superscripts(body, size), margin).find_tables())
+    cell_tables = [table_cells(t) for t in found]
     words = [
         Word(
             text=w["text"],
@@ -187,6 +301,9 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
         height=float(page.height),
         font_size=size,
         words=words,
+        cell_tables=cell_tables,
+        small_chars=small,
+        footer=footer_text(body),
     )
 
 
