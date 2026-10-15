@@ -375,8 +375,8 @@ def _insert_season(document_id: int, season: ParsedSeason) -> int:
         "INSERT INTO seasons (document_id, status, species_id, sub_species, tag_type_id,"
         " zone, hunt_number, hunt_area, hunt_class, weapon, sex, start_date, end_date,"
         " restrictions, bag_limit, notes, tag_quota, source_page, source_text, source_bbox,"
-        " extract_agree, confidence)"
-        " VALUES (?, 'staged', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        " extract_agree, confidence, section)"
+        " VALUES (?, 'staged', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         document_id,
         season.species_id,
         season.sub_species,
@@ -398,6 +398,7 @@ def _insert_season(document_id: int, season: ParsedSeason) -> int:
         json.dumps(list(season.source_bbox)) if season.source_bbox else None,
         1 if season.extract_agree else 0,
         float(season.confidence),
+        season.section or None,
     )
     season_id = int(cur.lastrowid or 0)
     db.exec_many(

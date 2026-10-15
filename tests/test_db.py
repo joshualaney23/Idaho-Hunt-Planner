@@ -59,13 +59,23 @@ def test_connect_pragmas(conn):
 
 
 def test_migrate_fresh_db_and_rerun(conn):
+    latest = max([db.SCHEMA_VERSION, *(v for v, _ in db.migration_files())])
     assert db.schema_version(conn) == 0
-    assert db.migrate(conn) == 1
+    assert db.migrate(conn) == latest
     names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert TABLES <= names
-    assert [tuple(r) for r in conn.execute("SELECT version FROM schema_version")] == [(1,)]
-    assert db.migrate(conn) == 1  # no-op, no second version row
+    assert [tuple(r) for r in conn.execute("SELECT version FROM schema_version")] == [(latest,)]
+    assert db.migrate(conn) == latest  # no-op, no second version row
     assert _count(conn, "schema_version") == 1
+
+
+def test_migration_002_publish_gate_columns(conn):
+    """T-22b: the review gate's audit columns ship as migration 002."""
+    db.migrate(conn)
+    seasons = {r["name"] for r in conn.execute("PRAGMA table_info(seasons)")}
+    checks = {r["name"] for r in conn.execute("PRAGMA table_info(import_checks)")}
+    assert {"section", "reviewed_at"} <= seasons
+    assert {"waived_by_user", "waive_reason", "waived_by", "waived_at"} <= checks
 
 
 def test_migrations_apply_in_order_once(conn, tmp_path):
