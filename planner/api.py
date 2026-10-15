@@ -8,9 +8,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request, send_file
 
-from planner import __version__, db, engine
+from planner import __version__, db, engine, importer
 from planner.dates import DEFAULT_WEEKEND_DEF, WEEKEND_DEFS, default_range, parse_iso, to_iso
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -731,3 +731,167 @@ def put_profile():
         species,
     )
     return jsonify({"profile": _profile()})
+
+
+# ───────── documents (T-10, §8.1) ─────────
+def _data_dir() -> Path:
+    """`data/` for this app: beside the DB, so tests never write into the repo's copy."""
+    configured = current_app.config.get("DATA_DIR")
+    return Path(configured) if configured else Path(current_app.config["DB_PATH"]).parent
+
+
+def _regs_dir() -> Path:
+    return _data_dir() / "regs"
+
+
+def _document_row(doc_id: int):
+    row = db.q1("SELECT * FROM source_documents WHERE id = ?", doc_id)
+    if row is None:
+        raise ApiError(
+            "unknown_document", f"no document {doc_id}", {"document_id": doc_id}, status=404
+        )
+    return row
+
+
+def _document_dict(row) -> dict[str, Any]:
+    counts = db.q(
+        "SELECT status, COUNT(*) AS n FROM seasons WHERE document_id = ? GROUP BY status",
+        row["id"],
+    )
+    checks = db.q(
+        "SELECT status, COUNT(*) AS n FROM import_checks WHERE document_id = ? GROUP BY status",
+        row["id"],
+    )
+    return {
+        "id": row["id"],
+        "kind": row["kind"],
+        "title": row["title"],
+        "filename": row["filename"],
+        "license_year": row["license_year"],
+        "year_end": row["year_end"],
+        "pages": row["pages"],
+        "sha256": row["sha256"],
+        "status": row["status"],
+        "priority": row["priority"],
+        "parser_version": row["parser_version"],
+        "imported_at": row["imported_at"],
+        "published_at": row["published_at"],
+        "error": row["error"],
+        "pdf_url": f"/api/documents/{row['id']}/pdf",
+        "seasons": {r["status"]: r["n"] for r in counts},
+        "checks": {r["status"]: r["n"] for r in checks},
+    }
+
+
+@api.get("/documents")
+def list_documents():
+    rows = db.q("SELECT * FROM source_documents ORDER BY license_year DESC, priority DESC, id DESC")
+    return jsonify({"documents": [_document_dict(r) for r in rows]})
+
+
+@api.get("/documents/<int:doc_id>")
+def get_document(doc_id: int):
+    """One document with its staged rows and accuracy checks (§8.4 review UI, T-15)."""
+    row = _document_row(doc_id)
+    seasons = _dicts(
+        "SELECT s.*, GROUP_CONCAT(su.unit_id) AS units FROM seasons s"
+        " LEFT JOIN season_units su ON su.season_id = s.id"
+        " WHERE s.document_id = ? GROUP BY s.id ORDER BY s.source_page, s.id",
+        doc_id,
+    )
+    for s in seasons:
+        s["restrictions"] = json.loads(s["restrictions"] or "[]")
+        s["units"] = sorted((s["units"] or "").split(","), key=_unit_sort) if s["units"] else []
+    checks = _dicts(
+        "SELECT * FROM import_checks WHERE document_id = ? ORDER BY section, check_name", doc_id
+    )
+    for c in checks:
+        c["detail"] = json.loads(c["detail"]) if c["detail"] else None
+    return jsonify({"document": _document_dict(row), "seasons": seasons, "checks": checks})
+
+
+def _unit_sort(unit_id: str):
+    from planner.importer.common import natural_key
+
+    return natural_key(unit_id)
+
+
+@api.post("/documents")
+def upload_document():
+    """Upload a regulation PDF, store it by sha256, and import it synchronously (§8.1).
+
+    `kind` and `year` form fields override the classifier. An already-stored file is
+    rejected with 409 and the id of the document that holds it.
+    """
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        raise ApiError("missing_file", "attach the PDF as the `file` field", {"field": "file"})
+    data = upload.read()
+    if len(data) > importer.MAX_PDF_BYTES:
+        raise ApiError(
+            "file_too_large",
+            f"PDFs are limited to {importer.MAX_PDF_BYTES // (1024 * 1024)} MB",
+            {"bytes": len(data), "limit": importer.MAX_PDF_BYTES},
+            status=413,
+        )
+    if not importer.looks_like_pdf(data):
+        raise ApiError(
+            "not_a_pdf", "that file is not a PDF", {"filename": upload.filename}, status=415
+        )
+
+    sha = importer.sha256_bytes(data)
+    existing = db.q1("SELECT id, status, title FROM source_documents WHERE sha256 = ?", sha)
+    if existing is not None:
+        raise ApiError(
+            "duplicate_document",
+            "this PDF is already imported",
+            {"document_id": existing["id"], "status": existing["status"], "sha256": sha},
+            status=409,
+        )
+
+    kind = (request.form.get("kind") or "").strip() or None
+    year = _year(request.form.get("year"), field="year") if request.form.get("year") else None
+    try:
+        info = importer.classify_bytes(data, kind=kind, year=year, filename=upload.filename)
+    except importer.ClassifyError as exc:
+        raise ApiError(
+            "unclassified", str(exc), {"sample": exc.sample, "filename": upload.filename}, 422
+        ) from None
+
+    path = importer.save_pdf(_regs_dir(), info.license_year, sha, data)
+    cur = db.exec(
+        "INSERT INTO source_documents (license_year, year_end, kind, title, filename, sha256,"
+        " stored_path, priority, status, parser_version)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?)",
+        info.license_year,
+        info.year_end,
+        info.kind,
+        info.title or upload.filename,
+        upload.filename,
+        sha,
+        str(path),
+        info.priority,
+        importer.PARSER_VERSION,
+    )
+    doc_id = int(cur.lastrowid or 0)
+    result = importer.run_import(doc_id, pdf_path=path, data_dir=_data_dir())
+    body = {"document": _document_dict(_document_row(doc_id)), "import": result.to_json()}
+    return jsonify(body), 201
+
+
+@api.get("/documents/<int:doc_id>/pdf")
+def document_pdf(doc_id: int):
+    """The stored PDF, inline so `#page=N` jumps to a season's source page (§6)."""
+    row = _document_row(doc_id)
+    path = Path(row["stored_path"] or "")
+    if not path.is_file():
+        raise ApiError(
+            "missing_file",
+            "the stored PDF is gone; re-upload it",
+            {"document_id": doc_id, "stored_path": str(path)},
+            status=410,
+        )
+    response = send_file(path, mimetype="application/pdf", conditional=True)
+    name = row["filename"] or path.name
+    response.headers["Content-Disposition"] = f'inline; filename="{Path(name).name}"'
+    return response

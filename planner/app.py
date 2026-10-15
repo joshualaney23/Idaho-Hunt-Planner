@@ -19,6 +19,9 @@ def create_app(db_path: str | Path | None = None) -> Flask:
     """Build the app. `db_path` defaults to `data/planner.db`, created + seeded on first run."""
     app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
     app.config["DB_PATH"] = Path(db_path) if db_path is not None else DEFAULT_DB_PATH
+    # Uploaded PDFs and the page cache live beside the DB (T-10, §8.1), so a test DB in
+    # a tmp dir never writes into the repo's `data/`.
+    app.config["DATA_DIR"] = app.config["DB_PATH"].parent
     db.init_app(app)
     app.register_blueprint(api)
 
