@@ -34,7 +34,6 @@ from typing import Any
 from planner import db
 from planner.dates import to_iso
 from planner.importer import (
-    CheckResult,
     ParseContext,
     ParsedSeason,
     ParserSpec,
@@ -42,6 +41,7 @@ from planner.importer import (
     common,
     register,
 )
+from planner.importer.checks import DateCell, SeasonRef, SectionFacts, TwoPath
 from planner.importer.extract import Cell, CellTable, Page, Word
 from planner.importer.textlayer import (
     TextLine,
@@ -1116,74 +1116,45 @@ def attach_note_texts(ctx: ParseContext, state: DocState, spec: Brochure, specie
     return len(updates)
 
 
-def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> list[CheckResult]:
-    """The §8.7 invariants for one `controlled_<species>` section."""
+def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts | None:
+    """What one `controlled_<species>` section measured, plus the rows it writes.
+
+    The §8.7 invariants themselves live in `planner.importer.checks` (T-22a); this
+    collects their evidence and does the section's own database work (`hunt_areas` and
+    the note texts attached to staged seasons).
+    """
     state = state_for(ctx)
     pairs = _rows_for(state, spec, species)
     rows = [row for row, _ in pairs]
     if not rows:
-        return []
-    numbers = [row.hunt_number for row in rows]
+        return None
+    # One resolution per row — a hunt number can legitimately repeat, and proving it
+    # does not is `no_duplicate_keys`' job, not this one's.
+    resolved = [(row, resolve_dates(row, ctx)) for row in rows]
     keys = [
         (row.hunt_number, to_iso(window.start), to_iso(window.end))
-        for row in rows
-        for window in resolve_dates(row, ctx)[0]
+        for row, (wins, _) in resolved
+        for window in wins
     ]
-    duplicates = sorted({"-".join(k) for k in keys if keys.count(k) > 1})
-    disagreements = [d for d in state.disagreements if spec.species_of(str(d["hunt"])) == species]
-    merged = [n for n in state.text_only if spec.species_of(n) == species]
-    in_text = text_hunt_numbers(state, spec, species)
-    missing = sorted(in_text - set(numbers))
-    unparsed = [
-        {"hunt": row.hunt_number, "page": row.page, "dates": list(row.dates_texts)}
-        for row in rows
-        if not resolve_dates(row, ctx)[0] or resolve_dates(row, ctx)[1]
+    date_cells = [
+        DateCell(
+            page=row.page,
+            texts=tuple(row.dates_texts),
+            seasons=len(wins),
+            label=row.hunt_number,
+            leftovers=tuple(leftovers),
+            bbox=row.bbox,
+            must_produce=True,  # every controlled hunt prints at least one season window
+        )
+        for row, (wins, leftovers) in resolved
     ]
-    windows = sum(len(resolve_dates(row, ctx)[0]) for row in rows)
-    tokens = sum(
-        len(common.parse_date_ranges(text, ctx.license_year))
-        for row in rows
-        for text in row.dates_texts
-    )
-    bad_titles = [t for t in state.bad_titles]
-    marks = [m for m in state.missing_marks if spec.species_of(str(m["hunt"])) == species]
-
-    checks = [
-        CheckResult(
-            name="two_path_agreement",
-            status="pass" if not disagreements else "fail",
-            expected=f"{len(rows)} rows agree",
-            actual=f"{len(rows) - len(disagreements)} agree,"
-            f" {len(merged)} text lines merged with a neighbour",
-            detail={"disagreements": disagreements, "text_line_merged": merged} or None,
-        ),
-        CheckResult(
-            name="hunt_number_completeness",
-            status="pass" if not missing else "fail",
-            expected=f"{len(in_text)} hunt numbers start a line in the page text",
-            actual=f"{len(rows)} parsed, {len(missing)} missing",
-            detail={"missing": missing} if missing else None,
-        ),
-        CheckResult(
-            name="no_duplicate_keys",
-            status="pass" if not duplicates else "fail",
-            # A hunt number can print several season windows (§12 T-17a), so the key is
-            # the window, not the number alone.
-            expected="every (hunt number, start, end) unique per document",
-            actual=f"{len(duplicates)} duplicates",
-            detail=duplicates or None,
-        ),
-        CheckResult(
-            name="date_token_accounting",
-            status="pass" if tokens == windows and not unparsed else "fail",
-            expected=f"{tokens} date tokens consumed",
-            actual=f"{windows} seasons from {len(rows)} hunts, {len(unparsed)} unparsed date cells",
-            detail=unparsed or None,
-        ),
+    first_windows = [
+        SeasonRef(label=row.hunt_number, title=row.title.text, start=wins[0].start)
+        for row, (wins, _) in resolved
+        if wins
     ]
-
     scopes = checksum_scopes(state, spec, species)
-    summed = [
+    tag_totals = [
         {
             "title": title,
             "header": amount,
@@ -1193,17 +1164,6 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> list[CheckRe
         }
         for title, amount, scope in scopes
     ]
-    bad_sums = [s for s in summed if s["header"] != s["parsed"]]
-    checks.append(
-        CheckResult(
-            name="tag_checksum",
-            status="pass" if scopes and not bad_sums else "fail",
-            expected=", ".join(f"{s['header']}" for s in summed) or "a printed tag total",
-            actual=", ".join(f"{s['parsed']}" for s in summed) or "no total found",
-            detail=summed or None,
-        )
-    )
-
     refs = sorted(
         {(row.area, row.description_page) for row in rows if row.description_page is not None}
     )
@@ -1212,62 +1172,40 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> list[CheckRe
         for area, printed in refs
         if not _area_entries(state, spec, area, state.printed_pages.get(printed))
     ]
-    checks.append(
-        CheckResult(
-            name="page_ref_resolves",
-            status="pass" if not unresolved else "fail",
-            expected=f"{len(refs)} '(See pg N)' pointers resolve to the area's description",
-            actual=f"{len(refs) - len(unresolved)} resolve",
-            detail=unresolved or None,
-        )
-    )
-    checks.append(
-        CheckResult(
-            name="footnote_legend",
-            status="pass" if not marks and not bad_titles else "fail",
-            expected="every footnote marker has a legend entry and every title maps",
-            actual=f"{len(marks)} rows with an unknown marker, {len(bad_titles)} unreadable titles",
-            detail={"markers": marks, "titles": bad_titles} if marks or bad_titles else None,
-        )
-    )
-    other_year = [
-        {"hunt": row.hunt_number, "title": row.title.text, "start": to_iso(window.start)}
-        for row in rows
-        for window in resolve_dates(row, ctx)[0][:1]
-        if window.start.year != ctx.license_year
-    ]
-    checks.append(
-        CheckResult(
-            name="yoy_diff",
-            status="warn" if other_year else "pass",
-            expected=f"dates inside the {ctx.license_year} license year",
-            actual=f"{len(other_year)} rows dated in another calendar year",
-            detail=other_year or None,
-        )
-    )
-    checks.append(
-        CheckResult(
-            name="corrections_applied",
-            status="pass",
-            expected="every item on the brochure's corrections page is matched",
-            actual="no corrections page in this document"
-            if not _corrections_pages(state)
-            else f"corrections on pages {_corrections_pages(state)} need review",
-            detail=_corrections_pages(state) or None,
-        )
-    )
-
     areas = write_hunt_areas(ctx, state, spec, species)
     attached = attach_note_texts(ctx, state, spec, species)
-    checks.append(
-        CheckResult(
-            name="hunt_areas_written",
-            status="pass",
-            expected=f"{len({row.area for row in rows})} distinct hunt areas",
-            actual=f"{areas} rows in hunt_areas, {attached} seasons with an attached note",
-        )
+    return SectionFacts(
+        section=spec.section(species),
+        two_path=TwoPath(
+            compared=len(rows),
+            disagreeing=len(
+                [d for d in state.disagreements if spec.species_of(str(d["hunt"])) == species]
+            ),
+            disagreements=[
+                d for d in state.disagreements if spec.species_of(str(d["hunt"])) == species
+            ],
+            merged_lines=[n for n in state.text_only if spec.species_of(n) == species],
+        ),
+        date_cells=date_cells,
+        keys=keys,
+        key_label="(hunt number, start, end)",
+        hunt_numbers_in_text=sorted(text_hunt_numbers(state, spec, species)),
+        hunt_numbers_parsed=[row.hunt_number for row in rows],
+        tag_totals=tag_totals,
+        first_windows=first_windows,
+        page_refs=len(refs),
+        page_refs_unresolved=unresolved,
+        unknown_marks=[
+            m for m in state.missing_marks if spec.species_of(str(m["hunt"])) == species
+        ],
+        unreadable_titles=list(state.bad_titles),
+        corrections_pages=_corrections_pages(state),
+        hunt_areas={
+            "distinct": len({row.area for row in rows}),
+            "areas": areas,
+            "attached": attached,
+        },
     )
-    return checks
 
 
 def _corrections_pages(state: DocState) -> list[int]:

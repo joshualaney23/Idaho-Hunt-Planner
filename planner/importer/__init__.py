@@ -25,7 +25,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from planner import db
 from planner.dates import to_iso
@@ -33,6 +33,9 @@ from planner.importer import common
 from planner.importer.classify import CLASSIFY_PAGES, Classification, ClassifyError
 from planner.importer.classify import classify as classify_document
 from planner.importer.extract import Page, cache_dir_for, iter_pages, page_texts
+
+if TYPE_CHECKING:  # pragma: no cover - typing only (the checks package imports this one)
+    from planner.importer.checks import SectionFacts
 
 __all__ = [
     "PARSER_VERSION",
@@ -182,7 +185,9 @@ class CheckResult:
 
 
 BeginFn = Callable[["ParseContext"], None]
-FinalizeFn = Callable[["ParseContext"], Iterable[CheckResult]]
+#: `finalize` returns the facts its section measured; the §8.7 checks live in the
+#: `planner.importer.checks` registry and read those facts (T-22a).
+FinalizeFn = Callable[["ParseContext"], "SectionFacts | None"]
 
 
 @dataclass(frozen=True)
@@ -196,7 +201,7 @@ class ParserSpec:
     section: str = ""
     #: Called once before the first page — a parser resets its per-document state here.
     begin: BeginFn | None = None
-    #: Called once after the last page — document-wide §8.7 checks.
+    #: Called once after the last page — returns the section's `SectionFacts` (§8.7).
     finalize: FinalizeFn | None = None
 
 
@@ -227,7 +232,7 @@ def parser(
     def deer_general(page, ctx): ...
 
     `begin` runs once before the first page (reset per-document state) and `finalize`
-    once after the last one, returning the section's §8.7 `CheckResult`s.
+    once after the last one, returning the `SectionFacts` the §8.7 check registry reads.
     """
 
     def deco(fn: ParserFn) -> ParserFn:
@@ -534,7 +539,8 @@ def run_import(
                     detail=[{"page": e.page, "reason": e.reason, "detail": e.detail} for e in bad]
                     or None,
                 )
-                for check in _finalize_checks(spec, ctx, result):
+                facts = _section_facts(spec, ctx, result)
+                for check in checks.run_checks(ctx, spec.section, facts):
                     _record_check(
                         doc_id,
                         spec.section,
@@ -557,15 +563,15 @@ def run_import(
         return result
 
 
-def _finalize_checks(
+def _section_facts(
     spec: ParserSpec, ctx: ParseContext, result: ImportResult
-) -> list[CheckResult]:
-    """A parser's document-wide §8.7 checks — a crash in one becomes a failing check."""
+) -> SectionFacts | None:
+    """The facts a section measured — a crash while collecting them fails loudly (D3)."""
     if spec.finalize is None:
-        return []
+        return None
     try:
-        return list(spec.finalize(ctx))
-    except Exception as exc:  # a broken check never kills the import, it fails loudly
+        return spec.finalize(ctx)
+    except Exception as exc:  # a broken parser never kills the import, it fails loudly
         result.errors.append(
             RowError(
                 section=spec.section,
@@ -574,14 +580,15 @@ def _finalize_checks(
                 detail=f"{type(exc).__name__}: {exc}",
             )
         )
-        return [
-            CheckResult(
-                name="checks_ran",
-                status="fail",
-                expected="checks run",
-                actual=f"{type(exc).__name__}: {exc}",
-            )
-        ]
+        _record_check(
+            ctx.document_id,
+            spec.section,
+            "checks_ran",
+            "fail",
+            expected="checks run",
+            actual=f"{type(exc).__name__}: {exc}",
+        )
+        return None
 
 
 def _data_dir_of(pdf_path: Path) -> Path:
@@ -605,6 +612,7 @@ def _null_context() -> Iterator[None]:
     yield None
 
 
-# Importing the parser modules registers them (§8.1 section router). Kept last so the
-# registry API above is fully defined when they import it.
-from planner.importer import controlled, deer  # noqa: E402,F401  (import for the side effect)
+# Importing the check registry and the parser modules registers them (§8.1 section
+# router, §8.7 checks). Kept last so the API above is fully defined when they import it.
+from planner.importer import checks, controlled, deer  # noqa: E402,F401  (side effect)
+from planner.importer.checks import SectionFacts  # noqa: E402,F401  (re-exported for parsers)
