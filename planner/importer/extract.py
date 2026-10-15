@@ -32,9 +32,37 @@ ROTATED_SHARE = 0.30
 #: Superscript cutoff: chars below this share of the page's median font size (§8.2).
 SUPERSCRIPT_SHARE = 0.75
 #: Bumped whenever the cached shape changes, which invalidates older cache files.
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 Table = list[list[str | None]]
+
+
+@dataclass(frozen=True)
+class Word:
+    """One word of the text layer with its position — the text path's geometry (§8.7).
+
+    Column membership and row bands are read from these positions, so the text path
+    never borrows `find_tables`' ruled geometry.
+    """
+
+    text: str
+    x0: float
+    top: float
+    x1: float
+    bottom: float
+
+    @property
+    def cx(self) -> float:
+        """Horizontal centre — what a word is assigned to a column by."""
+        return (self.x0 + self.x1) / 2
+
+    def to_json(self) -> list[Any]:
+        return [self.text, self.x0, self.top, self.x1, self.bottom]
+
+    @classmethod
+    def from_json(cls, data: Sequence[Any]) -> Word:
+        text, x0, top, x1, bottom = data
+        return cls(str(text), float(x0), float(top), float(x1), float(bottom))
 
 
 @dataclass(frozen=True)
@@ -48,6 +76,7 @@ class Page:
     width: float = 0.0
     height: float = 0.0
     font_size: float = 0.0  # median body font size, for superscript detection
+    words: list[Word] = field(default_factory=list)  # text path geometry (§8.7)
 
     @property
     def lines(self) -> list[str]:
@@ -63,6 +92,7 @@ class Page:
             "width": self.width,
             "height": self.height,
             "font_size": self.font_size,
+            "words": [w.to_json() for w in self.words],
         }
 
     @classmethod
@@ -75,6 +105,7 @@ class Page:
             width=float(data["width"]),
             height=float(data["height"]),
             font_size=float(data.get("font_size") or 0.0),
+            words=[Word.from_json(w) for w in data.get("words") or ()],
         )
 
 
@@ -137,6 +168,16 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
     opts: dict[str, Any] = {"line_dir_rotated": "ltr", "char_dir_rotated": "btt"} if rotated else {}
     text = cropped.extract_text(**opts) or ""
     tables: list[Table] = [] if rotated else [list(t) for t in cropped.extract_tables()]
+    words = [
+        Word(
+            text=w["text"],
+            x0=round(float(w["x0"]), 2),
+            top=round(float(w["top"]), 2),
+            x1=round(float(w["x1"]), 2),
+            bottom=round(float(w["bottom"]), 2),
+        )
+        for w in cropped.extract_words(**opts)
+    ]
     return Page(
         number=number,
         text=text,
@@ -145,6 +186,7 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
         width=float(page.width),
         height=float(page.height),
         font_size=size,
+        words=words,
     )
 
 

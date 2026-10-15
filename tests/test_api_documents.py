@@ -306,7 +306,9 @@ def test_parser_decorator_registers_for_one_kind() -> None:
         assert [s.name for s in importer.parsers_for("upland")] == ["turkey"]
         assert importer.parsers_for("migratory") == []
         assert len(importer.registered()) == 2
-    assert importer.registered() == []  # the registry is empty again outside the block
+    # Outside the block the real registry is back: T-11's deer parser is registered by
+    # importing `planner.importer`, so an upload goes through it without any wiring.
+    assert "deer_general" in [s.name for s in importer.parsers_for("big_game")]
 
 
 # ───────── streaming the PDF ─────────

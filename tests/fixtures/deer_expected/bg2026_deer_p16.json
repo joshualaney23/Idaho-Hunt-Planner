@@ -1,0 +1,184 @@
+[
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "archery",
+    "sex": "antlered",
+    "start": "2026-08-30",
+    "end": "2026-09-30",
+    "units": [
+      "73A"
+    ],
+    "partial": [],
+    "restrictions": [],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "archery",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-24",
+    "units": [
+      "73A"
+    ],
+    "partial": [],
+    "restrictions": [],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "muzzleloader",
+    "sex": "antlered",
+    "start": "2026-11-10",
+    "end": "2026-11-14",
+    "units": [
+      "4",
+      "7",
+      "9"
+    ],
+    "partial": [],
+    "restrictions": [],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "muzzleloader",
+    "sex": "antlerless",
+    "start": "2026-11-10",
+    "end": "2026-12-01",
+    "units": [
+      "4",
+      "7",
+      "9"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "muzzleloader",
+    "sex": "antlered",
+    "start": "2026-11-15",
+    "end": "2026-12-01",
+    "units": [
+      "4",
+      "7",
+      "9"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "muzzleloader",
+    "sex": "antlerless",
+    "start": "2026-09-08",
+    "end": "2026-09-30",
+    "units": [
+      "39"
+    ],
+    "partial": [],
+    "restrictions": [],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "muzzleloader",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-24",
+    "units": [
+      "73A"
+    ],
+    "partial": [],
+    "restrictions": [],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "short_range",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "38"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes"
+    ],
+    "notes": "Very limited access, See Note 3, Page 15"
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "short_range",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-11-24",
+    "units": [
+      "38"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes"
+    ],
+    "notes": "Very limited access, See Note 3, Page 15"
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "short_range",
+    "sex": "antlered",
+    "start": "2026-08-30",
+    "end": "2026-11-06",
+    "units": [
+      "53"
+    ],
+    "partial": [
+      "53"
+    ],
+    "restrictions": [
+      "portion_of_unit",
+      "motorized_rule",
+      "see_notes"
+    ],
+    "notes": "Attention: Portion of Unit only, See Note 6, Page 15, Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "short_range",
+    "sex": "antlerless",
+    "start": "2026-08-30",
+    "end": "2026-11-06",
+    "units": [
+      "53"
+    ],
+    "partial": [
+      "53"
+    ],
+    "restrictions": [
+      "portion_of_unit",
+      "motorized_rule",
+      "see_notes"
+    ],
+    "notes": "Attention: Portion of Unit only, See Note 6, Page 15, Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_regular",
+    "weapon": "short_range",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-24",
+    "units": [
+      "63"
+    ],
+    "partial": [],
+    "restrictions": [],
+    "notes": null
+  }
+]
