@@ -224,10 +224,13 @@ QUALIFIER_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"private\s+land\s+only", "private_land_only"),
     (r"(?:in\s+a\s+)?portion\s+of\s+(?:the\s+)?unit", "portion_of_unit"),
     (r"outfitt(?:er|ed)[\s-]?(?:allocated\s+)?only", "outfitter_only"),
-    (r"chronic\s+wasting\s+disease\s+testing\s+required", "cwd_testing"),
-    (r"\bcwd\s+testing\s+required", "cwd_testing"),
+    (r"chronic\s+wasting\s+disease[\w\s]*testing\s+(?:is\s+)?required", "cwd_testing"),
+    (r"\bcwd\s+testing\s+(?:is\s+)?required", "cwd_testing"),
     (r"motorized\s+hunting\s+rule\s+applies", "motorized_rule"),
-    (r"second\s+deer\s+tag\s+may\s+not\s+be\s+used", "second_tag_prohibited"),
+    (
+        r"second\s+(?:white[\s-]?tailed\s+)?(?:deer\s+)?tag\s+may\s+not\s+be\s+used",
+        "second_tag_prohibited",
+    ),
 )
 _QUALIFIER_RES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(p, re.IGNORECASE), code) for p, code in QUALIFIER_PATTERNS
@@ -335,10 +338,19 @@ class TitleInfo:
     matched: bool
 
 
+#: The sentence under a table title ("Regular Deer tag is valid for mule deer or
+#: white-tailed deer unless otherwise noted.") names other tags and would hijack the
+#: title → tag mapping, so it is trimmed off before matching.
+_TITLE_DISCLAIMER_RE = re.compile(r"\btags?\s+(?:is|are)\s+valid\b", re.IGNORECASE)
+
+
 def parse_title(title: str) -> TitleInfo:
     """`"2026 Regular Deer Tag / General Archery Only Seasons"` → deer_regular/archery/general."""
     raw = re.sub(r"\s+", " ", (title or "").replace("\n", " ")).strip()
-    low = raw.lower()
+    head = raw
+    if m := _TITLE_DISCLAIMER_RE.search(head):
+        head = head[: m.start()].strip()
+    low = head.lower()
     tag_type = species = None
     for phrase, tag, sp in TAG_TITLES:
         if phrase in low:

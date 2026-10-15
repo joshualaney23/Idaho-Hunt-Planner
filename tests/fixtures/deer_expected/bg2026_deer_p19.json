@@ -1,0 +1,685 @@
+[
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "21",
+      "21A",
+      "28",
+      "36B"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "Very limited access"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "21",
+      "21A",
+      "28",
+      "36B"
+    ],
+    "partial": [],
+    "restrictions": [
+      "youth_only",
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "Very limited access"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "22",
+      "25",
+      "39",
+      "43"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "22",
+      "25",
+      "39",
+      "43"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-11-20",
+    "units": [
+      "23"
+    ],
+    "partial": [],
+    "restrictions": [
+      "cwd_testing",
+      "whitetail_only"
+    ],
+    "notes": "Chronic Wasting Disease Testing Required, See Page 96"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-11-20",
+    "units": [
+      "23"
+    ],
+    "partial": [],
+    "restrictions": [
+      "cwd_testing",
+      "whitetail_only"
+    ],
+    "notes": "Chronic Wasting Disease Testing Required, See Page 96"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-11-20",
+    "units": [
+      "24"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 3, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-11-20",
+    "units": [
+      "24"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 3, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "29",
+      "37A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "Very limited access, Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "29",
+      "37A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "youth_only",
+      "motorized_rule",
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "Very limited access, Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "30",
+      "30A",
+      "36A",
+      "37"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "Very limited access, See Note 2, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "30",
+      "30A",
+      "36A",
+      "37"
+    ],
+    "partial": [],
+    "restrictions": [
+      "youth_only",
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "Very limited access, See Note 2, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "31",
+      "32"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Notes 2 and 4, Page 18, Motorized Hunting Rule Applies in Unit 32, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "31",
+      "32"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Notes 2 and 4, Page 18, Motorized Hunting Rule Applies in Unit 32, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "32A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "32A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-11-08",
+    "units": [
+      "33",
+      "34",
+      "35"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-11-08",
+    "units": [
+      "33",
+      "34",
+      "35"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-24",
+    "units": [
+      "40",
+      "41"
+    ],
+    "partial": [],
+    "restrictions": [
+      "two_point_only",
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 2, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "46"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Notes 2 and 4, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "46"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Notes 2 and 4, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "50",
+      "51",
+      "58",
+      "59",
+      "59A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "50",
+      "51",
+      "58",
+      "59",
+      "59A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-11-10",
+    "end": "2026-12-09",
+    "units": [
+      "50",
+      "51",
+      "58",
+      "59",
+      "59A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-11-10",
+    "end": "2026-12-09",
+    "units": [
+      "50",
+      "51",
+      "58",
+      "59",
+      "59A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "60",
+      "61",
+      "62A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 2, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "60",
+      "61",
+      "62A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 2, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-11-10",
+    "end": "2026-12-09",
+    "units": [
+      "60",
+      "61",
+      "62A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 2, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-11-10",
+    "end": "2026-12-09",
+    "units": [
+      "60",
+      "61",
+      "62A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 2, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "60A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 5, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "60A"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 5, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "62",
+      "65"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "62",
+      "65"
+    ],
+    "partial": [],
+    "restrictions": [
+      "whitetail_only"
+    ],
+    "notes": null
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "64",
+      "69"
+    ],
+    "partial": [],
+    "restrictions": [
+      "cwd_testing",
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Chronic Wasting Disease Testing Required, See Page 96, Motorized Hunting Rule Applies in Unit 69, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "64",
+      "69"
+    ],
+    "partial": [],
+    "restrictions": [
+      "cwd_testing",
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Chronic Wasting Disease Testing Required, See Page 96, Motorized Hunting Rule Applies in Unit 69, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "66"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "66"
+    ],
+    "partial": [],
+    "restrictions": [
+      "motorized_rule",
+      "whitetail_only"
+    ],
+    "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlered",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "67"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 6, Page 18"
+  },
+  {
+    "tag_type_id": "deer_whitetail",
+    "weapon": "any",
+    "sex": "antlerless",
+    "start": "2026-10-10",
+    "end": "2026-10-31",
+    "units": [
+      "67"
+    ],
+    "partial": [],
+    "restrictions": [
+      "see_notes",
+      "whitetail_only"
+    ],
+    "notes": "See Note 6, Page 18"
+  }
+]

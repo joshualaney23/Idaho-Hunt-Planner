@@ -36,6 +36,7 @@ from planner.importer.extract import Page, cache_dir_for, iter_pages, page_texts
 
 __all__ = [
     "PARSER_VERSION",
+    "CheckResult",
     "Classification",
     "ClassifyError",
     "ImportResult",
@@ -170,6 +171,21 @@ MatchFn = Callable[[Page], bool]
 
 
 @dataclass(frozen=True)
+class CheckResult:
+    """One §8.7 invariant a parser ran over the whole document."""
+
+    name: str
+    status: str  # 'pass' | 'fail' | 'warn'
+    expected: str | None = None
+    actual: str | None = None
+    detail: Any = None
+
+
+BeginFn = Callable[["ParseContext"], None]
+FinalizeFn = Callable[["ParseContext"], Iterable[CheckResult]]
+
+
+@dataclass(frozen=True)
 class ParserSpec:
     """A registered page parser (§8.1 section router)."""
 
@@ -178,6 +194,10 @@ class ParserSpec:
     match: MatchFn
     fn: ParserFn
     section: str = ""
+    #: Called once before the first page — a parser resets its per-document state here.
+    begin: BeginFn | None = None
+    #: Called once after the last page — document-wide §8.7 checks.
+    finalize: FinalizeFn | None = None
 
 
 # ───────── registry ─────────
@@ -193,12 +213,21 @@ def register(spec: ParserSpec) -> ParserSpec:
 
 
 def parser(
-    *, kind: str, match: MatchFn, name: str | None = None, section: str | None = None
+    *,
+    kind: str,
+    match: MatchFn,
+    name: str | None = None,
+    section: str | None = None,
+    begin: BeginFn | None = None,
+    finalize: FinalizeFn | None = None,
 ) -> Callable[[ParserFn], ParserFn]:
     """Register a page parser for one brochure `kind` (§8.1)::
 
     @parser(kind="big_game", match=lambda page: "Deer Tag" in page.text)
     def deer_general(page, ctx): ...
+
+    `begin` runs once before the first page (reset per-document state) and `finalize`
+    once after the last one, returning the section's §8.7 `CheckResult`s.
     """
 
     def deco(fn: ParserFn) -> ParserFn:
@@ -210,6 +239,8 @@ def parser(
                 match=match,
                 fn=fn,
                 section=section or parser_name,
+                begin=begin,
+                finalize=finalize,
             )
         )
         return fn
@@ -440,6 +471,9 @@ def run_import(
             cache = cache_dir_for(doc["sha256"] or f"doc{doc_id}", data_dir or _data_dir_of(path))
             rows: list[tuple[ParsedSeason, ParserSpec]] = []
             pages = 0
+            for spec in specs:
+                if spec.begin is not None:
+                    spec.begin(ctx)
             for page in iter_pages(path, cache_dir=cache):
                 pages += 1
                 for spec in specs:
@@ -500,6 +534,16 @@ def run_import(
                     detail=[{"page": e.page, "reason": e.reason, "detail": e.detail} for e in bad]
                     or None,
                 )
+                for check in _finalize_checks(spec, ctx, result):
+                    _record_check(
+                        doc_id,
+                        spec.section,
+                        check.name,
+                        check.status,
+                        expected=check.expected,
+                        actual=check.actual,
+                        detail=check.detail,
+                    )
             result.sections = sections
             result.status = "needs_review"
             _set_status(
@@ -511,6 +555,33 @@ def run_import(
                 error=None,
             )
         return result
+
+
+def _finalize_checks(
+    spec: ParserSpec, ctx: ParseContext, result: ImportResult
+) -> list[CheckResult]:
+    """A parser's document-wide §8.7 checks — a crash in one becomes a failing check."""
+    if spec.finalize is None:
+        return []
+    try:
+        return list(spec.finalize(ctx))
+    except Exception as exc:  # a broken check never kills the import, it fails loudly
+        result.errors.append(
+            RowError(
+                section=spec.section,
+                page=None,
+                reason="check_error",
+                detail=f"{type(exc).__name__}: {exc}",
+            )
+        )
+        return [
+            CheckResult(
+                name="checks_ran",
+                status="fail",
+                expected="checks run",
+                actual=f"{type(exc).__name__}: {exc}",
+            )
+        ]
 
 
 def _data_dir_of(pdf_path: Path) -> Path:
@@ -532,3 +603,8 @@ def _with_defaults(season: ParsedSeason, spec: ParserSpec, page: Page) -> Parsed
 @contextmanager
 def _null_context() -> Iterator[None]:
     yield None
+
+
+# Importing the parser modules registers them (§8.1 section router). Kept last so the
+# registry API above is fully defined when they import it.
+from planner.importer import deer  # noqa: E402,F401  (import for its side effect)

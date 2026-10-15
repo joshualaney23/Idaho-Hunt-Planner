@@ -547,6 +547,12 @@ upload PDF ─► store (sha256) ─► classify(kind, year) ─► extract page
      ─► section router ─► species parsers ─► normalize & validate ─► staging rows (status='staged')
      ─► Review UI (diff vs prior year, confidence, page preview) ─► approve ─► publish
 ```
+A parser is a page function registered with `@parser(kind=…, match=…)`. It may also
+register two per-document hooks: `begin(ctx)` runs before the first page (reset the
+state a parser carries between pages — the current table title, coverage sets), and
+`finalize(ctx)` runs after the last one and returns the section's §8.7 `CheckResult`s,
+which `run_import` writes to `import_checks`. A hook that raises becomes a failing
+check, never a failed import.
 
 ### 8.2 Extraction rules (`importer/extract.py`)
 - Open with `pdfplumber`. For each page, **crop 40 pt off the left and right** (side tabs), then `extract_tables()` and `extract_text()`.
@@ -556,12 +562,14 @@ upload PDF ─► store (sha256) ─► classify(kind, year) ─► extract page
 - **Two-column prose pages** (hunt-area descriptions): find the gutter as the widest vertical band with no word boxes in the middle 40 % of the page width, then extract each column separately.
 - **Rotated pages** (elk zone calendars): `extract_text(line_dir_rotated='ltr', char_dir_rotated='btt')` for text, and `extract_words` with the same options for geometry.
 - Detect rotated layouts. If more than 30 % of a page's chars have `upright == False`, set `page.rotated = True` and route the page to the rotated-layout handler (T-12).
-- Cache per-page extraction as JSON in `data/cache/<sha256>/p<N>.json` so re-parsing after a parser fix is fast.
+- Cache per-page extraction as JSON in `data/cache/<sha256>/p<N>.json` so re-parsing after a parser fix is fast. The cache holds **both** extraction paths: the ruled tables and the text layer's words with their positions (`Page.words`), which is what the text path rebuilds rows and columns from (§8.7). Bump `CACHE_VERSION` when the cached shape changes.
+- **The ruled-table path loses vertically merged cells.** In the 2026 general deer tables a Notes cell spans a row's sub-rows, and `find_tables` reports it as an empty cell on every one of them (p. 12: all four notes lost). Columns that can be merged this way must be read from the text path by position, not from `extract_tables`.
 
 ### 8.3 Common parsing (`importer/common.py`)
 - **Date ranges**: `(Mon) D – (Mon) D` with `-`/`–`/`—`/"through". Full month names, and an optional year (`August 30, 2026 through January 31, 2027`). Infer the year from the document's license year. If the end is before the start, the end rolls into the next year.
 - **Unit lists**: `1, 2, 3, 4A, 5, 6`, `Units 16A, 17, 19, and 20`, ranges like `21–21A`. Every token is validated against `units`. Unknown tokens become a warning on the row.
-- **Qualifiers → restriction codes**: `(White-tailed deer only)`→`whitetail_only`, `(Youth hunt only)`→`youth_only`, `(2-point deer only)`→`two_point_only`, `Private land only`→`private_land_only`, `In a Portion of Unit`→`portion_of_unit`, `Chronic Wasting Disease Testing Required`→`cwd_testing`, `Motorized Hunting Rule Applies`→`motorized_rule`, `Second deer tag may not be used`→`second_tag_prohibited`. A cell reading `None` means no season (no row is created).
+- **Qualifiers → restriction codes**: `(White-tailed deer only)`→`whitetail_only`, `(Youth hunt only)`→`youth_only`, `(2-point deer only)`→`two_point_only`, `Private land only`→`private_land_only`, `In a Portion of Unit`→`portion_of_unit`, `Chronic Wasting Disease Testing Required` (also the printed variant `… Transport Rules Apply and Testing is Required`)→`cwd_testing`, `Motorized Hunting Rule Applies`→`motorized_rule`, `Second [white-tailed] deer tag may not be used`→`second_tag_prohibited`. A cell reading `None` means no season (no row is created). A qualifier belongs to the date range it follows, within 60 characters **and never past the next date range in the same cell**.
+- **Table titles carry a disclaimer line** ("Regular Deer tag is valid for mule deer or white-tailed deer unless otherwise noted") that names other tags; `parse_title` trims it at `tag is valid` before mapping, or every Regular table reads as White-tailed.
 - **Table title → (tag_type, weapon, hunt_class)**: e.g. `"2026 Regular Deer Tag / General Archery Only Seasons – Archery Permit Required"` → (`deer_regular`, `archery`, `general`). Titles carry forward to continuation tables on later pages that start directly with the `Unit(s)` header.
 - **Confidence** starts at 1.0 and loses 0.2 for each of: unknown unit token, unparsed date text left in a cell, qualifier text not matched, or a cell spanning more than 3 date ranges.
 
@@ -780,7 +788,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 **Description:** `importer/deer.py`, generalized from `docs/spike_deer_parser.py`. Scope: all "Regular Deer Tag" and "White-tailed Deer Tag" **general** tables (Any Weapon, Archery Only, Muzzleloader Only, Short Range). Skip "Controlled" tables (T-17a). Rules: crop sides; header row must be `Unit(s) | Antlered | Antlerless | Notes`; carry the title across pages; carry the unit list across continuation rows; each date range in the Antlered/Antlerless cells produces one season (`sex` = antlered/antlerless); qualifiers in the 60 chars after a date attach to that season; the Notes column parses to restriction codes plus `notes` text; "None" means no row. Map titles: Regular → `deer_regular`, White-tailed → `deer_whitetail` (implicitly add `whitetail_only` only for display, since the tag itself is WT-only). Set `source_page`, `source_text`.
 **Fixtures:** cut pages 12–16 and 18–21 of the 2026 Big Game PDF into `tests/fixtures/bg2026_deer_pXX.pdf` (use `pypdf` to split) with hand-verified expected JSON for at least 4 pages.
 **Acceptance criteria:**
-- On the full 2026 PDF: ≥ 230 rows. Every GMU except {44, 45, 52, 54, 68A, YNP} has at least one Regular-tag general season. Fixture expectations match exactly.
+- On the full 2026 PDF: ≥ 230 rows. Every GMU except {11, 11A, 13, 14, 18, 44, 45, 52, 54, 63A, 68A, YNP} has at least one Regular-tag general season, and each of those is confirmed controlled-only in the page text (T-11 measured this: the "5 controlled-only units" in §8.7 is coverage by *any* general deer tag — units 11, 11A, 13, 14, 18 and 63A have White-tailed-tag general seasons but no Regular-tag one). Fixture expectations match exactly.
 - Spot checks: Unit 39 Regular any-weapon antlered **Oct 10–Oct 31**; Units 1, 2, 3, 4A, 5, 6 antlered Oct 10–31 carries `whitetail_only`; Unit 22 antlered carries `two_point_only`.
 - Implements a **text-path twin** for these tables and the `two_path_agreement`, `date_token_accounting`, `unit_tokens_valid` and `general_coverage` checks from §8.7 for section `deer_general`. All pass on the 2026 PDF.
 - **Matches `tests/golden/2026/deer_general.json` exactly** (produced in T-22).
