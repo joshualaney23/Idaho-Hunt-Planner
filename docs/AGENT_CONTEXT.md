@@ -1,128 +1,114 @@
 # Agent context — Idaho Hunt Planner
 
-Read this first on every ticket. It's kept short on purpose: **read only the DESIGN.md sections your ticket cites**, not the whole doc (~120 KB).
+Read this first on every ticket, then the ticket, then **only the DESIGN.md sections it cites** (DESIGN.md is ~140 KB — never read it whole).
+
+This file holds what *every* ticket needs and what is expensive to look up. It is deliberately not an API reference: for signatures and shapes, open the module — faster, and never stale. **If this file disagrees with the repo, the repo wins; fix the file in your PR.**
 
 ## What this is
-A local, single-user web app. It parses the official IDFG regulation PDFs into SQLite, stores the tags/permits Josh holds, and shows an Idaho GMU map: green = legal to hunt in the date range, yellow = restricted/partial, grey = closed. The UI style follows Treeline's State Heat Map (`docs/mockup.html`).
+A local, single-user Flask app. It parses the official IDFG regulation PDFs into SQLite, stores the tags/permits Josh holds, and shows an Idaho GMU map: green = legal to hunt in the date range, yellow = restricted/partial, grey = closed. Visual reference: `docs/mockup.html` (Treeline's State Heat Map).
 
 ## Decisions that bind every ticket (DESIGN.md §0)
 - **D1** Residents only. No nonresident rules, fees, or quotas in the UI.
 - **D2** Controlled hunts are MVP scope.
-- **D3** **PDF parsing accuracy is the top priority.** Use deterministic parsers only, never publish LLM-extracted data, never guess (unexplained cells are staged as `fail`), and publishing stays blocked while any check fails (§8.7).
+- **D3** **PDF parsing accuracy is the top priority.** Deterministic parsers only, never publish LLM-extracted data, never guess (an unexplained cell is staged `fail`), and publishing stays blocked while any §8.7 check fails.
 - **D4/D7** Every species huntable under 4 brochures: Big Game, Upland/Turkey/Furbearer, Moose/Sheep/Goat, Migratory. Trapping-only species are out.
 - **D5** The default date range is the coming weekend, **Fri–Sun**.
-- **D6** No land ownership/access layers, ever. The map shows GMUs only.
+- **D6** No land-ownership/access layers, ever. The map shows GMUs only.
 - Always show the "verify against official regulations" disclaimer, and link every season to its source PDF page.
 
 ## Stack & conventions
-- Python 3.12 (the only version required and tested), Flask 3, stdlib `sqlite3` (plain SQL, no ORM), pdfplumber. Use shapely/pyproj only in build scripts (`requirements-dev.txt`).
-- Frontend: vanilla ES modules plus SVG, no framework, no build step. Colors come only from the CSS vars in `static/css/theme.css`.
-- Type hints, `ruff`, and `pytest -q` from the repo root. The server binds `127.0.0.1:5050` (override with `PLANNER_PORT`).
-- Commit `static/data/*.json`, `tests/fixtures/*`, `tests/golden/*`. **Never commit `data/`** (DB, PDFs).
+- Python 3.12 (the only version required and tested), Flask 3, stdlib `sqlite3` (plain SQL, no ORM), pdfplumber. shapely/pyproj only in build scripts (`requirements-dev.txt`).
+- Frontend: vanilla ES modules + SVG. No framework, no build step. Every JS module has a `*.test.mjs` twin run by `node --test`.
+- Colors come only from the CSS vars in `static/css/theme.css` — **the one file allowed color literals** (a test enforces it).
+- Type hints, `ruff`, `pytest -q` from the repo root. The server binds `127.0.0.1:5050` (`PLANNER_PORT` overrides).
+- Commit `static/data/*.json`, `tests/fixtures/*`, `tests/golden/*`. **Never commit `data/`** (DB, PDFs, page cache); `.gitignore` anchors `/data/` to the repo root so `static/data/` stays committed.
 - Find PDF sections by their content (e.g. `"Hunt No."`), never by hard-coded page numbers. Printed page ≠ PDF index.
+- Schema changes go in `planner/migrations/NNN_*.sql`, not by editing `schema.sql` alone (a test asserts `schema.sql` == DESIGN §5).
+- `planner/dates.py` and `static/js/dates.js` are twins sharing `tests/fixtures/dates_cases.json`: change the fixture, not one twin.
 
-## What exists (update this table when your ticket lands)
-| Path | Status |
+## Where DESIGN.md answers what
+`python3 docs/tools/section.py <§ or T-XX>` prints one section; `--toc` lists all.
+
+| § | Topic |
 |---|---|
-| `docs/DESIGN.md` | Full design: §3.3 is the target repo layout, §5 schema, §6 API, §7 engine, §8 importer, §8.7 accuracy, §12 tickets, §14 build order |
-| `docs/mockup.html` | Working UI mockup with real 2026 deer data, the visual reference for T-03/07/08 |
-| `docs/spike_*_parser.py` | Proven parser spikes (deer general, controlled Big Game, MSG). Parser tickets productionize these. |
-| `docs/tools/issue_map.json` | Ticket → GitHub issue number. Numbers match through T-16, then shift by one (T-17a = #17, T-18 = #20); later additions take the next free number (T-27 = #36, T-22a–f = #45–#50). The original T-22 (#24) was split into T-22a–f and closed as superseded. |
-| `docs/tools/make_issues.py` | Re-syncs issue bodies from §12 (`--link`) after a ticket is edited |
-| `docs/tools/section.py` | Prints one DESIGN.md section or ticket |
-| `docs/images/` | PR evidence renders (`t-02-gmu-*.png`; `t-03-*.png` app-shell screenshots, plus `t-03-mockup-reference.png`; `t-09-*.png` My Tags tab; `t-07-*.png` map, restricted/untagged, tooltip, keyboard brief; `t-08-*.png` results table, Unit Brief, zoom, print page) |
-| `scripts/build_gmu_geometry.py` | T-02: IDFG MapServer/3 → EPSG:8826 → 300 m coverage-simplify → `static/data/gmu.json` + `units_seed.json`. `--check` (stale exit 1), `--input FILE` (offline). |
-| `scripts/build_idfg_unit_links.py` | T-08: reads the `<h1>Unit 4A</h1>` of every IDFG Hunt Planner `unit.aspx?ID=N` page (internal ids, not unit numbers) → `static/data/idfg_units.json` (`{"4A": 5, …}`, all 99 huntable units). `--check` exits 1 when stale. |
-| `scripts/render_gmu_svg.py` | T-02: renders `gmu.json` to a stroke-free SVG for visual gap checks (`--crop X Y SIZE`) |
-| `static/data/gmu.json` | T-02 geometry: 100 units, 139 KB, `viewBox` `0 0 430 690`. `d` is `M<abs> l<relative deltas> Z` (1 decimal, 1 svg unit ≈ 1.1 km); `YNP` is `"closed": true`. |
-| `static/data/idfg_units.json` | T-08: unit → IDFG Hunt Planner page id; `api.py` turns it into `unit.idfg_url` |
-| `static/data/units_seed.json` | T-02: `[{id, sort_key, elk_zone, area_acres}]` in map order; T-04 seeds the `units` table from it |
-| `planner/importer/` | T-10 the §8 pipeline. `common.py` (§8.3): `parse_date_ranges/parse_date_range` (year inferred from the license year, Jan–Jun → year+1, end<start rolls over), `leftover_date_text`, `is_no_season`, `in_license_year`, `parse_units` (ranges, `Units …, and …`, page pointers stripped, unknown tokens reported not dropped), `natural_key`, `qualifiers` → §5.1 codes (an unexplained parenthetical ⇒ `see_notes`, never silently dropped), `parse_title` → (tag type, weapon, hunt class), `confidence`. `extract.py` (§8.2): `iter_pages(pdf, cache_dir=, pages=, margin=)` → `Page(number, text, tables, rotated, width, height, font_size)` with 40 pt side crop, `dedupe_chars`, >30 % sideways chars ⇒ `rotated` (read with the rotated options, no `find_tables`), JSON cache `data/cache/<sha>/pN.json` (`CACHE_VERSION`), plus `page_texts`, `page_count`, `median_font_size`, `without_superscripts`. T-17a adds (cache v3) `cell_tables` (the same ruled tables read from the page **without** superscripts, each cell with its bbox), `small_chars` (every sub-cutoff char, uncropped — footnote markers *and* the legend keys printed outside the side crop) and `footer` (the uncropped bottom band, which carries the brochure's own page number). `classify.py` (§8.1): `classify(texts, kind=, year=, filename=)` → `Classification(kind, license_year, year_end, title, priority)`; raises `ClassifyError` instead of guessing. `__init__.py`: `@parser(kind=, match=)` registry (`register`, `parsers_for`, `registered`, `use_parsers()` for tests), `ParsedSeason`/`UnitRef`/`ParseContext`, `validate`, `run_import(doc_id, pdf_path=, data_dir=)` → `ImportResult`; a parser's `finalize` hook returns one `SectionFacts` (T-22a) and `run_import` runs every matching registry check over it; writes `seasons` (`staged`) + `season_units`, re-runs idempotently, rejected rows become a failing `import_checks` row, document ends `needs_review` (or `failed` + error). `PARSER_VERSION`, `MAX_PDF_BYTES` (50 MB), `sha256_bytes`, `looks_like_pdf`, `save_pdf`, `classify_bytes`. |
-| `planner/importer/controlled.py` | T-17a: every controlled-hunt table of a brochure, data-driven per `Brochure` (species prefixes, column header, checksum/legend/footer patterns) so T-23/25/26 reuse it. Registers one parser + section per species (`controlled_deer/elk/pronghorn/black_bear`). Path A = `cell_tables` with markers read back per cell bbox; path B = word positions, rows cut by assigning each date line to the nearest hunt number (`assign_rows` DP). Writes `seasons` (one row per printed season window) + `hunt_areas`, attaches `See Note N, Page P` texts at finalize. Since T-22a `finalize` returns `SectionFacts` (two-path verdicts, per-hunt `DateCell`s, keys, printed hunt numbers, checksum scopes, page pointers, markers, corrections pages) and the registry runs `two_path_agreement`, `tag_checksum`, `hunt_number_completeness`, `no_duplicate_keys`, `date_token_accounting`, `page_ref_resolves`, `footnote_legend`, `corrections_applied`, `yoy_diff`, `hunt_areas_written` over them. |
-| `planner/importer/checks/` | T-22a the §8.7 check registry. `@check(section_glob, name=)` registers one invariant; `run_checks(parse_ctx, section, facts)` runs every check whose glob matches and returns `CheckResult`s (a check that crashes fails loudly, the rest still run; `use_checks()` isolates the registry in tests). A parser's `finalize` returns `SectionFacts` — `two_path`/`date_cells`/`unknown_units`/`keys`/`hunt_numbers_*`/`tag_totals`/`coverage`/`first_windows`/`page_refs*`/`unknown_marks`/`corrections_pages`/`hunt_areas`. **A field left `None` means the check is skipped**, so a parser opts into an invariant by measuring it, never by re-implementing it. `shared.py`: `two_path_agreement`, `hunt_number_completeness`, `no_duplicate_keys`, `date_token_accounting` (per cell: every `Mon D - Mon D` token consumed by exactly one season, `must_produce` for a row that has to print one), `unit_tokens_valid`, `tag_checksum`, `general_coverage` (+ `controlled_only`), `yoy_diff` (warn), `corrections_applied`. `controlled.py`: `page_ref_resolves`, `footnote_legend`, `hunt_areas_written` (glob `controlled_*`). |
-| `planner/importer/textlayer.py` | Text-layer geometry shared by the parsers (§8.7 path B): `TextLine`, `group_lines`, `split_bands`, `column_blocks`, `column_of`, `join_words`. Extracted from T-11's `deer.py`, which re-exports them. |
-| `tests/fixtures/bg2026_controlled.pdf` | T-17a: 14-page excerpt of the 2026 brochure (hunt tables + the hunt-area description pages they point at), built by `tests/fixtures/make_controlled_fixtures.py`. |
-| `planner/` | T-10 `api.py`: `POST /api/documents` (multipart `file` + optional `kind`/`year` overrides; 400 `missing_file`, 413 `file_too_large`, 415 `not_a_pdf`, 409 `duplicate_document` with the existing id, 422 `unclassified`; stores `data/regs/<year>/<sha256>.pdf` and imports synchronously), `GET /api/documents`, `GET /api/documents/<id>` (staged rows + checks), `GET /api/documents/<id>/pdf` (inline, so `#page=N` works; 410 when the file is gone). `app.py` sets `DATA_DIR` beside the DB, so tests never write the repo's `data/`. T-08 `api.py`: `GET /api/units/<unit>/seasons?year=` (Unit Brief: every published season of the unit for documents covering `year`, all species, with `notes`/`bag_limit`/`coverage_note`/`document_title`; `held_species`; `unit.idfg_url`; 404 `unknown_unit`). T-09 `api.py`: `ApiError` → `{error:{code,message,detail}}`; `GET/POST /api/tags`, `PUT/DELETE /api/tags/<id>`, `POST /api/tags/copy?from&to`, `GET/PUT /api/permits?year`, `GET/PUT /api/profile`. `GET /api/tags` also returns `years`, `tag_types`, `species` and `zones` (the Add-tag dialog's metadata). Validation: `requires_zone` → a zone that has `zone_units` rows that year (elk), `requires_hunt_no` → a numeric hunt number (T-17c adds the real lookup); unused fields are cleared. Copy-year never copies controlled tags or filled status, and is idempotent. T-01 scaffold: `python -m planner` (`__main__.py`), `create_app(db_path=None)` (`app.py`), `api.py`: `GET /api/health`, plus (T-06) `/api/meta` (species with `published_seasons`, tag types, weapons, `restrictions` + derived `reasons`, license years, server default range, profile, published documents), `/api/units`, and `/api/availability` (one SQL query per table, then `engine.evaluate`; errors are `{error:{code,message,detail}}` via `ApiError`), `__version__` in `__init__.py`. `dates.py` (T-05): `default_range`, `overlap`, `days`, `parse_iso`, `to_iso`, `fmt_short`, presets (`presets()` returns all five). `schema.sql` (T-04) is §5 verbatim (schema v1); `db.py` (T-04): `connect(path)` (FKs on, WAL, `sqlite3.Row`, autocommit), `migrate(conn)` (schema.sql → v1, then `planner/migrations/NNN_*.sql` in order, each atomic), `q`/`q1`/`exec`/`exec_many`/`tx()` (nests via SAVEPOINT) using `use(conn)` or the Flask app-context connection (or `conn=`), `init_db`/`init_app` (`create_app` creates + seeds the DB on every start). `seed.py` (T-04): `SPECIES` (35), `TAG_TYPES` (12), units from `units_seed.json`, GIS-default `zone_units` for the current year (only if that year has none), all `INSERT OR IGNORE`. `engine.py` (T-06): `RESTRICTIONS` (§5.1 code → `{label, severity}`), `DERIVED_REASONS`, `WEAPONS`, and the pure `evaluate(seasons, season_units, my_tags, permits, profile, species, start, end, weapon, include_untagged, *, tag_types, unit_ids)` → the §6 shape (rules + engine notes in DESIGN §7.2). Other modules are docstring stubs for their tickets. |
-| `static/js/api.js` | T-09 fetch wrapper: `request/getJSON/postJSON/putJSON/deleteJSON` + `ApiError` (`code`, `status`, `detail`, `.fields` for inline form errors). `api.test.mjs`. |
-| `static/js/tags.js` | T-09 My Tags tab: `initTags(panel)` renders year selector, tag cards (filled toggle + delete), Add-tag dialog (`<dialog>`, fields follow the tag type), permits + profile panels, `Copy tags from <year-1>`. Pure helpers `activeTags`, `fieldsFor`, `tagTitle`, `tagDetail`, `tagChipLabel`, `tagsSummary` (`tags.test.mjs`). Dispatches `TAGS_CHANGED` (`ihp:tags-changed`, detail `{year, tags}`) on `window` after every change; the map (T-07) subscribes, so filling a tag invalidates availability. `PERMITS_CHANGED` (`ihp:permits-changed`, detail `{year, permits, source: "tags"\|"map"}`) keeps the permits panel and the map's permit chips in sync both ways. |
-| `static/js/state.js` | T-07 filter state, pure (`state.test.mjs`): `defaultState({profile, today})` (profile species + coming weekend, §7.3), `stateFromQuery`/`toQuery` (URL keys `species,start,end,weapon` always, `tags=<ids>\|none` only for a subset, `untagged=1`; bad values fall back to defaults), `availabilityPath`, `withDate`, `rangeYears`, `createStore` (notifies on real changes), `createFetcher` (150 ms debounce, last request wins). State shape `{species, start, end, weapon, tags: null(=mine)\|ids, includeUntagged}`. |
-| `static/js/map.js` | T-07 `createMap(svg, gmu)` → `{setStatuses, onHover, onClick, highlight, statusOf, paths}`: `<g.units>` paths (`tabindex=0`, `role=button`, `aria-label="Unit 39, open"`, classes `u-open/u-restricted/u-closed/u-untagged`; YNP always closed), `<g.overlay>` (untagged dashed rings `.ut`, `highlight()` rings `.hl`, hover/focus `.hover-ring`, so Tab order never changes), `<g.labels>`. Enter/Space/click → `onClick`. Also `placeTip` (viewport clamp), `tooltipContent`/`seasonLine` (§4.3 badges, shared with the brief), `legendItems`/`renderLegend`. T-08: `pdfHref(doc, page)` (`/api/documents/<id>/pdf#page=N`, served by T-10), `pageLink`, `seasonLine(s, labels, {link})`; zoom: `enableZoom(svg)` → `{zoomBy, reset, scale, box, onChange}` (wheel, two-pointer pinch, drag-to-pan when zoomed; a drag never clicks a unit; `svg[data-zoom]`), pure `zoomBox`/`panBox`/`wheelFactor`/`parseViewBox`, clamped 1×–8×. `map.test.mjs`. |
-| `static/js/filters.js` | T-07 filter bar via `chipGroup`: `createFilters(container, {species, state, today, weekendDef, untaggedBox, onChange(patch), onPermits(codes)})` → `{update(state, {tags, permits, year})}`. Species chips (12 featured + `More ▾`, disabled without `published_seasons`, hint linking `#/regs`), tag chips = unfilled tags for the species + species-less (controlled) tags, multi-select (all on = `tags: null`), weapon, archery/muzzleloader permit chips, dates + presets. Rebuilds chip rows only when their content changes and restores keyboard focus. `breadcrumbParts`/`renderViewing`. `filters.test.mjs`. |
-| `static/js/results.js` | T-08 results table: `createResults(container, {labels, onHover, onOpen})` → `{update(availability), sort(key, dir), rows(), sortState()}`. Units with status ≠ closed; sortable Unit/Status/Days open/Weapons/Earliest start (`th[aria-sort]` + buttons). Pure: `naturalCompare` (4, 4A, 5, 10, 10A), `resultRows`, `sortRows` (stable: ties keep the on-screen order, desc flips only the key), `toCSV`/`csvCell` (RFC 4180, CRLF), `csvFilename`, `downloadText`. Weapons render twice (`.wl` full, `.ws` short for print). `results.test.mjs`. |
-| `static/js/drawer.js` | T-08 Unit Brief: `createDrawer({labels, fetchBrief, today, gmu})` → `{open(unit, {state, unit, opener}), close(), isOpen(), current(), el}`. A modal `<dialog id=unit-brief>` on the right: Esc/backdrop click close, Tab trapped (`trapIndex`; skips content of closed `<details>`, which Chrome still lays out), focus returns to the opener. Ignores the async `close` event when it arrives after a quick re-open. Pure: `timelineModel` (Aug 1 → Jan 31, 184 days, bars clipped, `outside` count, band, today), `renderTimeline`, `splitSeasons` (held + viewing species first), `sourceDocs`. Test hooks `body[data-brief]`, `body[data-brief-loaded]`. `drawer.test.mjs`. |
-| `static/js/dates.js` | T-05 JS twin of `planner/dates.py` (local-noon `Date`s; camelCase + snake_case aliases). `dates.test.mjs` runs `node --test`. |
-| `static/index.html` | T-03 app shell: VERIFY disclaimer (`sessionStorage` dismissal) + always-on footer disclaimer, header (`#ver`), `role="tablist"` of `<a role="tab" href="#/…">` with one `role="tabpanel"` per tab, and map-panel containers `#viewing`, `#filters`, `#include-untagged`, `#map-wrap`, plus `#toasts` |
-| `static/css/theme.css` · `app.css` | T-03: §4.1 tokens plus named tints and font stacks. **The only file allowed color literals.** T-08 adds an `@media print` light theme that re-assigns the same tokens (tests read only the screen block). `:focus-visible` ring is `--gold2`. `app.css` (var-only) holds the layout: `.wrap` 2-col → 1-col below 1100 px, chip rows scroll below 700 px, `.chip[aria-pressed]`, `.card`, `.badge.b-<kind>`, `.toast-<level>`. T-07: `.gmu-map` (status fills as `path[data-unit].u-*` — keep the `[data-unit]` or the base path rule wins on specificity), `.overlay .ut/.hl/.hover-ring`, labels, `.legend .sw-*`, `.tip`, `.sline`, `.brief-head`. T-08: `.map-stage`/`.zoombar`, `table.results`, `dialog.drawer`, timeline `.tl-*` (weapon fills `--rifle/--bow/--sc2`, band `--gold` @ 0.22), and the print block (`@page { size: landscape }`, map 95 mm + table in 2 columns, one line per row, Seasons column hidden). |
-| `static/js/ui.js` | T-03 components: `chipGroup({id, items, multi, value, onChange, disabled, label, labelledBy})` (returns the container with `getValue/setValue`; chips are `<button aria-pressed>`), `card(title, ...children)`, `badge(kind, text)`, `toast(msg, level, {ms})`, `textEl` |
-| `static/js/router.js` | T-03: `TABS`, `parseRoute(hash)` → `{tab, rest, query, known}` (`#/regs/12` → rest `["12"]`; query kept for T-07), `tabHash` |
-| `static/js/main.js` | T-03 boot: disclaimer, version from `/api/health` (regs label waits for `/api/meta`), hash routing (unknown → `replaceState` `#/map`; arrow/Home/End keys), placeholder cards for seasons/regs/settings. T-09: mounts `initTags()` on `#/tags`. T-07 `initMapTab()`: loads `/api/meta` + `gmu.json`, owns the store; every change → `replaceState('#/map?…')`, repaint filters + breadcrumb, debounced `/api/availability` → `map.setStatuses` + legend. A pasted/bookmarked `#/map?…` is adopted via `mapTab.applyRoute`; a bare `#/map` (tab link) keeps the current filters. Tags/permits are cached per license year in range. Right card = summary title + `[⬇ CSV] [🖨 Print]` + the T-08 results table (`#results`); click/Enter on a unit (or a table unit button) dispatches `UNIT_OPEN` (`ihp:unit-open`, detail `{unit, state, opener}`) and the drawer listens to it. Zoom bar `#zoom-in/#zoom-out/#zoom-reset` over the map. Test hooks: `body[data-map-ready]`, `body[data-availability]` (query shown), `body[data-availability-seq]` (ticks per repaint). |
-| `planner/importer/deer.py` | T-11 the `deer_general` parser: every **general** Regular/White-tailed deer table (any/archery/muzzleloader/short_range), controlled tables left to T-17a. Two paths — `table_cells` → `CellSeasons` (one entry per printed date cell, the §8.7 accounting unit; `table_seasons` flattens it), `tables_from_rules` (pdfplumber ruled tables) and `tables_from_text` (word positions: `group_lines`, `split_bands` ≥ 4 pt gap, `column_blocks` gutters, `assign_unit_labels` DP for vertically centred unit cells, `_join_words` de-hyphenation). They are compared per unit group: a group that agrees is staged `extract_agree = 1`. **Notes come from the text path only** — `find_tables` drops the vertically merged Notes cells. `table_seasons` carries title + unit list forward and clamps each date's 60-char qualifier window to the next range; `notes_codes` → restriction codes + `partial` coverage (a numbered-note pointer always adds `see_notes`, D3). `begin`/`finalize` hooks record the §8.7 checks `two_path_agreement`, `date_token_accounting`, `unit_tokens_valid`, `general_coverage`. 2026: 235 rows on pp. 12–16 + 18–21, all four checks pass. |
-| `tests/fixtures/bg2026_deer_p*.pdf` | T-11: the nine real general-deer pages of the 2026 brochure, one PDF per page, images stripped (`make_deer_fixtures.py`). `deer_expected/*.json` holds hand-verified rows for pp. 12, 16, 19, 21. |
-| `tests/fixtures/*.pdf` | T-10 synthetic brochures (`big_game_sample.pdf` cover + ruled deer table + rotated calendar page, `upland_sample.pdf` 2-year cover, `supplemental_sample.pdf`), rebuilt byte-identically by `tests/fixtures/make_regs_fixture.py` (hand-rolled minimal PDFs; no writer dependency). |
-| `tests/` | `conftest.py` (`app`/`client` fixtures, temp DB path), `test_api.py` smoke tests, `test_startup.py` (boots `python -m planner --no-browser` on a free port), `test_dates.py` (also runs the JS twin under 4 time zones when node is installed; `fixtures/dates_cases.json` is the shared Python/JS date contract: change it, not just one twin), `test_build_gmu_geometry.py` (T-02: decodes the committed paths with an independent SVG number parser and asserts the units tile Idaho with no gaps; `fixtures/gmu_sample.geojson` is its offline 3-unit input), `test_db.py` (T-04: schema.sql == §5 block, migrations order/rollback, seed counts + idempotency, FK/CHECK enforcement, helpers, `RESTRICTIONS` == §5.1), `test_engine.py` (T-06: every §7.2/§7.4 rule on plain dicts, no DB), `test_api_availability.py` (T-06: endpoints on a temp DB; perf test builds 5,000 synthetic seasons with `build_perf_db`, asserting a median under 150 ms, plus an all-overlap regression guard), `test_static_shell.py` (T-03: tokens equal DESIGN §4.1, no color literals outside `theme.css`, every `var(--x)` is defined, tablist/tabpanel wiring, runs the `ui`/`router`/`api`/`tags`/`state`/`map`/`filters` node tests; T-07 pins the map status classes to `--open/--restricted/--closed` + the gold dashed ring; T-08: `@media print` light theme only re-assigns screen tokens, `@page` landscape, chrome hidden, table in 2 columns), `test_api_unit_seasons.py` (T-08: brief endpoint, 2-year documents, errors, `idfg_units.json` covers every unit), `test_api_tags.py` (T-09: tags CRUD, validation detail, copy-year, permits, profile), `test_importer_checks.py` (T-22a: the registry, one passing + one failing case per invariant, and corrupted real fixtures — a dropped bear row fails `hunt_number_completeness`+`tag_checksum`, superscript filtering turned off fails `two_path_agreement` on 1001, a blanked unit cell fails `date_token_accounting`), `test_importer_common.py` (T-10: 30 date cases, 14 unit-list cases, every §5.1 qualifier code, titles, confidence), `test_importer_extract.py` (T-10: fixture PDFs — side crop, ruled table, rotation, page cache, classification), `test_api_documents.py` (T-10: upload/409/415/422, stored path, staged rows, invalid rows → failing check, inline PDF; parsers are registered per test with `importer.use_parsers`), `test_importer_deer.py` (T-11: the nine real fixture pages, four of them row-for-row against hand-verified JSON; both paths agree on all 235 rows; §8.7 checks; pure helpers — band splitting, unit-label DP, qualifier windows, notes codes; `run_import` end to end). `js/fakedom.mjs` is a tiny DOM shim (elements + SVG via `createElementNS`, text nodes, `dispatch(type, init)`, `focus`/`activeElement`, tag/`#id` `querySelectorAll`); extend it when a module needs more DOM. |
-| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + `node --test static/js/*.test.mjs` (TZ=America/Boise) on 3.12 for pushes to main and PRs. The `main: require CI` ruleset requires `test (3.12)` |
-| `pyproject.toml` | ruff + pytest config (`docs/` excluded from ruff) |
+| §0 | The binding decisions above |
+| §3.3 | Target repo layout |
+| §4.1 · §4.3 · §4.4 | Design tokens · map behavior · **status semantics (the core rule)** |
+| §5 · §5.1 · §5.3 | SQLite schema · restriction codes (closed vocabulary) · species coverage matrix |
+| §6 | API surface |
+| §7 | Availability engine (§7.3 default range, §7.4 license-year crossover) |
+| §8 | Import pipeline (§8.1 classify, §8.2 extract, §8.3 common parsing, §8.5 supersession, §8.6 fallbacks) |
+| §8.7 | **Accuracy strategy — read it for any importer/parser/publish ticket** |
+| §10 · §12 · §14 | Phasing · ticket texts · build order, issue map, agent rules |
+
+## Repo map
+One line per path: what it owns, and the ticket that brought it. Open the file for its API.
+
+| Path | What it owns |
+|---|---|
+| `planner/app.py`, `__main__.py`, `__init__.py` | `create_app(db_path=None)`, `DATA_DIR` beside the DB (so tests never write the repo's `data/`), `python -m planner`, `__version__` (T-01) |
+| `planner/api.py` | Every JSON endpoint plus `ApiError` → `{error:{code,message,detail}}`: meta/units/availability (T-06), tags/permits/profile (T-09), unit seasons (T-08), documents + PDF serving (T-10). Spec is §6 |
+| `planner/engine.py` | Availability evaluation, pure over dicts (§7.2/§7.4), plus `RESTRICTIONS` — the §5.1 closed vocabulary (T-06) |
+| `planner/dates.py` | Date-range helpers and presets; twin of `static/js/dates.js` (§7.3) (T-05) |
+| `planner/db.py`, `schema.sql`, `migrations/`, `seed.py` | §5 schema, migrations, seed from `static/data/units_seed.json` (T-04) |
+| `planner/importer/__init__.py` | §8 pipeline: `@parser` registry, `ParsedSeason`/`UnitRef`/`ParseContext`, `run_import()`, `validate`, `PARSER_VERSION`. Rows land `staged`; a rejected row becomes a failing `import_checks` row (T-10) |
+| `planner/importer/extract.py` | §8.2 page extraction → `Page` (text, ruled + cell tables, small chars, footer, rotation) and the `data/cache/<sha>/` page cache — bump `CACHE_VERSION` when you add a field (T-10, T-17a) |
+| `planner/importer/common.py`, `classify.py` | §8.3 shared parsing (date ranges, unit lists, qualifiers → §5.1 codes, titles, confidence) · §8.1 brochure classification, which raises `ClassifyError` instead of guessing (T-10) |
+| `planner/importer/textlayer.py` | Text-layer geometry shared by parsers (lines, bands, columns) — the §8.7 "path B" primitives (T-11) |
+| `planner/importer/deer.py` | General deer tables, both paths (ruled tables vs. word positions) (T-11) |
+| `planner/importer/controlled.py` | Controlled-hunt tables for every species, data-driven per `Brochure` so T-23/25/26 reuse it (T-17a) |
+| `planner/importer/checks/` | §8.7 check registry: `@check(section_glob)`; a parser's `finalize` returns one `SectionFacts` and the registry runs every matching invariant. **A facts field left `None` skips that check — opt in by measuring it, never by re-implementing a check inside a parser** (T-22a) |
+| `static/index.html` · `css/theme.css` · `css/app.css` | App shell (disclaimers, tablist/tabpanels, map containers) · §4.1 tokens + `@media print` light theme · all layout, var-only (T-03, T-07, T-08) |
+| `static/js/` | One module per area, each with a `.test.mjs` twin: `main.js` (boot, routing, map tab), `router`, `ui`, `api`, `state`, `map`, `filters`, `results`, `drawer`, `tags`, `dates` |
+| `static/data/*.json` | Committed build outputs — `gmu.json` (map geometry, 100 units), `units_seed.json`, `idfg_units.json` — regenerated by `scripts/build_gmu_geometry.py` and `build_idfg_unit_links.py` (both `--check` = exit 1 when stale; `render_gmu_svg.py` draws it) |
+| `tests/` | `conftest.py` (temp-DB `app`/`client`), one `test_*.py` per area, `test_startup.py` (boots `python -m planner`), `test_static_shell.py` (tokens, no color literals, runs the node tests) |
+| `tests/fixtures/` | Synthetic PDFs **generated** by `make_*_fixture(s).py` (byte-stable, no writer dependency), plus real 2026 brochure pages with hand-verified `*_expected/*.json` |
+| `tests/golden/<year>/` | Where human-verified golden data lands (T-22c–f; empty so far). **Never mark a golden row verified yourself** |
+| `docs/mockup.html` · `spike_*_parser.py` | UI mockup with real 2026 deer data (also the seed source for map demos) · proven parser spikes that parser tickets productionize |
+| `docs/tools/` | `section.py` prints a §/ticket · `make_issues.py` syncs issues from §12 (`--dry-run`/`--create`/`--link`) · `issue_map.json` ticket → issue number |
+| `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + node tests (TZ=America/Boise) on 3.12. The `main: require CI` ruleset requires `test (3.12)` and a branch up to date with `main` |
 
 ## Commands
 ```bash
 cd ~/git/Idaho-Hunt-Planner
-python3 docs/tools/section.py T-11          # one ticket; also 8.7, 5.3, --toc
-gh issue view <N>                            # ticket + acceptance criteria + definition of done
-jq -r '."T-17a"' docs/tools/issue_map.json   # ticket -> issue number
+python3 docs/tools/section.py T-11          # one ticket or section; also 8.7, 5.3, --toc
+jq -r '."T-17a"' docs/tools/issue_map.json  # ticket -> issue number
+gh issue view <N>                            # ticket text + acceptance criteria
 
-# Environment: this Mac's system python3 is 3.9. Use 3.12 (`brew install python@3.12`).
+# Environment: this Mac's system python3 is 3.9; the project needs 3.12.
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
-python -m planner --no-browser               # run (http://127.0.0.1:5050, GET /api/health)
-                                             #   first run creates + seeds data/planner.db (delete it to reset)
-curl -s '127.0.0.1:5050/api/availability?species=deer&start=2026-10-17&end=2026-10-18&include_untagged=1' | jq .summary   # core query (T-06)
-sqlite3 data/planner.db '.tables'            # inspect the DB (schema: planner/schema.sql; new changes: planner/migrations/NNN_*.sql)
 
-# Import a regulation PDF (T-10; stores data/regs/<year>/<sha256>.pdf, caches pages in data/cache/)
+pytest -q && ruff check . && ruff format --check .   # the gates; CI runs all three
+ruff format .                                        # formatter
+TZ=America/Boise node --test static/js/*.test.mjs    # JS tests (node 22+; pytest runs them too)
+
+python -m planner --no-browser   # http://127.0.0.1:5050; first run creates + seeds data/planner.db
+sqlite3 data/planner.db '.tables'
+curl -s '127.0.0.1:5050/api/availability?species=deer&start=2026-10-17&end=2026-10-18&include_untagged=1' | jq .summary
+
+# Import a regulation PDF (stores data/regs/<year>/<sha>.pdf, caches pages under data/cache/)
 curl -s -F file=@data/regs/seasons-rules-big-game-2026.pdf 127.0.0.1:5050/api/documents | jq '.document, .import'
-curl -s 127.0.0.1:5050/api/documents | jq '.documents[] | {id,kind,license_year,status,pages}'
-curl -s 127.0.0.1:5050/api/documents/1 | jq '.seasons | length'   # staged rows + checks
-# Re-upload of the same file -> 409 duplicate_document. Pass -F kind=big_game -F year=2026 to
-# override the classifier. python tests/fixtures/make_regs_fixture.py rebuilds the test PDFs.
-# T-11 deer fixtures (the real brochure pages; needs pypdf from requirements-dev.txt):
-python tests/fixtures/make_deer_fixtures.py data/regs/seasons-rules-big-game-2026.pdf
 curl -s 127.0.0.1:5050/api/documents/1 | jq '[.checks[] | {check_name,status}]'   # §8.7 results
-pytest -q && ruff check . && ruff format --check .   # must pass before a PR (CI runs all three;
-                                             #   tests/test_startup.py boots `python -m planner`)
+# Re-upload of the same file -> 409 duplicate_document; -F kind=big_game -F year=2026 overrides the
+# classifier. python tests/fixtures/make_regs_fixture.py rebuilds the synthetic test PDFs.
 
-ruff format .                                # formatter (config in pyproject.toml)
-TZ=America/Boise node --test static/js/*.test.mjs   # JS tests (node 22+; pytest also runs them)
-PLANNER_PORT=6060 python -m planner          # alternate port; omit --no-browser to open browser
-
-# UI checks (T-03/T-07 pattern; tools live in a scratch dir, not the repo)
-#   The map needs published seasons to show color: seed a temp DB (create_app(db_path=…) + INSERT
-#   source_documents/seasons/season_units, as tests/test_api_availability.py does) and app.run() it.
-#   Wait on body[data-availability-seq] ticking, not on the hash, to time a filter change.
-#   npm i lighthouse puppeteer-core   (in scratch), CHROME_PATH=/Applications/Google Chrome.app/…
-#   npx lighthouse http://127.0.0.1:5050/#/map --only-categories=accessibility --preset=desktop
-#   Chrome --headless=new --screenshot=out.png --window-size=1400,900 <url>   # quick render
-#   Print (T-08): page.emulateMediaType('print') + page.pdf({preferCSSPageSize:true}); count pages with
-#   pdfplumber (raw /Type /Page regex sees 0: Chrome compresses object streams). Check Letter AND A4.
-#   pdfplumber's extract_words splits mono unit ids ("19A" → "1","9A"): rebuild them from p.chars.
-
-# Map geometry (T-02; regenerate only when IDFG updates the units)
-python scripts/build_gmu_geometry.py         # fetch + rewrite static/data/gmu.json + units_seed.json
-python scripts/build_gmu_geometry.py --check # exit 1 if the committed files are stale
-python scripts/render_gmu_svg.py /tmp/gmu.svg --crop 150 330 120   # visual gap check (no strokes)
-python scripts/build_idfg_unit_links.py --check  # T-08: IDFG unit-page ids still current? (~100 fetches)
-qlmanage -t -s 1400 -o /tmp /tmp/gmu.svg     # SVG -> PNG on macOS, no extra tooling
-# .gitignore anchors /data/ to the repo root so static/data/ stays committed.
-
-# Source PDFs (go in data/regs/, git-ignored; base URL https://idfg.idaho.gov/sites/default/files/)
-#   seasons-rules-big-game-2026.pdf   seasons-rules-upland-game-2026-2027.pdf
-#   seasons-rules-moose-sheep-goat-2025-26.pdf   migratorygame2026-2027_web.pdf
-# GIS: https://gisportal-idfg.idaho.gov/hosting/rest/services/Hunting/MapServer (3=GMUs, 4=controlled hunt areas)
+python scripts/build_gmu_geometry.py --check   # committed geometry stale? (same flag on build_idfg_unit_links.py)
 ```
 
+## Facts that cost time to rediscover
+- **Source PDFs** live in `data/regs/` (git-ignored), base URL `https://idfg.idaho.gov/sites/default/files/`:
+  `seasons-rules-big-game-2026.pdf` · `seasons-rules-upland-game-2026-2027.pdf` · `seasons-rules-moose-sheep-goat-2025-26.pdf` · `migratorygame2026-2027_web.pdf`
+- **GIS:** `https://gisportal-idfg.idaho.gov/hosting/rest/services/Hunting/MapServer` (layer 3 = GMUs, 4 = controlled hunt areas).
+- **2026 Big Game brochure:** 125 pages; pages 38–50 and 85 are rotated (elk calendars); 62 pages have tables, 24 contain `Hunt No.`; general-deer tables on pp. 12–21 → 132 unit rows / 235 date ranges; controlled tables → 469 hunts. Cold extraction ~35 s, warm (page cache) ~0.02 s, so re-importing while iterating is cheap.
+- **Issue numbers ≠ ticket numbers.** They match through T-16, shift by one from T-17a (T-17a = #17, T-18 = #20), and later additions take the next free number (T-27 = #36, T-22a–f = #45–#50). The original T-22 (#24) was split into T-22a–f and closed as superseded. Read `issue_map.json`; never guess.
+- **IDFG Hunt Planner URLs use internal ids**, not unit numbers (`unit.aspx?ID=5` is unit 4A) — mapping in `static/data/idfg_units.json`.
+- The map shows no color without **published** seasons: seed a temp DB (as `tests/test_api_availability.py` does, or from `docs/mockup.html`'s `DATA.seasons`) before any visual check.
+
 ## Workflow per ticket
-1. `git checkout main && git pull`, then `git checkout -b t-xx-<slug>`.
-2. Read the issue, then only the DESIGN.md sections it cites (§8.7 too for any importer/accuracy ticket).
+1. `git checkout main && git pull --ff-only`, then `git checkout -b t-xx-<slug>`. Never push to `main` — it is ruleset-protected, and every change lands through a PR with green CI.
+2. Read the issue, then only the DESIGN.md sections it cites (plus §8.7 for any importer/accuracy ticket).
 3. Stay in the ticket's scope. If the design is wrong, say so in the PR and fix `DESIGN.md` in the same PR.
-4. Get `pytest -q`, `ruff check` and `ruff format --check` green, and confirm `python -m planner --no-browser` starts.
-5. Push and run `gh pr create` titled `T-XX: <title>`, with `Closes #N` in the body. The PR description lists every acceptance criterion with its evidence (real command output and spot-check values).
-6. **Update this file in the same PR** if you changed commands, layout, environment, or the "What exists" table. Keep it short.
+4. Gates green: `pytest -q`, `ruff check .`, `ruff format --check .`.
+5. Stage explicit paths (`git add <files>`, not `-A`), push, then `gh pr create` titled `T-XX: <title>` with `Closes #N`, listing **every acceptance criterion with real evidence** (command output, spot-check values, screenshots in `docs/images/`, linked by commit SHA so they survive branch deletion).
+6. **Update this file in the same PR** when you change commands, layout, environment, or add a path — one line, no API detail. Keep the whole file under ~10 KB: every future ticket re-reads it. Detail belongs in the module, the PR description, or DESIGN.md.
