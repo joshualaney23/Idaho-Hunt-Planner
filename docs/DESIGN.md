@@ -197,7 +197,7 @@ Reference: Treeline Hunt Research IQ. Working mockup: **`docs/mockup.html`** (op
   /* scale */    --sc1:#c44040; --sc2:#c47830; --sc3:#c4b840; --sc4:#8ab840; --sc5:#3aaa78;
   /* weapons */  --bow:#b8a038; --rifle:#4a7fa0;
   /* trend */    --up:#2d7a4a; --dn:#7a3030; --flat:#5a6a3a;
-  /* semantic */ --open:var(--sc5); --restricted:var(--sc3); --closed:var(--bg4); --notag:transparent;
+  /* semantic */ --open:#238636; --restricted:var(--sc3); --closed:var(--bg4); --notag:transparent;
 }
 body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
 /* headings: "Bebas Neue", letter-spacing .06em; numerics & unit IDs: "DM Mono" */
