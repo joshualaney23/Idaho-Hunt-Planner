@@ -29,16 +29,19 @@ PHASES = {
 }
 PHASE_OF = {}
 for t in ["T-01", "T-02", "T-03", "T-04", "T-05"]: PHASE_OF[t] = 0
-for t in ["T-06", "T-07", "T-08", "T-09", "T-10", "T-11", "T-15", "T-16", "T-17a", "T-17b", "T-17c", "T-22"]: PHASE_OF[t] = 1
+for t in ["T-06", "T-07", "T-08", "T-09", "T-10", "T-11", "T-15", "T-16", "T-17a", "T-17b", "T-17c",
+          "T-22a", "T-22b", "T-22c", "T-22d", "T-22e", "T-22f"]: PHASE_OF[t] = 1
 for t in ["T-12", "T-13", "T-18"]: PHASE_OF[t] = 2
 for t in ["T-14", "T-23"]: PHASE_OF[t] = 3
 PHASE_OF["T-24"] = 4
 for t in ["T-25", "T-26"]: PHASE_OF[t] = 5
 for t in ["T-19", "T-20", "T-21", "T-27"]: PHASE_OF[t] = 6
 
-BUILD_ORDER = [["T-01"], ["T-02", "T-03", "T-05"], ["T-04"], ["T-10"], ["T-22"], ["T-11", "T-17a"],
-               ["T-17b"], ["T-06"], ["T-09", "T-15"], ["T-07"], ["T-08"], ["T-17c"], ["T-16"]]
+BUILD_ORDER = [["T-01"], ["T-02", "T-03", "T-05"], ["T-04"], ["T-10"], ["T-11", "T-17a"], ["T-22a"],
+               ["T-22b", "T-22c"], ["T-22d", "T-22e"], ["T-17b"], ["T-22f"], ["T-06"], ["T-09", "T-15"],
+               ["T-07"], ["T-08"], ["T-17c"], ["T-16"]]
 SEPARATE_PARSERS = {"T-11", "T-17a", "T-17b", "T-12", "T-14", "T-23", "T-24", "T-25", "T-26"}
+GOLDEN_TICKETS = {"T-22d", "T-22e", "T-22f"}  # human page-by-page verification (§8.7)
 
 AREA = {  # area labels
     "T-01": ["infra"], "T-02": ["gis"], "T-03": ["frontend"], "T-04": ["backend"],
@@ -49,7 +52,10 @@ AREA = {  # area labels
     "T-16": ["frontend", "backend"], "T-17a": ["importer", "accuracy"],
     "T-17b": ["importer", "gis", "accuracy"], "T-17c": ["backend", "frontend"],
     "T-18": ["importer"], "T-19": ["accuracy"], "T-20": ["accuracy"],
-    "T-21": ["backend", "frontend", "documentation"], "T-22": ["accuracy"],
+    "T-21": ["backend", "frontend", "documentation"],
+    "T-22a": ["importer", "accuracy"], "T-22b": ["backend", "accuracy"],
+    "T-22c": ["importer", "accuracy"], "T-22d": ["accuracy"], "T-22e": ["accuracy"],
+    "T-22f": ["accuracy"],
     "T-23": ["importer", "accuracy"], "T-24": ["importer", "gis", "accuracy"],
     "T-25": ["importer", "accuracy"], "T-26": ["importer", "gis", "accuracy"],
     "T-27": ["backend", "frontend"],
@@ -73,7 +79,7 @@ LABELS = {
 }
 PHASE_LABEL = {0: "phase:0", 1: "phase:1-mvp", 2: "phase:2", 3: "phase:3", 4: "phase:4", 5: "phase:5", 6: "phase:6"}
 
-TID = r"T-\d{2}[a-c]?"
+TID = r"T-\d{2}[a-z]?"
 
 
 def anchor(heading: str) -> str:
@@ -95,7 +101,7 @@ def parse_tickets():
         tid, title = m.group(1), m.group(2).strip()
         meta = re.search(r"\*\*Depends on:\*\*\s*(.*?)\s*·\s*\*\*Size:\*\*\s*(\w+)", rest)
         dep_text, size = meta.group(1), meta.group(2)
-        expanded = re.sub(r"(T-\d{2})([a-c])((?:/[a-c])+)",
+        expanded = re.sub(r"(T-\d{2})([a-z])((?:/[a-z])+)",
                           lambda m: ", ".join(m.group(1) + x for x in [m.group(2)] + m.group(3).split("/")[1:]), dep_text)
         deps = [] if dep_text.strip().lower() == "none" else list(dict.fromkeys(re.findall(TID, expanded)))
         body = rest[meta.end():].strip()
@@ -205,9 +211,14 @@ def render(t, tickets, conventions, issue_map):
     else:
         lines.append(f"> **Build order (§14):** after the MVP path ({PHASES[PHASE_OF[t['id']]][0]})")
     lines.append("")
-    if t["id"] == "T-22":
-        lines += ["> [!IMPORTANT]", "> Highest-priority ticket (D3: PDF parsing accuracy is the top priority). "
-                  "Golden-data verification is **human work** — an agent prepares the page-by-page checklist; Josh ticks off `VERIFICATION.md`.", ""]
+    if t["id"].startswith("T-22"):
+        note = "> Highest-priority ticket (D3: PDF parsing accuracy is the top priority)."
+        if t["id"] in GOLDEN_TICKETS:
+            note += (" Golden-data verification is **human work** — an agent prepares the page-by-page checklist "
+                     "and the candidate rows, then **stops**; Josh ticks off `VERIFICATION.md`. "
+                     "Never mark a page verified yourself.")
+        note += " T-22 was split into T-22a–f (§14); stay inside this ticket's slice."
+        lines += ["> [!IMPORTANT]", note, ""]
     lines += ["## Before you start",
               f"Read [`docs/AGENT_CONTEXT.md`]({BLOB}/docs/AGENT_CONTEXT.md) first, then this ticket, then only the [`docs/DESIGN.md`]({BLOB}/docs/DESIGN.md) sections it cites "
               "(`python3 docs/tools/section.py 8.7`; importer/accuracy tickets always read §8.7). "
@@ -239,13 +250,14 @@ def render(t, tickets, conventions, issue_map):
 
 def labels_for(t):
     ls = ["ticket", PHASE_LABEL[PHASE_OF[t["id"]]], f"size:{t['size']}"] + AREA[t["id"]]
-    if t["id"] == "T-22": ls += ["priority:highest", "human-verification"]
+    if t["id"].startswith("T-22"): ls.append("priority:highest")
+    if t["id"] in GOLDEN_TICKETS: ls.append("human-verification")
     if t["id"] in ("T-11", "T-12", "T-14", "T-23", "T-24", "T-25", "T-26"): ls.append("human-verification")  # golden files
     return sorted(set(ls))
 
 
 def sort_key(t):
-    m = re.match(r"T-(\d+)([a-c]?)", t["id"]); return (int(m.group(1)), m.group(2))
+    m = re.match(r"T-(\d+)([a-z]?)", t["id"]); return (int(m.group(1)), m.group(2))
 
 
 def gh(*args, input=None):
