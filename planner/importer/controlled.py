@@ -29,6 +29,7 @@ import re
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import partial
+from typing import Any
 
 from planner import db
 from planner.dates import to_iso
@@ -142,6 +143,8 @@ TITLE_DISCLAIMER_RE = re.compile(r"\btags?\s+(?:is|are)\s+valid\b", re.IGNORECAS
 MARK_PAD_PT = 4.0
 #: How far below its last date line a table's rows may still carry text (path B).
 TABLE_END_PAD_PT = 8.0
+#: Slack (pt) past the mirrored right edge of the date column (word boxes overhang).
+DATE_COLUMN_PAD_PT = 12.0
 
 
 @dataclass(frozen=True)
@@ -424,7 +427,12 @@ def column_bounds(header: TextLine) -> list[float]:
     """
     blocks = column_blocks(header.words, gutter=8.0)
     centres = [(x0 + x1) / 2 for x0, x1 in blocks]
-    return [(a + b) / 2 for a, b in zip(centres, centres[1:], strict=False)]
+    bounds = [(a + b) / 2 for a, b in zip(centres, centres[1:], strict=False)]
+    if len(bounds) >= 3:
+        # The date column's right edge, mirrored around its (centred) label: a note can
+        # print a date range of its own, and the Notes column starts right of this.
+        bounds.insert(3, bounds[2] + 2 * (centres[3] - bounds[2]) + DATE_COLUMN_PAD_PT)
+    return bounds
 
 
 def _is_junk_line(text: str, spec: Brochure) -> bool:
@@ -496,6 +504,58 @@ def date_lines(words: Sequence[Word], spec: Brochure, license_year: int) -> list
     return sorted(out, key=lambda d: (d.top, d.text))
 
 
+def assign_rows(dates: Sequence[DateLine], hunts: Sequence[Word]) -> list[list[int]]:
+    """Which date lines belong to each hunt number, in printed order.
+
+    A hunt's cells are printed **vertically centred** on it, so a row with four season
+    windows has lines both above and below its own number and reaches past the midpoint
+    to its neighbour. The date lines are therefore cut into consecutive runs, one per
+    hunt, so that every hunt number ends up as centred as possible in the run it labels
+    — the same dynamic program T-11 used for merged unit cells.
+    """
+    if not hunts or not dates:
+        return [[] for _ in hunts]
+    centres = [(w.top + w.bottom) / 2 for w in hunts]
+    n, m = len(dates), len(hunts)
+
+    def cost(first: int, last: int, hunt: int) -> float:
+        return abs((dates[first].top + dates[last].bottom) / 2 - centres[hunt])
+
+    # dp[k][i] = best cost of giving the first k hunts the first i date lines
+    best = [[float("inf")] * (n + 1) for _ in range(m + 1)]
+    back = [[0] * (n + 1) for _ in range(m + 1)]
+    best[0][0] = 0.0
+    for k in range(1, m + 1):
+        for i in range(k, n - (m - k) + 1):
+            for j in range(k - 1, i):
+                if best[k - 1][j] == float("inf"):
+                    continue
+                total = best[k - 1][j] + cost(j, i - 1, k - 1)
+                if total < best[k][i]:
+                    best[k][i], back[k][i] = total, j
+    out: list[list[int]] = [[] for _ in hunts]
+    if best[m][n] == float("inf"):  # fewer date lines than hunts: fall back to nearest
+        for index, found in enumerate(dates):
+            out[min(range(m), key=lambda h: abs(centres[h] - found.centre))].append(index)
+        return out
+    end = n
+    for k in range(m, 0, -1):
+        start = back[k][end]
+        out[k - 1] = list(range(start, end))
+        end = start
+    return out
+
+
+def row_of(value: float, spans: Sequence[tuple[float, float]]) -> int:
+    """The row whose vertical span `value` falls in, else the nearest one."""
+
+    def distance(index: int) -> float:
+        top, bottom = spans[index]
+        return 0.0 if top <= value <= bottom else min(abs(value - top), abs(value - bottom))
+
+    return min(range(len(spans)), key=distance)
+
+
 def rows_from_text(
     page: Page, spec: Brochure, carried: TitleInfo | None, license_year: int
 ) -> tuple[list[HuntRow], TitleInfo | None]:
@@ -520,10 +580,10 @@ def rows_from_text(
             continue
         carried = info
         bounds = column_bounds(header)
-        if len(bounds) < 3:
+        if len(bounds) < 4:
             continue
         region = [w for w in page.words if header.bottom <= w.top < bottom]
-        dates = date_lines([w for w in region if w.cx >= bounds[2]], spec, license_year)
+        dates = date_lines([w for w in region if bounds[2] <= w.cx < bounds[3]], spec, license_year)
         if not dates:
             continue
         cut = max(d.bottom for d in dates) + TABLE_END_PAD_PT
@@ -537,32 +597,34 @@ def rows_from_text(
         )
         if not hunts:
             continue
-        centres = [(w.top + w.bottom) / 2 for w in hunts]
-
-        def nearest(value: float, centres: list[float] = centres) -> int:
-            return min(range(len(centres)), key=lambda i: abs(centres[i] - value))
+        owned = assign_rows(dates, hunts)
+        spans = [
+            (
+                min([hunt.top, *(dates[i].top for i in owned[index])]),
+                max([hunt.bottom, *(dates[i].bottom for i in owned[index])]),
+            )
+            for index, hunt in enumerate(hunts)
+        ]
 
         area: dict[int, list[Word]] = {}
         tags: dict[int, list[Word]] = {}
         for word in region:
-            if word in hunts or (word.top + word.bottom) / 2 >= cut:
+            centre = (word.top + word.bottom) / 2
+            if word in hunts or centre >= cut:
                 continue
             if bounds[0] <= word.cx < bounds[1]:
-                area.setdefault(nearest((word.top + word.bottom) / 2), []).append(word)
+                area.setdefault(row_of(centre, spans), []).append(word)
             elif bounds[1] <= word.cx < bounds[2]:
-                tags.setdefault(nearest((word.top + word.bottom) / 2), []).append(word)
-        windows: dict[int, list[str]] = {}
-        for found in dates:
-            windows.setdefault(nearest(found.centre), []).append(found.text)
+                tags.setdefault(row_of(centre, spans), []).append(word)
         for index, hunt in enumerate(hunts):
-            if index not in windows:
+            if not owned[index]:
                 continue
             out.append(
                 _text_row(
                     hunt.text,
                     join_words(area.get(index, [])),
                     join_words(tags.get(index, [])),
-                    tuple(windows[index]),
+                    tuple(dates[i].text for i in owned[index]),
                     page.number,
                     info,
                 )
@@ -582,22 +644,6 @@ def _title_above(lines: Sequence[TextLine], spec: Brochure) -> TitleInfo | None:
         if len(kept) > 4:
             break
     return None
-
-
-def _with_notes(row: HuntRow, notes: str) -> HuntRow:
-    return HuntRow(
-        hunt_number=row.hunt_number,
-        area=row.area,
-        marks=row.marks,
-        tags_text=row.tags_text,
-        dates_text=row.dates_text,
-        page=row.page,
-        title=row.title,
-        description_page=row.description_page,
-        notes=notes,
-        bbox=row.bbox,
-        leftovers=row.leftovers,
-    )
 
 
 def _text_row(
@@ -679,7 +725,9 @@ def notes_codes(text: str) -> tuple[list[str], list[str]]:
         explained = re.sub(pattern, " ", explained, flags=re.IGNORECASE)
     explained = _NOISE_RE.sub(" ", _POINTER_RE.sub(" ", explained))
     unmatched = list(quals.unmatched)
-    if explained.strip():
+    if explained.strip() or NOTE_REF_RE.search(value):
+        # A pointer to a numbered note is never interpreted here: the note's text is
+        # attached verbatim at finalize, and the condition itself stays unexplained.
         unmatched.append(value)
     if unmatched and "see_notes" not in codes:
         codes.append("see_notes")
@@ -804,11 +852,10 @@ def page_rows(page: Page, ctx: ParseContext, spec: Brochure) -> list[tuple[HuntR
             state.missing_marks.append(
                 {"page": page.number, "hunt": row.hunt_number, "markers": unknown}
             )
-        notes = peer.notes if peer is not None else row.notes
-        out.append((_with_notes(row, notes), agree))
-    state.date_tokens += sum(
-        len(common.parse_date_ranges(row.dates_text, ctx.license_year)) for row in rules
-    )
+        # The Notes cell is path A's alone: pdfplumber drops it from the ruled output and
+        # path B never reads it, so it is not part of the comparison (§8.7).
+        out.append((row, agree))
+
     state.rows[page.number] = out
     return out
 
@@ -826,27 +873,39 @@ def _first_per_title(rows: Sequence[HuntRow]) -> list[HuntRow]:
 # ───────── rows → staged seasons ─────────
 
 
-def resolve_dates(
-    row: HuntRow, ctx: ParseContext
-) -> tuple[dt.date | None, dt.date | None, list[str]]:
-    """The row's season window. The year printed in the table title wins (§12 T-17a).
+@dataclass(frozen=True)
+class Window:
+    """One resolved season window of a hunt, with the text nothing explained (D3)."""
 
-    Dates are read with the license year's Jul→Jun rule, then shifted to the title's year
-    when the title prints one (`2027 Controlled Hunts` → 2027 dates, spring bear → 2027).
-    An end before the start rolls into the next year, which `parse_date_ranges` does.
+    start: dt.date
+    end: dt.date
+    text: str
+
+
+def resolve_dates(row: HuntRow, ctx: ParseContext) -> tuple[list[Window], list[str]]:
+    """Every season window of the row, plus the date text no window consumed.
+
+    Dates are read with the license year's Jul→Jun rule, then shifted to the year the
+    table title prints when it prints one (`2027 Controlled Hunts` → 2027 dates, spring
+    bear → 2027). An end before the start rolls into the next year (`parse_date_ranges`).
     """
-    ranges = common.parse_date_ranges(row.dates_text, ctx.license_year)
-    leftovers = list(common.leftover_date_text(row.dates_text, ranges))
-    if len(ranges) != 1:
-        return None, None, leftovers + [row.dates_text]
-    found = ranges[0]
-    start, end = found.start, found.end
-    year = row.title.year
-    if year is not None and start.year != year:
-        shift = year - start.year
-        start = start.replace(year=start.year + shift)
-        end = end.replace(year=end.year + shift)
-    return start, end, leftovers
+    windows: list[Window] = []
+    leftovers: list[str] = []
+    for text in row.dates_texts:
+        ranges = common.parse_date_ranges(text, ctx.license_year)
+        leftovers += common.leftover_date_text(text, ranges)
+        if not ranges:
+            leftovers.append(text)
+            continue
+        for found in ranges:
+            start, end = found.start, found.end
+            year = row.title.year
+            if year is not None and start.year != year and start.month >= 7:
+                shift = year - start.year
+                start = start.replace(year=start.year + shift)
+                end = end.replace(year=end.year + shift)
+            windows.append(Window(start, end, found.text))
+    return windows, leftovers
 
 
 def base_unit(area: str) -> str | None:
@@ -857,10 +916,16 @@ def base_unit(area: str) -> str | None:
 
 def to_parsed(
     row: HuntRow, ctx: ParseContext, spec: Brochure, *, agree: bool
-) -> ParsedSeason | None:
-    """A compared `HuntRow` as the `ParsedSeason` the pipeline stages (None when unusable)."""
-    species = spec.species_of(row.hunt_number)
-    start, end, leftovers = resolve_dates(row, ctx)
+) -> list[ParsedSeason]:
+    """A compared `HuntRow` as the season rows the pipeline stages — one per window.
+
+    A hunt can print several season windows (2026 deer 1123 prints four), so one hunt
+    number can produce several `seasons` rows. A window whose dates can't be read is
+    never dropped: it is staged as a failing row so review sees it (D3).
+    """
+    species = spec.species_of(row.hunt_number) or f"unknown_prefix_{row.hunt_number[:1]}"
+    section = spec.section(species)
+    windows, leftovers = resolve_dates(row, ctx)
     codes, unmatched = notes_codes(row.notes)
     for code in row.title.restrictions:
         if code not in codes:
@@ -869,61 +934,57 @@ def to_parsed(
     meanings = {legend.get(m) for m in row.marks}
     if "portion_only" in meanings and "portion_of_unit" not in codes:
         codes.append("portion_of_unit")
-    unit = base_unit(row.area)
     note = (
         f"Controlled hunt area {row.area}"
         f"{' — includes other units' if 'includes_other_units' in meanings else ''}"
         " (exact units resolved by T-17b)"
     )
-    units = [UnitRef(unit_id=unit or row.area, coverage="partial", coverage_note=note)]
-    if species is None or start is None or end is None:
-        # D3: never dropped. The row is staged as a failing one so review sees it.
-        species = species or f"unknown:{row.hunt_number[:1]}"
-        if start is None or end is None:
-            return ParsedSeason(
-                species_id=species,
-                tag_type_id="controlled",
-                hunt_class=row.title.hunt_class,
-                weapon=row.title.weapon,
-                sex=row.title.sex,
-                start=dt.date(ctx.license_year, 1, 1),
-                end=dt.date(ctx.license_year, 1, 1),
-                units=units,
-                hunt_number=row.hunt_number,
-                hunt_area=row.area,
+    units = [
+        UnitRef(unit_id=base_unit(row.area) or row.area, coverage="partial", coverage_note=note)
+    ]
+    common_fields: dict[str, Any] = {
+        "species_id": species,
+        "tag_type_id": "controlled",
+        "hunt_class": row.title.hunt_class,
+        "weapon": row.title.weapon,
+        "sex": row.title.sex,
+        "units": units,
+        "hunt_number": row.hunt_number,
+        "hunt_area": row.area,
+        "tag_quota": row.tag_quota,
+        "source_page": row.page,
+        "source_text": row.source_text,
+        "source_bbox": list(row.bbox) if row.bbox else None,
+        "section": section,
+    }
+    if not windows:
+        day = dt.date(ctx.license_year, 7, 1)
+        return [
+            ParsedSeason(
+                start=day,
+                end=day,
                 restrictions=["see_notes"],
                 notes=f"unparsed season dates: {row.dates_text!r}",
-                source_page=row.page,
-                source_text=row.source_text,
-                source_bbox=list(row.bbox) if row.bbox else None,
                 extract_agree=False,
                 confidence=0.0,
-                section=spec.section(species),
+                **common_fields,
             )
-    return ParsedSeason(
-        species_id=species,
-        tag_type_id="controlled",
-        hunt_class=row.title.hunt_class,
-        weapon=row.title.weapon,
-        sex=row.title.sex,
-        start=start,
-        end=end,
-        units=units,
-        hunt_number=row.hunt_number,
-        hunt_area=row.area,
-        restrictions=codes,
-        notes=row.notes or None,
-        tag_quota=row.tag_quota,
-        source_page=row.page,
-        source_text=row.source_text,
-        source_bbox=list(row.bbox) if row.bbox else None,
-        extract_agree=agree,
-        confidence=common.confidence(
-            unparsed_date_text=len(leftovers),
-            unmatched_qualifiers=len(unmatched),
-        ),
-        section=spec.section(species),
-    )
+        ]
+    return [
+        ParsedSeason(
+            start=window.start,
+            end=window.end,
+            restrictions=codes,
+            notes=row.notes or None,
+            extract_agree=agree,
+            confidence=common.confidence(
+                unparsed_date_text=len(leftovers),
+                unmatched_qualifiers=len(unmatched),
+            ),
+            **common_fields,
+        )
+        for window in windows
+    ]
 
 
 def parse_page(
@@ -933,9 +994,7 @@ def parse_page(
     for row, agree in page_rows(page, ctx, spec):
         if spec.species_of(row.hunt_number) != species:
             continue
-        season = to_parsed(row, ctx, spec, agree=agree)
-        if season is not None:
-            yield season
+        yield from to_parsed(row, ctx, spec, agree=agree)
 
 
 # ───────── §8.7 checks, hunt areas and note texts ─────────
@@ -955,8 +1014,15 @@ def text_hunt_numbers(state: DocState, spec: Brochure, species: str) -> set[str]
     out: set[str] = set()
     for number in state.hunt_pages:
         for line in state.page_text.get(number, "").splitlines():
-            if (m := re.match(r"\s*(\d{4})\b", line)) and spec.species_of(m.group(1)) == species:
-                out.add(m.group(1))
+            m = re.match(r"\s*(\d{4})\b", line)
+            if m is None or spec.species_of(m.group(1)) != species:
+                continue
+            # A table title starts with the year it covers ("2026 Controlled Hunts …"),
+            # which reads as a hunt number of whatever species that digit belongs to.
+            # A printed hunt row always carries its season dates on the same line.
+            if parse_title(line, spec).matched or not common.parse_date_ranges(line, 2000):
+                continue
+            out.add(m.group(1))
     return out
 
 
@@ -1005,8 +1071,8 @@ def write_hunt_areas(ctx: ParseContext, state: DocState, spec: Brochure, species
     )
     seen: dict[tuple[int, str], tuple[int | None, bool, bool]] = {}
     for row, _ in _rows_for(state, spec, species):
-        start, _end, _leftovers = resolve_dates(row, ctx)
-        year = start.year if start else ctx.license_year
+        found = resolve_dates(row, ctx)[0]
+        year = found[0].start.year if found else ctx.license_year
         meanings = {state.legend.get(m) for m in row.marks}
         physical = state.printed_pages.get(row.description_page or -1)
         previous = seen.get((year, row.area), (None, False, False))
@@ -1058,17 +1124,27 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> list[CheckRe
     if not rows:
         return []
     numbers = [row.hunt_number for row in rows]
-    duplicates = sorted({n for n in numbers if numbers.count(n) > 1})
+    keys = [
+        (row.hunt_number, to_iso(window.start), to_iso(window.end))
+        for row in rows
+        for window in resolve_dates(row, ctx)[0]
+    ]
+    duplicates = sorted({"-".join(k) for k in keys if keys.count(k) > 1})
     disagreements = [d for d in state.disagreements if spec.species_of(str(d["hunt"])) == species]
     merged = [n for n in state.text_only if spec.species_of(n) == species]
     in_text = text_hunt_numbers(state, spec, species)
     missing = sorted(in_text - set(numbers))
     unparsed = [
-        {"hunt": row.hunt_number, "page": row.page, "dates": row.dates_text}
+        {"hunt": row.hunt_number, "page": row.page, "dates": list(row.dates_texts)}
         for row in rows
-        if resolve_dates(row, ctx)[0] is None
+        if not resolve_dates(row, ctx)[0] or resolve_dates(row, ctx)[1]
     ]
-    tokens = sum(len(common.parse_date_ranges(row.dates_text, ctx.license_year)) for row in rows)
+    windows = sum(len(resolve_dates(row, ctx)[0]) for row in rows)
+    tokens = sum(
+        len(common.parse_date_ranges(text, ctx.license_year))
+        for row in rows
+        for text in row.dates_texts
+    )
     bad_titles = [t for t in state.bad_titles]
     marks = [m for m in state.missing_marks if spec.species_of(str(m["hunt"])) == species]
 
@@ -1091,15 +1167,17 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> list[CheckRe
         CheckResult(
             name="no_duplicate_keys",
             status="pass" if not duplicates else "fail",
-            expected="hunt numbers unique per document",
+            # A hunt number can print several season windows (§12 T-17a), so the key is
+            # the window, not the number alone.
+            expected="every (hunt number, start, end) unique per document",
             actual=f"{len(duplicates)} duplicates",
             detail=duplicates or None,
         ),
         CheckResult(
             name="date_token_accounting",
-            status="pass" if tokens == len(rows) and not unparsed else "fail",
+            status="pass" if tokens == windows and not unparsed else "fail",
             expected=f"{tokens} date tokens consumed",
-            actual=f"{len(rows) - len(unparsed)} seasons, {len(unparsed)} unparsed date cells",
+            actual=f"{windows} seasons from {len(rows)} hunts, {len(unparsed)} unparsed date cells",
             detail=unparsed or None,
         ),
     ]
@@ -1153,9 +1231,10 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> list[CheckRe
         )
     )
     other_year = [
-        {"hunt": row.hunt_number, "title": row.title.text, "start": to_iso(start)}
+        {"hunt": row.hunt_number, "title": row.title.text, "start": to_iso(window.start)}
         for row in rows
-        if (start := resolve_dates(row, ctx)[0]) is not None and start.year != ctx.license_year
+        for window in resolve_dates(row, ctx)[0][:1]
+        if window.start.year != ctx.license_year
     ]
     checks.append(
         CheckResult(
