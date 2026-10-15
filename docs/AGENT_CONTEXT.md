@@ -5,7 +5,7 @@ Read this first on every ticket, then the ticket, then **only the DESIGN.md sect
 This file holds what *every* ticket needs and what is expensive to look up. It is deliberately not an API reference: for signatures and shapes, open the module — faster, and never stale. **If this file disagrees with the repo, the repo wins; fix the file in your PR.**
 
 ## What this is
-A local, single-user Flask app. It parses the official IDFG regulation PDFs into SQLite, stores the tags/permits Josh holds, and shows an Idaho GMU map: green = legal to hunt in the date range, yellow = restricted/partial, grey = closed. Visual reference: `docs/mockup.html` (Treeline's State Heat Map).
+A local, single-user Flask app. It parses the official IDFG regulation PDFs into SQLite, stores the tags/permits the user holds, and shows an Idaho GMU map: green = legal to hunt in the date range, yellow = restricted/partial, grey = closed. Visual reference: `docs/mockup.html` (Treeline's State Heat Map).
 
 ## Decisions that bind every ticket (DESIGN.md §0)
 - **D1** Residents only. No nonresident rules, fees, or quotas in the UI.
