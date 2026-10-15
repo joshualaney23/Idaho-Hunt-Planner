@@ -27,7 +27,7 @@ A local, single-user web app. It parses the official IDFG regulation PDFs into S
 | `docs/DESIGN.md` | Full design: §3.3 is the target repo layout, §5 schema, §6 API, §7 engine, §8 importer, §8.7 accuracy, §12 tickets, §14 build order |
 | `docs/mockup.html` | Working UI mockup with real 2026 deer data, the visual reference for T-03/07/08 |
 | `docs/spike_*_parser.py` | Proven parser spikes (deer general, controlled Big Game, MSG). Parser tickets productionize these. |
-| `docs/tools/issue_map.json` | Ticket → GitHub issue number. Numbers match through T-16, then shift by one (T-17a = #17, T-18 = #20, T-22 = #24). |
+| `docs/tools/issue_map.json` | Ticket → GitHub issue number. Numbers match through T-16, then shift by one (T-17a = #17, T-18 = #20); later additions take the next free number (T-27 = #36, T-22a–f = #45–#50). The original T-22 (#24) was split into T-22a–f and closed as superseded. |
 | `docs/tools/make_issues.py` | Re-syncs issue bodies from §12 (`--link`) after a ticket is edited |
 | `docs/tools/section.py` | Prints one DESIGN.md section or ticket |
 | `docs/images/` | PR evidence renders (`t-02-gmu-*.png`; `t-03-*.png` app-shell screenshots, plus `t-03-mockup-reference.png`; `t-09-*.png` My Tags tab; `t-07-*.png` map, restricted/untagged, tooltip, keyboard brief; `t-08-*.png` results table, Unit Brief, zoom, print page) |

@@ -10,7 +10,7 @@
 |---|---|---|
 | D1 | **Residents only** for now. | No nonresident quotas, fees, or rules anywhere: no resident/nonresident setting, and nonresident-only text isn't parsed into restrictions. The Tags (quota) column is stored for checksums only and isn't shown in the UI. |
 | D2 | **Controlled hunts are in core scope (MVP)**, not a later phase. Josh may hold a controlled tag. | The controlled-hunt parser, hunt-area descriptions, unit coverage, and the "add controlled tag by hunt number" flow are all Phase 1 (§10, T-17a/b/c). |
-| D3 | **PDF parsing accuracy is the top priority.** Everything else depends on it. | New §8.7 accuracy strategy and ticket T-22: two independent extraction paths must agree, checksums and completeness checks run on every import, every section is checked against hand-verified golden data, and publishing is **blocked** while any check fails. No LLM-extracted data is ever published. |
+| D3 | **PDF parsing accuracy is the top priority.** Everything else depends on it. | New §8.7 accuracy strategy and tickets T-22a–f: two independent extraction paths must agree, checksums and completeness checks run on every import, every section is checked against hand-verified golden data, and publishing is **blocked** while any check fails. No LLM-extracted data is ever published. |
 | D4 | **Every animal that can be hunted under the Big Game and the Upland Game, Turkey & Furbearer regulations is in scope.** | See the species matrix in §5.3. Big Game PDF: deer (mule + white-tailed), elk, pronghorn, black bear, mountain lion, gray wolf. Upland PDF: forest grouse (dusky/ruffed/spruce), California & bobwhite quail, chukar, gray partridge, sage-grouse, sharp-tailed grouse, pheasant, wild turkey, cottontail, snowshoe hare, red squirrel, the furbearers that may be **hunted** (badger, bobcat, red fox), predatory/unprotected animals (year-round), and falconry seasons. **Out:** trapping-only furbearers (beaver, mink, muskrat, otter, marten). (Moose/sheep/goat and migratory birds were added by D7.) |
 | D7 | **Moose, bighorn sheep, mountain goat and migratory birds are in scope too**, uploaded from their own brochures. | Two more source documents: **Moose, Bighorn Sheep & Mountain Goat** (2-year brochure, currently "2025 & 2026") and **Migratory Game Bird** (yearly, currently "2026–2027": ducks incl. mergansers, scaup sub-season, Wilson's snipe, American coot, Canada/white-fronted/light geese, swans (controlled), mourning & white-winged dove, American crow, sandhill crane). New tickets T-25 and T-26; species rows in §5.3. |
 | D5 | **Friday counts as part of the default weekend.** | Default `weekend_def = 'fri_sun'` (§7.3). Sat–Sun stays available as a setting. |
@@ -613,10 +613,10 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | `unit_tokens_valid` | Every unit token is a real GMU from `units`. Every hunt area resolves to ≥ 1 unit. | — |
 | `gis_area_match` | Every controlled hunt area exists in the GIS Controlled Hunts layer for `license_year` (fall back to the latest year with a warning). Match **exactly**, including a full-size `*`. | Big Game 469/469 · MSG 145/145 (2025 GIS) |
 | `general_coverage` | Every GMU (except `YNP`) has ≥ 1 general Regular deer season **or** appears in a controlled-only list that is confirmed in the page text. | 5 controlled-only: 44, 45, 52, 54, 68A |
-| `golden_match` | For every section with a committed `tests/golden/<year>/<section>.json`, the import matches it **exactly**. | Golden files are built in T-22 |
+| `golden_match` | For every section with a committed `tests/golden/<year>/<section>.json`, the import matches it **exactly**. | The check ships in T-22c; the 2026 golden files are built in T-22d–f |
 | `yoy_diff` (warn) | Changes vs. last year's published data are listed for review. More than 25 % of rows changed in a section → warn. | — |
 
-**Golden dataset (T-22).** For the first year (2026), every row of every MVP section (general deer, all controlled deer/elk/pronghorn/bear) is **verified by hand against the PDF**, one page at a time, and committed as JSON. The parser must reproduce it with zero diffs. In later years the previous year's golden file is not truth for the new PDF, but it serves as a regression fixture: re-parsing the 2026 PDF after any parser change must still match 2026 golden exactly. New years are protected by the invariants plus the review gate.
+**Golden dataset (T-22c–f).** For the first year (2026), every row of every MVP section (general deer, all controlled deer/elk/pronghorn/bear) is **verified by hand against the PDF**, one page at a time, and committed as JSON. The parser must reproduce it with zero diffs. In later years the previous year's golden file is not truth for the new PDF, but it serves as a regression fixture: re-parsing the 2026 PDF after any parser change must still match 2026 golden exactly. New years are protected by the invariants plus the review gate.
 
 **Review gate.** Publishing requires every check to pass or be explicitly waived with a written reason, and every disagreeing row to be individually reviewed (§8.4). There's no bulk approve for rows that fail any check.
 
@@ -643,14 +643,14 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | Phase | Outcome | Tickets |
 |---|---|---|
 | **0 – Foundations** | Repo runs, themed shell, map renders | T-01 … T-05 |
-| **1 – MVP: Deer + all controlled hunts, accuracy-gated** | Upload the 2026 big-game PDF; general deer **and** every controlled deer/elk/pronghorn/bear hunt parse with every invariant passing and a 100 % golden match; review and publish; add a Regular Deer tag and/or a controlled tag by hunt number; see this weekend's green units | T-06 … T-11, T-15, T-16, **T-17a, T-17b, T-17c, T-22** |
+| **1 – MVP: Deer + all controlled hunts, accuracy-gated** | Upload the 2026 big-game PDF; general deer **and** every controlled deer/elk/pronghorn/bear hunt parse with every invariant passing and a 100 % golden match; review and publish; add a Regular Deer tag and/or a controlled tag by hunt number; see this weekend's green units | T-06 … T-11, T-15, T-16, **T-17a, T-17b, T-17c, T-22a … T-22f** |
 | **2 – Elk A/B & other general big game** | Elk A/B zones, pronghorn, bear, lion, wolf, supplements | T-12, T-13, T-18 |
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
 | **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter | T-19, T-20, T-21, T-27 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18, T-22} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; T-22 → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; T-22b → T-15 (publish gate) ; T-11 → T-15 ; T-15 → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; T-19 spans all`.
 
 ---
 
@@ -791,7 +791,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 - On the full 2026 PDF: ≥ 230 rows. Every GMU except {11, 11A, 13, 14, 18, 44, 45, 52, 54, 63A, 68A, YNP} has at least one Regular-tag general season, and each of those is confirmed controlled-only in the page text (T-11 measured this: the "5 controlled-only units" in §8.7 is coverage by *any* general deer tag — units 11, 11A, 13, 14, 18 and 63A have White-tailed-tag general seasons but no Regular-tag one). Fixture expectations match exactly.
 - Spot checks: Unit 39 Regular any-weapon antlered **Oct 10–Oct 31**; Units 1, 2, 3, 4A, 5, 6 antlered Oct 10–31 carries `whitetail_only`; Unit 22 antlered carries `two_point_only`.
 - Implements a **text-path twin** for these tables and the `two_path_agreement`, `date_token_accounting`, `unit_tokens_valid` and `general_coverage` checks from §8.7 for section `deer_general`. All pass on the 2026 PDF.
-- **Matches `tests/golden/2026/deer_general.json` exactly** (produced in T-22).
+- **Matches `tests/golden/2026/deer_general.json` exactly** (produced in T-22d).
 
 ---
 
@@ -804,7 +804,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 - All 28 zones present for both A and B tags where the regs offer them. A zone with only one tag type is acceptable if the PDF says so.
 - Fixture tests for at least 3 zones are hand-verified against the PDF.
 - If the automated approach yields confidence < 0.8 for a zone, rows are still staged (flagged) rather than dropped.
-- Accuracy: every date token on each zone page is consumed exactly once (`date_token_accounting`), and the zone→unit list printed in each zone header matches GIS `Elk_Zone` membership, with differences listed as `fail`. Hand-verified golden file `tests/golden/2026/elk_zones.json` for all zones (added to T-22's scope when this ticket starts).
+- Accuracy: every date token on each zone page is consumed exactly once (`date_token_accounting`), and the zone→unit list printed in each zone header matches GIS `Elk_Zone` membership, with differences listed as `fail`. Hand-verified golden file `tests/golden/2026/elk_zones.json` for all zones (verified the T-22d–f way, in this ticket).
 
 ---
 
@@ -823,7 +823,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 ---
 
 ### T-15 · Regulations tab: upload & review & publish UI
-**Depends on:** T-10, T-11 (for real data), T-22 (checks + publish gate), T-03 · **Size:** L
+**Depends on:** T-10, T-11 (for real data), T-22a (checks), T-22b (publish gate), T-03 · **Size:** L
 **Description:** `#/regs` per §8.4: a drag-and-drop upload card (shows sha/dup warnings, a spinner, then the result counts), a documents table by year with status badges, and a review screen at `#/regs/<docId>` with a grouped row list, confidence coloring (`--sc1`…`--sc5`), inline editors (unit chip editor with autocomplete from units, date inputs, selects for tag/weapon/sex, restriction multi-select), an embedded PDF iframe synced to the selected row's page, a diff vs prior published year (API: `GET /api/documents/<id>/diff`, implemented here, matching on species+tag+zone+weapon+sex+unit set), approve/reject per row, approve-all-passing (only rows with `extract_agree = 1` in sections whose checks all pass), keyboard shortcuts (j/k/a/r/e), and a Publish button (§8.5 supersession implemented in `api.py`/`db.py` here) with a confirmation modal summarizing counts.
 **Acceptance criteria:** end-to-end test: upload the 2026 deer fixture, approve all, publish, and `/api/availability` returns open units. Publishing a supplement supersedes the matching rows. The UI prevents publishing while staged rows remain. **The Accuracy panel (§8.4, §8.7) renders every `import_checks` row. Publish is blocked (UI and API both return 409) while any check is `fail` and not waived, or any `extract_agree = 0` row is unreviewed. Waiving requires a typed reason, which is stored and displayed.**
 
@@ -853,7 +853,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 - `tag_checksum` passes: deer **13,226**, elk **18,670**, pronghorn **2,040**.
 - `two_path_agreement`: 0 disagreements. Footnote counts **131 `a` / 77 `b`**.
 - Spot checks: **1001** area `1-1`, footnote a, Aug 30–Dec 1, antlered, "See pg 31" → physical description page 32; **1002** area `11`, no footnote, Oct 10–Nov 3, 50 tags; **1028** area `38-1`, footnote b, Oct 10–Nov 24; **2032** elk antlered, area `51`, Nov 1–Nov 30; **2111** elk either-sex, area `30A-1`, footnote b, Aug 1–Aug 29 (its text-layer line is merged with a neighbor; the table path must still get it); **4014** pronghorn either-sex, area `50`, Sep 25–Oct 24, "See pg 67" → physical page 68; **8501** fall bear, area `1-1`, footnote b, Sep 15–Oct 9.
-- Matches `tests/golden/2026/controlled_{deer,elk,pronghorn,bear}.json` exactly (T-22).
+- Matches `tests/golden/2026/controlled_{deer,elk,pronghorn,bear}.json` exactly (T-22e/f).
 
 ---
 
@@ -886,18 +886,68 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ---
 
-### T-22 · Accuracy harness, golden dataset & publish gate (MVP — highest priority)
-**Depends on:** T-10 · **Size:** L
-**Description:** Implements §8.7 end to end.
-1. `importer/checks/`: a check registry (`@check(section_glob, name)`), each check returning `CheckResult(status, expected, actual, detail)`, all persisted to `import_checks` at the end of `run_import`. Shared implementations: two-path comparison helper, `date_token_accounting` (scan page text inside each table's bbox for `Mon D - Mon D` tokens and require that each maps to exactly one season by `source_bbox`), `unit_tokens_valid`, `no_duplicate_keys`, `general_coverage`, `golden_match`, `yoy_diff`.
-2. **Golden dataset for 2026.** `scripts/make_golden.py` dumps a section's parsed rows to `tests/golden/2026/<section>.json` in a canonical sorted form. A human then **verifies every row against the PDF page by page** and records it in `tests/golden/2026/VERIFICATION.md` (a table of page, rows on page, verified-by, date, and corrections made). MVP sections: `deer_general`, `controlled_deer`, `controlled_elk`, `controlled_pronghorn`, `controlled_bear`, `hunt_areas_*`. Golden files are **only** committed after verification. A row the parser got wrong is fixed in the golden file and becomes a failing test until the parser is fixed.
-3. `tests/test_golden.py`: re-parses the 2026 PDF (downloaded once to a cache dir; skipped with a clear message if offline) and asserts an exact match for every golden section. CI runs it with the PDF cached by URL hash.
-4. Publish gate in `api.py` (§8.4): `POST /publish` → 409 with the list of blocking checks and rows unless the gate is satisfied. Waiver endpoint requires a non-empty reason.
+### T-22a · Check registry & shared invariant checks
+**Depends on:** T-10, T-11, T-17a · **Size:** M
+**Description:** Part 1 of §8.7's harness. (T-22 was one Size-L ticket; it is split into T-22a–f so each fits one agent session — see §14.) `planner/importer/checks/`: a check registry `@check(section_glob, name)`; each check takes the finalize context and returns `CheckResult(status, expected, actual, detail)`; `run_import` runs every registered check whose glob matches the section and persists all of them to `import_checks`. Move the inline `finalize` checks of `deer.py` and `controlled.py` into the registry **unchanged** (same check names, same statuses on the 2026 brochure), so every later parser inherits them instead of re-implementing them. Shared implementations live in the registry, not in a parser: a two-path comparison helper (so `two_path_agreement` is one function), `date_token_accounting` (scan the page text inside each table's bbox for `Mon D - Mon D` tokens and require that each is consumed by **exactly one** parsed season, matched by `source_bbox`), `unit_tokens_valid`, `no_duplicate_keys`, `general_coverage`, `yoy_diff` (warn). `golden_match` is T-22c; the publish gate that consumes these rows is T-22b.
 **Acceptance criteria:**
-- All checks implemented with unit tests, including a deliberately corrupted fixture for each (e.g. drop one table row → `hunt_number_completeness` and `tag_checksum` fail; strip superscript filtering → `two_path_agreement` fails on 1001).
-- `VERIFICATION.md` covers every page of every MVP section, with no unverified pages.
-- `pytest -q` passes with golden match = 0 diffs on 2026.
-- Publish is impossible via the API while any unwaived `fail` exists (API test).
+- Every check above is registered, unit-tested, and has a deliberately corrupted fixture that makes it fail (e.g. drop one table row → `hunt_number_completeness` and `tag_checksum` fail; strip superscript filtering → `two_path_agreement` fails on 1001).
+- Importing `tests/fixtures/bg2026_controlled.pdf` and the deer fixtures yields the same check names and statuses as before the refactor; the before/after table is in the PR.
+- No parser keeps a private implementation of a check the registry provides.
+
+---
+
+### T-22b · Publish gate & waiver API
+**Depends on:** T-22a · **Size:** M
+**Description:** The §8.4 review gate, API-side only (T-15 builds the UI on top of it). `POST /api/documents/<id>/publish` publishes a document's staged rows only when (1) no row is still unreviewed, (2) every `import_checks` row is `pass` or explicitly waived, and (3) every row with `extract_agree = 0` has been individually reviewed; otherwise **409 `publish_blocked`** with the list of blocking checks and row ids. `POST /api/documents/<id>/checks/<check_id>/waive` requires a non-empty `reason` (400 `missing_reason`); the reason, who waived it and when are stored on the check forever and returned by `GET /api/documents/<id>`. Add the per-row review endpoints the gate needs (approve/reject a staged row; bulk approve is allowed **only** for rows that pass every check — there is no confidence-only bulk approve). §8.7 display safety: the document payload flags each section that has a waived check, so the UI can show the ⚠ "manually verified" badge.
+**Acceptance criteria:**
+- API test: publishing is impossible while an unwaived `fail` exists, and the 409 body names every blocking check and row.
+- API test: an empty waiver reason is a 400; a waiver with a reason unblocks publish, and the reason survives a re-read of the document.
+- API test: a row with `extract_agree = 0` blocks publishing until it is individually reviewed, and bulk approve never covers a row that fails a check.
+
+---
+
+### T-22c · Golden harness: dump, diff, `golden_match` & verification checklist
+**Depends on:** T-22a · **Size:** M
+**Description:** Everything needed to produce and enforce golden files, without hand-verifying 2026 (that is T-22d–f, one section group each, because it is human work).
+1. `scripts/make_golden.py <section> [--year] [--check]`: dumps a section's parsed rows to `tests/golden/<year>/<section>.json` in a canonical, stably sorted, diff-friendly form; `--check` prints the diff against the committed file and exits non-zero instead of writing.
+2. `scripts/make_verification_checklist.py <section>`: renders every source page the section's rows cite to `data/verify/<year>/<section>/pNNN.png` (never committed) and writes the `tests/golden/<year>/VERIFICATION.md` skeleton — a table of page, rows on page, verified-by, date, and corrections made — with every page **unverified**.
+3. `golden_match` in the check registry: for every section with a committed golden file for the document's year, the import must match it exactly; a missing golden file is `warn`, not `fail`.
+4. `tests/test_golden.py`: re-parses the real 2026 PDF (downloaded once into a cache dir keyed by URL hash; skipped with a clear message when offline or uncached) and asserts an exact match for every committed golden section. CI caches the PDF by URL hash.
+**Acceptance criteria:**
+- The dump → checklist → diff → test loop is proven end to end on one section derived from the committed fixtures (`tests/golden/2026/fixture_controlled_deer.json`), with the commands and output in the PR.
+- `scripts/make_golden.py --check` exits non-zero with a readable diff when a row changes.
+- `tests/test_golden.py` skips with an explicit message when the 2026 PDF isn't cached, and passes when it is.
+- No page is marked verified by the agent: every `VERIFICATION.md` skeleton ships unverified.
+
+---
+
+### T-22d · Golden dataset: general deer 2026 (human verification)
+**Depends on:** T-22c, T-11 · **Size:** M
+**Description:** Produce and hand-verify `tests/golden/2026/deer_general.json` — the general-deer season pages of the 2026 Big Game brochure (2026: 132 unit rows / 235 date ranges). The agent dumps the candidate rows, renders every cited page, and fills `VERIFICATION.md` with page, rows on page and the parsed values to tick off; **Josh verifies each page against the PDF and signs the row — an agent never marks a page verified.** A row the parser got wrong is corrected in the golden file first; the resulting failing test is the parser bug report.
+**Acceptance criteria:**
+- `tests/golden/2026/deer_general.json` is committed only after `VERIFICATION.md` shows every cited page verified, with a name and a date.
+- `pytest -q` shows golden match = 0 diffs, or every remaining diff is a parser bug with its own issue and an `xfail` that references it.
+- The corrections table lists every row the parser got wrong, with its page.
+
+---
+
+### T-22e · Golden dataset: controlled deer & elk 2026 (human verification)
+**Depends on:** T-22c, T-17a · **Size:** M
+**Description:** As T-22d, for `controlled_deer` and `controlled_elk` (2026: the deer and elk controlled-hunt tables, the bulk of the brochure's 469 hunts). Verify page by page; one `VERIFICATION.md` section per golden file.
+**Acceptance criteria:**
+- `tests/golden/2026/controlled_deer.json` and `controlled_elk.json` committed only after every cited page is signed off in `VERIFICATION.md`.
+- `pytest -q` shows golden match = 0 diffs for both, or every remaining diff is a parser bug with its own issue and an `xfail`.
+- The PR states the verified hunt counts per species and reconciles them with `tag_checksum` and `hunt_number_completeness`.
+
+---
+
+### T-22f · Golden dataset: controlled pronghorn, bear & hunt areas 2026 (human verification)
+**Depends on:** T-22c, T-17a, T-17b · **Size:** M
+**Description:** As T-22d, for `controlled_pronghorn`, `controlled_bear` and the `hunt_areas_*` sections (T-17b's hunt-area descriptions and their unit coverage). Completing this closes the MVP golden set: `deer_general`, `controlled_deer`, `controlled_elk`, `controlled_pronghorn`, `controlled_bear`, `hunt_areas_*`.
+**Acceptance criteria:**
+- Golden files for all three sections committed only after every cited page is signed off in `VERIFICATION.md`.
+- `VERIFICATION.md` covers every page of every MVP section (T-22d + T-22e + T-22f), with no unverified pages.
+- `pytest -q` shows golden match = 0 diffs on 2026 across every MVP section.
 
 ---
 
@@ -921,7 +971,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 ---
 
 ### T-25 · Moose, bighorn sheep & mountain goat brochure
-**Depends on:** T-17a, T-17b, T-22 · **Size:** M
+**Depends on:** T-17a, T-17b, T-22a, T-22c · **Size:** M
 **Description:** Classify `kind='moose_sheep_goat'` (title "Idaho Moose, Bighorn Sheep & Mountain Goat YYYY & YYYY Seasons & Rules", so `license_year` = first year and `year_end` = second; seasons are created for **both** years with the printed dates). All hunts are controlled, so drive the shared T-17a parser with an MSG profile, reproducing `docs/spike_msg_parser.py` (read it and run it first):
 - `dedupe_chars(tolerance=1)` on every page (the goat page is printed 4× fake-bold).
 - Header-located columns: every `Hunt No.` cell starts a 4-column hunt record (two per row for sheep/goat; column 1 for the nested California table).
@@ -935,7 +985,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 ---
 
 ### T-26 · Migratory game birds brochure
-**Depends on:** T-14 (county overlay), T-17a/b (swan controlled hunts), T-22 · **Size:** L
+**Depends on:** T-14 (county overlay), T-17a/b (swan controlled hunts), T-22a, T-22c · **Size:** L
 **Description:** Classify `kind='migratory'` ("Idaho Migratory Game Bird YYYY-YYYY Seasons & Rules"). One season spans two calendar years, so dates carry explicit years. `license_year` per season = the calendar year of each day (§7.4 crossover applies: a Jan 2027 duck day needs 2027 license/permits).
 1. **Ducks/snipe/coot (physical p. 8), Canada geese (p. 9), white-fronted (p. 10), light geese (p. 11):** pages are multi-column with sidebars, so crop to the main column (detect the sidebar box via `page.rects` and exclude it; the "Areas Closed to Hunting… see pages 27–28" sidebar must not leak into area text). Parse `AREA n` blocks: bullet date lines ("• October 19, 2026 – January 31, 2027"; "• September 1 – 15, 2026"), sub-seasons ("• Scaup Season: November 7, 2026 – January 31, 2027" → a `duck` season with `sub_species='scaup'`), and the definition ("includes the following counties: …", "that portion of X County …" → `partial` with verbatim note, "all parts of the state NOT included in areas 2 and 3" → remainder per §5.2). Bag/possession limits → `bag_limit`. Youth/veteran days, if printed, → `youth_only` / `veteran_only` (new narrowing code).
 2. **Swans (p. 12):** controlled table, header `Hunt No. | Controlled Hunt Area | Tags | Season Dates | Notes`, dates like "Oct. 10 –⏎Dec. 1". The Notes column holds the area's county list, which resolves through the county overlay (there's no GIS polygon for swans; verify and say so in the PR). Hunt numbers 93xx.
@@ -1023,11 +1073,12 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 - **No grouping.** Every ticket gets its own session and its own PR, including small, closely related ones (e.g. T-01/T-04/T-05, T-07/T-08). Context is handed off through the repo: merged code, the PR description, and `AGENT_CONTEXT.md`. This matters most for the parser tickets (T-11, T-17a, T-17b, T-12, T-14, T-23, T-24, T-25, T-26), which are the hardest and need the most room in the context.
 - **Merge before you build on it.** Start a ticket only after its dependencies' PRs are merged into `main`.
-- **Order** (every step's dependencies are in earlier steps): T-01 → T-02, T-03, T-05 (in parallel) → T-04 → T-10 → **T-22** → T-11 and T-17a (in parallel) → T-17b → T-06 → T-09, T-15 (in parallel) → T-07 → T-08 → T-17c → T-16 → Phase 2+.
+- **Order** (every step's dependencies are in earlier steps): T-01 → T-02, T-03, T-05 (in parallel) → T-04 → T-10 → T-11 and T-17a (in parallel) → **T-22a** → **T-22b, T-22c** (in parallel) → **T-22d, T-22e** (in parallel) → T-17b → **T-22f** → T-06 → T-09, T-15 (in parallel) → T-07 → T-08 → T-17c → T-16 → Phase 2+. The golden-data tickets (T-22d–f) are human-paced; once T-22c is merged they can run in parallel with the UI steps that follow.
 - **Hand-off lives in the repo, not in chat:** each ticket ends with a PR whose description lists what was built, check results, and any deviation from this doc. If the design changes, update `DESIGN.md` in the same PR.
-- **Golden-data verification (T-22) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
+- **Golden-data verification (T-22d–f) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
+- **Split a ticket that won't fit one session.** T-22 was one Size-L ticket bundling the check registry, the publish gate, the golden harness and the hand-verification of ~470 controlled hunts and 235 deer date ranges; it is now T-22a–f (§12). When a ticket looks bigger than one session, split it in §12 first, re-run `docs/tools/make_issues.py`, and close the old issue pointing at the new ones.
 
-**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
+**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward; later additions take the next free number instead (T-27 = #36, T-22a–f = #45–#50). The original T-22 (#24) was closed as superseded when it was split into T-22a–f. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
 
 | Ticket | Issue | Title |
 |---|---|---|
@@ -1054,7 +1105,12 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 | T-19 | [#21](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/21) | Test fixtures, regression suite & data QA report |
 | T-20 | [#22](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/22) | IDFG Hunt Planner cross-check (optional) |
 | T-21 | [#23](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/23) | Settings, backup/restore, docs |
-| T-22 | [#24](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/24) | Accuracy harness, golden dataset & publish gate (MVP — highest priority) |
+| T-22a | [#45](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/45) | Check registry & shared invariant checks |
+| T-22b | [#46](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/46) | Publish gate & waiver API |
+| T-22c | [#47](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/47) | Golden harness: dump, diff, `golden_match` & verification checklist |
+| T-22d | [#48](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/48) | Golden dataset: general deer 2026 (human verification) |
+| T-22e | [#49](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/49) | Golden dataset: controlled deer & elk 2026 (human verification) |
+| T-22f | [#50](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/50) | Golden dataset: controlled pronghorn, bear & hunt areas 2026 (human verification) |
 | T-23 | [#25](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/25) | Wild turkey: general + controlled hunts |
 | T-24 | [#26](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/26) | Small game, furbearer hunting, predatory/unprotected, falconry |
 | T-25 | [#27](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/27) | Moose, bighorn sheep & mountain goat brochure |
