@@ -66,6 +66,11 @@ def _today() -> _dt.date:
     return _dt.date.today()
 
 
+def _now() -> str:
+    """Timestamp for audit columns (review, waivers, publish), matching the importer's."""
+    return _dt.datetime.now().isoformat(timespec="seconds")
+
+
 @api.get("/health")
 def health():
     return jsonify({"ok": True, "version": __version__})
@@ -802,12 +807,18 @@ def get_document(doc_id: int):
     for s in seasons:
         s["restrictions"] = json.loads(s["restrictions"] or "[]")
         s["units"] = sorted((s["units"] or "").split(","), key=_unit_sort) if s["units"] else []
-    checks = _dicts(
-        "SELECT * FROM import_checks WHERE document_id = ? ORDER BY section, check_name", doc_id
+    checks = _checks_for(doc_id)
+    return jsonify(
+        {
+            "document": _document_dict(row),
+            "seasons": seasons,
+            "checks": checks,
+            # §8.7 display safety: a section with a waived check shows the ⚠ badge, and
+            # every season carries its `section` so the UI can join the two (T-22b).
+            "sections": _sections_for(checks),
+            "publish": _publish_state(doc_id),
+        }
     )
-    for c in checks:
-        c["detail"] = json.loads(c["detail"]) if c["detail"] else None
-    return jsonify({"document": _document_dict(row), "seasons": seasons, "checks": checks})
 
 
 def _unit_sort(unit_id: str):
@@ -895,3 +906,336 @@ def document_pdf(doc_id: int):
     name = row["filename"] or path.name
     response.headers["Content-Disposition"] = f'inline; filename="{Path(name).name}"'
     return response
+
+
+# ───────── review gate (T-22b, §8.4 + §8.7) ─────────
+#: A check in one of these states is neither a `pass` nor a no-op, so it blocks publishing
+#: until it is explicitly waived with a reason. `skipped` means the check found no facts
+#: to measure, so it never blocks.
+BLOCKING_CHECK_STATUSES = ("fail", "warn")
+REVIEW_STATUSES = ("approved", "rejected")
+#: Row states review can still change (a published or superseded row is history).
+REVIEWABLE_STATUSES = ("staged", "approved", "rejected")
+
+
+def _check_row(doc_id: int, check_id: int):
+    row = db.q1("SELECT * FROM import_checks WHERE id = ? AND document_id = ?", check_id, doc_id)
+    if row is None:
+        raise ApiError(
+            "unknown_check",
+            f"no check {check_id} on document {doc_id}",
+            {"document_id": doc_id, "check_id": check_id},
+            status=404,
+        )
+    return row
+
+
+def _check_dict(row: dict[str, Any]) -> dict[str, Any]:
+    """One `import_checks` row for the API: detail decoded, waiver and gate flags added."""
+    out = dict(row)
+    out["detail"] = json.loads(out["detail"]) if out["detail"] else None
+    out["waived"] = bool(out["waived_by_user"])
+    out["blocks_publish"] = out["status"] in BLOCKING_CHECK_STATUSES and not out["waived"]
+    return out
+
+
+def _checks_for(doc_id: int) -> list[dict[str, Any]]:
+    rows = _dicts(
+        "SELECT * FROM import_checks WHERE document_id = ? ORDER BY section, check_name", doc_id
+    )
+    return [_check_dict(r) for r in rows]
+
+
+def _sections_for(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-section check summary.
+
+    `waived` is §8.7 display safety: every season of a section with a waived check shows the
+    ⚠ "manually verified" badge. `clean` is the bulk-approve rule — a section whose checks
+    all pass (a waiver is a human override, not a pass, so it never makes a section clean).
+    """
+    sections: dict[str, dict[str, Any]] = {}
+    for c in checks:
+        s = sections.setdefault(
+            c["section"] or "",
+            {
+                "section": c["section"] or "",
+                "checks": {},
+                "waived": False,
+                "waived_checks": [],
+                "blocking_checks": [],
+                "clean": True,
+            },
+        )
+        s["checks"][c["status"]] = s["checks"].get(c["status"], 0) + 1
+        if c["waived"]:
+            s["waived"] = True
+            s["waived_checks"].append(c["check_name"])
+        if c["blocks_publish"]:
+            s["blocking_checks"].append(c["check_name"])
+        if c["status"] != "pass":
+            s["clean"] = False
+    return [sections[k] for k in sorted(sections)]
+
+
+def _row_refs(sql: str, doc_id: int) -> list[dict[str, Any]]:
+    return _dicts(
+        "SELECT id, section, status, source_page, extract_agree, reviewed_by_user"
+        f" FROM seasons WHERE document_id = ? AND {sql} ORDER BY id",
+        doc_id,
+    )
+
+
+def _publish_blockers(doc_id: int) -> dict[str, Any]:
+    """Everything that keeps document `doc_id` from publishing (§8.4's three conditions)."""
+    checks = [c for c in _checks_for(doc_id) if c["blocks_publish"]]
+    unreviewed = _row_refs("status = 'staged'", doc_id)
+    disagreeing = _row_refs(
+        "extract_agree = 0 AND reviewed_by_user = 0 AND status NOT IN ('superseded', 'published')",
+        doc_id,
+    )
+    rows = sorted({r["id"] for r in unreviewed} | {r["id"] for r in disagreeing})
+    return {
+        "checks": [
+            {
+                "id": c["id"],
+                "section": c["section"],
+                "check_name": c["check_name"],
+                "status": c["status"],
+                "expected": c["expected"],
+                "actual": c["actual"],
+            }
+            for c in checks
+        ],
+        "rows": rows,
+        "unreviewed_rows": unreviewed,
+        "disagreeing_rows": disagreeing,
+    }
+
+
+def _publish_state(doc_id: int) -> dict[str, Any]:
+    blockers = _publish_blockers(doc_id)
+    return {"blocked": bool(blockers["checks"] or blockers["rows"]), "blockers": blockers}
+
+
+def _season_row(doc_id: int, season_id: int):
+    row = db.q1("SELECT * FROM seasons WHERE id = ? AND document_id = ?", season_id, doc_id)
+    if row is None:
+        raise ApiError(
+            "unknown_season",
+            f"no season {season_id} on document {doc_id}",
+            {"document_id": doc_id, "season_id": season_id},
+            status=404,
+        )
+    return row
+
+
+def _season_dict(doc_id: int, season_id: int) -> dict[str, Any]:
+    rows = _dicts(
+        "SELECT s.*, GROUP_CONCAT(su.unit_id) AS units FROM seasons s"
+        " LEFT JOIN season_units su ON su.season_id = s.id"
+        " WHERE s.id = ? AND s.document_id = ? GROUP BY s.id",
+        season_id,
+        doc_id,
+    )
+    row = rows[0]
+    row["restrictions"] = json.loads(row["restrictions"] or "[]")
+    row["units"] = sorted((row["units"] or "").split(","), key=_unit_sort) if row["units"] else []
+    return row
+
+
+@api.get("/documents/<int:doc_id>/checks")
+def document_checks(doc_id: int):
+    """Accuracy results for the review screen's Accuracy panel (§8.4)."""
+    _document_row(doc_id)
+    checks = _checks_for(doc_id)
+    return jsonify(
+        {"checks": checks, "sections": _sections_for(checks), "publish": _publish_state(doc_id)}
+    )
+
+
+@api.post("/documents/<int:doc_id>/checks/<int:check_id>/waive")
+def waive_check(doc_id: int, check_id: int):
+    """Waive a failing check with a typed reason, kept on the check forever (§8.4)."""
+    _document_row(doc_id)
+    row = _check_row(doc_id, check_id)
+    body = _body()
+    reason = body.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ApiError(
+            "missing_reason",
+            "a waiver needs a written reason",
+            {"field": "reason"},
+            status=400,
+        )
+    if row["status"] not in BLOCKING_CHECK_STATUSES:
+        raise ApiError(
+            "nothing_to_waive",
+            f"check {row['check_name']} is {row['status']}; only a fail or warn can be waived",
+            {"check_id": check_id, "status": row["status"]},
+            status=409,
+        )
+    db.exec(
+        "UPDATE import_checks SET waived_by_user = 1, waive_reason = ?, waived_by = ?,"
+        " waived_at = ? WHERE id = ?",
+        reason.strip(),
+        _text(body.get("by"), "by") or "user",
+        _now(),
+        check_id,
+    )
+    checks = _checks_for(doc_id)
+    waived = next(c for c in checks if c["id"] == check_id)
+    return jsonify({"check": waived, "publish": _publish_state(doc_id)})
+
+
+@api.put("/documents/<int:doc_id>/seasons/<int:season_id>")
+def review_season(doc_id: int, season_id: int):
+    """Approve or reject one staged row by hand (§8.4; this is what clears `extract_agree = 0`)."""
+    _document_row(doc_id)
+    row = _season_row(doc_id, season_id)
+    status = _body().get("status")
+    if status not in REVIEW_STATUSES:
+        raise ApiError(
+            "validation_failed",
+            f"status must be one of {', '.join(REVIEW_STATUSES)}",
+            {"status": "invalid"},
+        )
+    if row["status"] not in REVIEWABLE_STATUSES:
+        raise ApiError(
+            "already_published",
+            f"season {season_id} is {row['status']} and can no longer be reviewed",
+            {"season_id": season_id, "status": row["status"]},
+            status=409,
+        )
+    db.exec(
+        "UPDATE seasons SET status = ?, reviewed_by_user = 1, reviewed_at = ? WHERE id = ?",
+        status,
+        _now(),
+        season_id,
+    )
+    return jsonify({"season": _season_dict(doc_id, season_id), "publish": _publish_state(doc_id)})
+
+
+@api.post("/documents/<int:doc_id>/approve-all")
+def approve_all(doc_id: int):
+    """Bulk approve, §8.4's one allowed form: rows the checks agree on.
+
+    A row qualifies only when both extraction paths agreed (`extract_agree = 1`) **and**
+    every check of its section passed. There is no confidence-only bulk approve, and a
+    waived check never makes its section eligible — those rows are approved one by one.
+    """
+    _document_row(doc_id)
+    clean = {s["section"] for s in _sections_for(_checks_for(doc_id)) if s["clean"]}
+    staged = _row_refs("status = 'staged'", doc_id)
+    approved = [r for r in staged if r["extract_agree"] and (r["section"] or "") in clean]
+    skipped = [r for r in staged if r not in approved]
+    if approved:
+        now = _now()
+        db.exec_many(
+            "UPDATE seasons SET status = 'approved', reviewed_by_user = 1, reviewed_at = ?"
+            " WHERE id = ?",
+            [(now, r["id"]) for r in approved],
+        )
+    return jsonify(
+        {
+            "approved": [r["id"] for r in approved],
+            "skipped": [
+                {
+                    "id": r["id"],
+                    "section": r["section"],
+                    "reason": "extract_disagreement"
+                    if not r["extract_agree"]
+                    else "section_has_failing_check",
+                }
+                for r in skipped
+            ],
+            "clean_sections": sorted(clean),
+            "publish": _publish_state(doc_id),
+        }
+    )
+
+
+def _supersede(doc_row, season_ids: list[int]) -> list[int]:
+    """§8.5: older published rows of the same year that this document replaces."""
+    superseded: list[int] = []
+    for new_id in season_ids:
+        s = db.q1("SELECT * FROM seasons WHERE id = ?", new_id)
+        olds = db.q(
+            "SELECT s.id FROM seasons s JOIN source_documents d ON d.id = s.document_id"
+            " WHERE s.status = 'published' AND s.document_id != ? AND d.license_year = ?"
+            " AND d.priority < ? AND s.species_id = ? AND s.tag_type_id = ?"
+            " AND IFNULL(s.zone, '') = ? AND IFNULL(s.hunt_number, '') = ?"
+            " AND s.weapon = ? AND s.sex = ?"
+            " AND EXISTS (SELECT 1 FROM season_units a JOIN season_units b"
+            "             ON a.unit_id = b.unit_id WHERE a.season_id = s.id AND b.season_id = ?)",
+            doc_row["id"],
+            doc_row["license_year"],
+            doc_row["priority"],
+            s["species_id"],
+            s["tag_type_id"],
+            s["zone"] or "",
+            s["hunt_number"] or "",
+            s["weapon"],
+            s["sex"],
+            new_id,
+        )
+        for old in olds:
+            db.exec(
+                "UPDATE seasons SET status = 'superseded', supersedes_id = ? WHERE id = ?",
+                new_id,
+                old["id"],
+            )
+            superseded.append(int(old["id"]))
+    return superseded
+
+
+@api.post("/documents/<int:doc_id>/publish")
+def publish_document(doc_id: int):
+    """Publish a document's approved rows — only when the §8.4 gate is satisfied.
+
+    The gate: (1) no row is still `staged`, (2) every check is `pass`, `skipped` or waived
+    with a reason, and (3) every `extract_agree = 0` row was reviewed individually.
+    Otherwise 409 `publish_blocked`, naming every blocking check and row.
+    """
+    row = _document_row(doc_id)
+    if row["status"] == "published":
+        raise ApiError(
+            "already_published",
+            f"document {doc_id} is already published",
+            {"document_id": doc_id, "published_at": row["published_at"]},
+            status=409,
+        )
+    blockers = _publish_blockers(doc_id)
+    if blockers["checks"] or blockers["rows"]:
+        raise ApiError(
+            "publish_blocked",
+            "the §8.7 review gate is not satisfied",
+            blockers,
+            status=409,
+        )
+    with db.tx():
+        ids = [
+            int(r["id"])
+            for r in db.q(
+                "SELECT id FROM seasons WHERE document_id = ? AND status = 'approved' ORDER BY id",
+                doc_id,
+            )
+        ]
+        if ids:
+            db.exec(
+                "UPDATE seasons SET status = 'published' WHERE document_id = ? AND"
+                " status = 'approved'",
+                doc_id,
+            )
+        superseded = _supersede(row, ids)
+        db.exec(
+            "UPDATE source_documents SET status = 'published', published_at = ? WHERE id = ?",
+            _now(),
+            doc_id,
+        )
+    return jsonify(
+        {
+            "document": _document_dict(_document_row(doc_id)),
+            "published": ids,
+            "superseded": superseded,
+        }
+    )
