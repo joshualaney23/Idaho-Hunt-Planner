@@ -35,7 +35,14 @@ def _app_js() -> list[Path]:
 
 
 def _theme_vars() -> dict[str, str]:
-    return {k: " ".join(v.split()) for k, v in VAR_DEF.findall(THEME.read_text())}
+    """The screen tokens: the `@media print` light theme (T-08) only re-assigns them."""
+    screen = THEME.read_text().split("@media print", 1)[0]
+    return {k: " ".join(v.split()) for k, v in VAR_DEF.findall(screen)}
+
+
+def _print_vars() -> dict[str, str]:
+    block = THEME.read_text().split("@media print", 1)[1]
+    return {k: " ".join(v.split()) for k, v in VAR_DEF.findall(block)}
 
 
 class _Index(HTMLParser):
@@ -197,6 +204,8 @@ def test_index_and_assets_are_served(client):
         "state.test.mjs",
         "map.test.mjs",
         "filters.test.mjs",
+        "results.test.mjs",
+        "drawer.test.mjs",
     ],
 )
 def test_js_components_under_node(name: str):
@@ -244,3 +253,27 @@ def test_untagged_checkbox_and_map_containers(index: _Index):
     js = (STATIC / "js" / "main.js").read_text()
     for mod in ("./state.js", "./filters.js", "./map.js"):
         assert mod in js, f"main.js must import {mod}"
+
+
+# ---- T-08 results, drawer, print -------------------------------------------------
+
+
+def test_print_is_one_landscape_page_in_a_light_theme():
+    """The print theme only overrides existing tokens; the layout hides the app chrome."""
+    screen, printed = _theme_vars(), _print_vars()
+    assert printed, "theme.css has no @media print light theme"
+    assert set(printed) <= set(screen), set(printed) - set(screen)
+    assert printed["--bg"] == "#ffffff" and printed["--text"] == "#111311"
+    css = APP_CSS.read_text()
+    assert re.search(r"@page\s*\{[^}]*size:\s*landscape", css)
+    block = css.split("@media print", 1)[1]
+    for sel in (".tabs", ".filters", ".banner", "dialog", ".zoombar", ".results-tools"):
+        assert sel in block.split("display: none", 1)[0], f"print keeps {sel}"
+    assert "column-count" in block  # the table flows into columns to fit the page
+
+
+def test_results_and_drawer_are_wired():
+    js = (STATIC / "js" / "main.js").read_text()
+    for mod in ("./results.js", "./drawer.js"):
+        assert mod in js, f"main.js must import {mod}"
+    assert "enableZoom(svg)" in js and "UNIT_OPEN" in js

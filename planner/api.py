@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, Response, jsonify, request
@@ -146,6 +148,73 @@ def units():
         "SELECT id, sort_key, elk_zone, region, area_acres FROM units ORDER BY sort_key, id"
     )
     return jsonify({"units": [dict(r) for r in rows]})
+
+
+IDFG_UNIT_PAGE = "https://idfg.idaho.gov/ifwis/huntplanner/unit.aspx?ID={}"
+_IDFG_LINKS_PATH = Path(__file__).resolve().parent.parent / "static" / "data" / "idfg_units.json"
+
+
+@lru_cache(maxsize=1)
+def _idfg_unit_ids() -> dict[str, int]:
+    """GMU id → IDFG Hunt Planner page id (`scripts/build_idfg_unit_links.py`)."""
+    try:
+        return json.loads(_IDFG_LINKS_PATH.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+@api.get("/units/<unit_id>/seasons")
+def unit_seasons(unit_id: str):
+    """Unit Brief (§4.3, T-08): every published season for one unit in a license year.
+
+    All species are returned; `held_species` (species of the tags held that year) lets
+    the drawer show those first. A season belongs to `year` when its document covers it
+    (`license_year <= year <= year_end`, so two-year upland brochures count for both).
+    """
+    unit = db.q1(
+        "SELECT id, sort_key, elk_zone, region, area_acres FROM units WHERE id = ?", unit_id
+    )
+    if unit is None:
+        raise ApiError("unknown_unit", f"unknown unit {unit_id!r}", {"unit": unit_id}, status=404)
+    year = _year(request.args.get("year"), default=_today().year)
+    seasons = _dicts(
+        "SELECT s.id, s.species_id, sp.label AS species_label, sp.icon AS species_icon,"
+        " s.sub_species, s.tag_type_id AS tag_type, tt.label AS tag_type_label, s.zone,"
+        " s.hunt_number, s.hunt_area, s.hunt_class, s.weapon, s.sex,"
+        " s.start_date AS start, s.end_date AS end, s.restrictions, s.bag_limit, s.notes,"
+        " su.coverage, su.coverage_note, s.source_page, s.document_id,"
+        " d.title AS document_title, d.kind AS document_kind, d.license_year"
+        " FROM season_units su"
+        " JOIN seasons s ON s.id = su.season_id"
+        " JOIN source_documents d ON d.id = s.document_id"
+        " JOIN species sp ON sp.id = s.species_id"
+        " JOIN tag_types tt ON tt.id = s.tag_type_id"
+        " WHERE su.unit_id = ? AND s.status = 'published'"
+        " AND ? BETWEEN d.license_year AND d.year_end"
+        " ORDER BY sp.rowid, s.start_date, s.end_date, s.id",
+        unit_id,
+        year,
+    )
+    for s in seasons:
+        s["restrictions"] = json.loads(s["restrictions"] or "[]")
+    held = [
+        r["species_id"]
+        for r in db.q(
+            "SELECT DISTINCT tt.species_id FROM my_tags t"
+            " JOIN tag_types tt ON tt.id = t.tag_type_id"
+            " WHERE t.license_year = ? AND tt.species_id IS NOT NULL ORDER BY tt.species_id",
+            year,
+        )
+    ]
+    page = _idfg_unit_ids().get(unit_id)
+    return jsonify(
+        {
+            "unit": {**dict(unit), "idfg_url": IDFG_UNIT_PAGE.format(page) if page else None},
+            "year": year,
+            "held_species": held,
+            "seasons": seasons,
+        }
+    )
 
 
 def _dicts(sql: str, *args: Any) -> list[dict[str, Any]]:

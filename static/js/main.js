@@ -3,13 +3,16 @@
 // Hunt tab: filters.js (filter bar) + state.js (URL-synced state, debounced
 // /api/availability) + map.js (SVG map, tooltip, legend).
 //
+// T-08 replaces the brief stub with results.js (sortable table, CSV, print) and
+// drawer.js (the Unit Brief), and adds wheel/pinch zoom to the map.
+//
 // T-09 mounts the My Tags tab (tags.js) and subscribes the map tab to
 // TAGS_CHANGED, so filling or deleting a tag updates the tag filter and the
 // breadcrumb at once (the shared state that invalidates availability).
 
 import { card, textEl, toast } from "./ui.js";
 import { TABS, parseRoute, tabHash } from "./router.js";
-import { localToday } from "./dates.js";
+import { localToday, toISO } from "./dates.js";
 import { PERMITS_CHANGED, TAGS_CHANGED, initTags } from "./tags.js";
 import { getJSON, putJSON } from "./api.js";
 import {
@@ -23,7 +26,9 @@ import {
   toQuery,
 } from "./state.js";
 import { MAP_PERMITS, createFilters, renderViewing } from "./filters.js";
-import { createMap, placeTip, renderLegend, tooltipContent } from "./map.js";
+import { createMap, enableZoom, placeTip, renderLegend, tooltipContent } from "./map.js";
+import { createResults, csvFilename, downloadText, toCSV } from "./results.js";
+import { createDrawer } from "./drawer.js";
 
 /** Fired when a unit is clicked or Enter is pressed on it; T-08's drawer listens. */
 export const UNIT_OPEN = "ihp:unit-open";
@@ -120,7 +125,6 @@ async function initMapTab() {
   const tagsByYear = {}; // license year → tags (filled included; filters drop them)
   const permitsByYear = {}; // license year → permit codes held
   let availability = null;
-  let selected = null;
   let repaints = 0;
 
   // ---- layout: map card (svg + legend) and the brief/results card ----
@@ -129,20 +133,94 @@ async function initMapTab() {
   const legend = document.createElement("div");
   legend.className = "legend";
   legend.id = "legend";
-  const mapCard = card("Open Units Map", svg, legend);
+  const stage = document.createElement("div");
+  stage.className = "map-stage";
+  const zoombar = document.createElement("div");
+  zoombar.className = "zoombar";
+  zoombar.setAttribute("role", "group");
+  zoombar.setAttribute("aria-label", "Map zoom");
+  const zoomBtn = (text, label, id) => {
+    const b = textEl("button", text, "chip");
+    b.type = "button";
+    b.id = id;
+    b.setAttribute("aria-label", label);
+    return b;
+  };
+  const zoomIn = zoomBtn("+", "Zoom in", "zoom-in");
+  const zoomOut = zoomBtn("−", "Zoom out", "zoom-out");
+  const zoomReset = zoomBtn("↺ Reset view", "Reset view", "zoom-reset");
+  zoomReset.removeAttribute("aria-label");
+  zoombar.append(zoomIn, zoomOut, zoomReset);
+  stage.append(svg, zoombar);
+  const mapCard = card("Open Units Map", stage, legend);
   mapCard.id = "map-card";
   const summaryEl = textEl("h2", "Open units");
   summaryEl.id = "results-title";
-  const brief = document.createElement("div");
-  brief.id = "brief";
-  brief.setAttribute("aria-live", "polite");
+  const csvBtn = textEl("button", "⬇ CSV", "chip");
+  csvBtn.type = "button";
+  csvBtn.id = "results-csv";
+  csvBtn.title = "Download these rows as CSV";
+  const printBtn = textEl("button", "🖨 Print", "chip");
+  printBtn.type = "button";
+  printBtn.id = "results-print";
+  printBtn.title = "Print the map and table on one landscape page";
+  const tools = document.createElement("div");
+  tools.className = "results-tools";
+  tools.append(csvBtn, printBtn);
+  const sideHead = document.createElement("div");
+  sideHead.className = "results-head";
+  sideHead.append(summaryEl, tools);
+  const tableWrap = document.createElement("div");
+  tableWrap.className = "results-wrap";
+  tableWrap.id = "results";
   const sideCard = document.createElement("section");
   sideCard.className = "card";
   sideCard.id = "side-card";
-  sideCard.append(summaryEl, brief);
+  sideCard.setAttribute("aria-labelledby", "results-title");
+  sideCard.append(sideHead, tableWrap);
   document.getElementById("map-wrap").replaceChildren(mapCard, sideCard);
 
   const map = createMap(svg, gmu);
+  const zoom = enableZoom(svg);
+  const paintZoom = (scale) => {
+    zoomIn.disabled = scale >= 7.999;
+    zoomOut.disabled = scale <= 1.001;
+    zoomReset.disabled = scale <= 1.001;
+  };
+  zoom.onChange(paintZoom);
+  paintZoom(zoom.scale());
+  zoomIn.addEventListener("click", () => zoom.zoomBy(1.5));
+  zoomOut.addEventListener("click", () => zoom.zoomBy(1 / 1.5));
+  zoomReset.addEventListener("click", () => zoom.reset());
+
+  const results = createResults(tableWrap, {
+    labels,
+    onHover: (id) => map.highlight(id ? [id] : []),
+    onOpen: (id, btn) => openUnit(id, btn),
+  });
+  const drawer = createDrawer({
+    labels,
+    gmu,
+    today: toISO(today),
+    fetchBrief: (unit, year) =>
+      getJSON(`/api/units/${encodeURIComponent(unit)}/seasons?year=${year}`),
+  });
+  // UNIT_OPEN is the single way a brief opens (map click/Enter or a table row).
+  window.addEventListener(UNIT_OPEN, (e) => {
+    const { unit, opener } = e.detail || {};
+    if (!unit) return;
+    drawer.open(unit, { state: store.get(), unit: availability?.units?.[unit], opener });
+  });
+  function openUnit(id, opener = map.paths[id]) {
+    tip.hidden = true;
+    window.dispatchEvent(
+      new CustomEvent(UNIT_OPEN, { detail: { unit: id, state: store.get(), opener } }),
+    );
+  }
+  csvBtn.addEventListener("click", () => {
+    downloadText(toCSV(results.rows(), labels), csvFilename(store.get()));
+  });
+  printBtn.addEventListener("click", () => window.print());
   const tip = document.createElement("div");
   tip.className = "tip";
   tip.id = "tip";
@@ -169,13 +247,9 @@ async function initMapTab() {
     tip.style.left = `${left}px`;
     tip.style.top = `${top}px`;
   });
-  map.onClick((id) => {
-    selected = id;
-    renderSide();
-    window.dispatchEvent(new CustomEvent(UNIT_OPEN, { detail: { unit: id, state: store.get() } }));
-  });
+  map.onClick((id) => openUnit(id));
 
-  // ---- side card: summary + the unit brief stub (the drawer itself is T-08) ----
+  // ---- side card: summary + results table ----
   function renderSide() {
     const sum = availability?.summary;
     summaryEl.textContent = sum
@@ -183,32 +257,7 @@ async function initMapTab() {
           store.get().includeUntagged ? ` · ${sum.untagged} untagged` : ""
         }`
       : "Open units";
-    if (!selected) {
-      brief.replaceChildren(
-        textEl(
-          "p",
-          "Hover a unit for its seasons; click it (or Tab to it and press Enter) for the unit brief. " +
-            "The results table and the full brief drawer arrive in T-08.",
-          "placeholder",
-        ),
-      );
-      return;
-    }
-    const geo = gmu.units[selected];
-    const unit = availability?.units?.[selected];
-    const close = textEl("button", "×", "icon-btn");
-    close.type = "button";
-    close.setAttribute("aria-label", `Close the unit ${selected} brief`);
-    close.addEventListener("click", () => {
-      const back = map.paths[selected];
-      selected = null;
-      renderSide();
-      back?.focus();
-    });
-    const head = document.createElement("div");
-    head.className = "brief-head";
-    head.append(textEl("h3", `📄 Unit ${selected} brief`), close);
-    brief.replaceChildren(head, ...tooltipContent(selected, unit, geo, labels).slice(1));
+    if (availability) results.update(availability);
   }
 
   // ---- filter bar ----
@@ -340,6 +389,9 @@ async function initMapTab() {
     },
     store,
     map,
+    zoom,
+    results,
+    drawer,
   };
   document.body.dataset.mapReady = "1";
 }

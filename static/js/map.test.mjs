@@ -7,7 +7,21 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { installFakeDom } from "../../tests/js/fakedom.mjs";
-import { createMap, legendItems, placeTip, renderLegend, tooltipContent, unitLabel } from "./map.js";
+import {
+  createMap,
+  enableZoom,
+  legendItems,
+  panBox,
+  parseViewBox,
+  pdfHref,
+  placeTip,
+  renderLegend,
+  seasonLine,
+  tooltipContent,
+  unitLabel,
+  wheelFactor,
+  zoomBox,
+} from "./map.js";
 
 const GMU = {
   viewBox: "0 0 430 690",
@@ -218,4 +232,89 @@ test("the real gmu.json renders 100 tabbable units", () => {
   assert.equal(labels(svg).length, 100);
   assert.equal(m.paths["39"].getAttribute("aria-label"), "Unit 39, open");
   assert.equal(m.paths.YNP.getAttribute("class"), "u-closed");
+});
+
+
+// ---- T-08: p.N links and zoom ----------------------------------------------------
+
+test("seasonLine links p.N to the stored PDF page only when asked", () => {
+  const s = { weapon: "any", sex: "antlered", start: "2026-10-10", end: "2026-10-31", source_page: 13, document_id: 7 };
+  assert.equal(pdfHref(7, 13), "/api/documents/7/pdf#page=13");
+  const linked = seasonLine(s, {}, { link: true });
+  const a = linked.querySelectorAll("a");
+  assert.equal(a.length, 1);
+  assert.equal(a[0].href, "/api/documents/7/pdf#page=13");
+  assert.equal(a[0].target, "_blank");
+  assert.equal(seasonLine(s).querySelectorAll("a").length, 0); // tooltip: plain text
+  assert.match(seasonLine(s).textContent, /p\.13/);
+});
+
+const BASE = { x: 0, y: 0, w: 430, h: 690 };
+
+test("zoomBox keeps the focal point fixed and clamps to 1×–8× and the map bounds", () => {
+  assert.deepEqual(parseViewBox("0 0 430 690"), BASE);
+  // 2× around the centre: 215×345 box, centred.
+  assert.deepEqual(zoomBox(BASE, BASE, 2, 215, 345), { x: 107.5, y: 172.5, w: 215, h: 345 });
+  // 2× around the top-left corner stays anchored there.
+  assert.deepEqual(zoomBox(BASE, BASE, 2, 0, 0), { x: 0, y: 0, w: 215, h: 345 });
+  // Clamped at 8× (430 / 8 = 53.75) and at 1×.
+  assert.equal(zoomBox(BASE, BASE, 100, 215, 345).w, 53.75);
+  assert.deepEqual(zoomBox(BASE, BASE, 0.5, 100, 100), BASE);
+  // Zooming out from 2× near the right edge can't leave the map.
+  const z = zoomBox(BASE, { x: 215, y: 0, w: 215, h: 345 }, 1 / 1.5, 430, 0);
+  assert.ok(z.x + z.w <= 430 && z.x >= 0, JSON.stringify(z));
+  // Panning is clamped to the bounds.
+  const two = { x: 107.5, y: 172.5, w: 215, h: 345 };
+  assert.equal(panBox(BASE, two, -500, 0).x, 0);
+  assert.equal(panBox(BASE, two, 1000, 0).x, 215);
+  assert.equal(panBox(BASE, two, 0, 1000).y, 345);
+});
+
+test("wheelFactor: wheel down zooms out, up zooms in, line deltas scale", () => {
+  assert.equal(wheelFactor({ deltaY: 100, deltaMode: 0 }), Math.exp(-0.2));
+  assert.equal(wheelFactor({ deltaY: -100, deltaMode: 0 }), Math.exp(0.2));
+  assert.equal(wheelFactor({ deltaY: -3, deltaMode: 1 }), Math.exp(48 * 0.002));
+  assert.equal(wheelFactor({ deltaY: -10, deltaMode: 0, ctrlKey: true }), Math.exp(0.1));
+});
+
+test("enableZoom: buttons/wheel change the viewBox, reset restores it, a drag never clicks", () => {
+  createMap(svg, GMU);
+  svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 430, height: 690 });
+  const clicks = [];
+  const z = enableZoom(svg);
+  const seen = [];
+  z.onChange((s) => seen.push(s));
+  assert.equal(svg.getAttribute("viewBox"), "0 0 430 690");
+  assert.equal(svg.style.touchAction, "pan-x pan-y");
+  z.zoomBy(2);
+  assert.equal(svg.getAttribute("viewBox"), "107.5 172.5 215 345");
+  assert.equal(svg.dataset.zoom, "2");
+  assert.equal(svg.style.touchAction, "none");
+  z.zoomBy(100);
+  assert.equal(z.scale(), 8);
+  z.reset();
+  assert.equal(svg.getAttribute("viewBox"), "0 0 430 690");
+  assert.deepEqual(seen, [2, 8, 1]);
+
+  const wheel = svg.dispatch("wheel", { deltaY: -100, deltaMode: 0, clientX: 0, clientY: 0 });
+  assert.ok(wheel.defaultPrevented); // the page doesn't scroll under the map
+  assert.equal(z.box().x, 0);
+  assert.ok(Math.abs(z.scale() - Math.exp(0.2)) < 1e-9);
+
+  z.reset();
+  z.zoomBy(2);
+  svg.addEventListener("click", () => clicks.push("unit"));
+  svg.dispatch("pointerdown", { pointerId: 1, clientX: 100, clientY: 100 });
+  svg.dispatch("pointermove", { pointerId: 1, clientX: 120, clientY: 100 });
+  // 20 px right at 2× (0.5 user units per px) pans the box 10 units left.
+  assert.equal(z.box().x, 97.5);
+  let stopped = false;
+  svg.listeners.click[0]({ type: "click", stopPropagation: () => (stopped = true), preventDefault() {} });
+  assert.ok(stopped, "the click that ends a drag is swallowed");
+  svg.dispatch("pointerup", { pointerId: 1 });
+  // A plain click (no movement) goes through.
+  svg.dispatch("pointerdown", { pointerId: 1, clientX: 100, clientY: 100 });
+  stopped = false;
+  svg.listeners.click[0]({ type: "click", stopPropagation: () => (stopped = true), preventDefault() {} });
+  assert.equal(stopped, false);
 });

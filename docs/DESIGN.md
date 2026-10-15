@@ -160,13 +160,14 @@ Idaho-Hunt-Planner/
 │   ├── build_gmu_geometry.py   # IDFG GIS → static/data/gmu.json
 │   ├── build_hunt_area_coverage.py # GIS MapServer/4 polygons × GMUs → data/hunt_area_coverage/<year>.json
 │   ├── build_county_overlay.py # TIGER counties × GMUs → static/data/county_units.json
+│   ├── build_idfg_unit_links.py # IDFG Hunt Planner unit pages → static/data/idfg_units.json (T-08)
 │   └── verify_golden.py        # compare an import against tests/golden/<year>/*.json
 ├── static/
 │   ├── index.html
 │   ├── css/theme.css           # tokens (§4)
 │   ├── css/app.css
 │   ├── js/{main,ui,router,api,state,map,filters,results,drawer,tags,review,seasons,dates}.js
-│   └── data/{gmu.json,county_units.json}
+│   └── data/{gmu.json,county_units.json,idfg_units.json}
 ├── data/                       # git-ignored: planner.db, regs/
 ├── tests/
 │   ├── fixtures/               # small single-page PDFs cut from real brochures + expected JSON
@@ -233,7 +234,8 @@ Below 1100 px the map and table stack vertically. Below 700 px chip rows scroll 
   - Every season for that unit in the active license year, across all species the user holds tags for.
   - A horizontal **timeline** (Aug–Jan) with season bars and the selected date range shaded.
   - Notes and qualifiers verbatim from the PDF, with a link to `source PDF p.N` (opens the stored PDF at `#page=N`).
-  - A link to the IDFG Hunt Planner unit page.
+  - A link to the IDFG Hunt Planner unit page. Those pages use internal ids (`unit.aspx?ID=5` is Unit 4A), so `scripts/build_idfg_unit_links.py` maps unit → page id into `static/data/idfg_units.json` and the API returns the full URL as `unit.idfg_url`.
+  - Seasons for the species you hold tags for, plus the species you're viewing, come first; other species sit in a collapsed "N seasons for other species" group. The drawer is a modal `<dialog>`: Esc and a click outside close it, Tab is trapped inside, and focus returns to the unit (or table row) that opened it.
 - **Zoom**: mouse-wheel and pinch zoom on the SVG viewBox, and a "↺ Reset view" button. (Nice-to-have; ticket T-08.)
 
 ### 4.4 Status semantics (the core rule)
@@ -452,7 +454,7 @@ Species with no hunting season are never shown. That includes closed species (e.
 | `GET /api/meta` | Species, tag types, weapons, restriction codes with severity, available license years, default date range (computed server-side using the local timezone). |
 | `GET /api/units` | Unit metadata (id, elk zone, region). Geometry stays in the static `gmu.json`. |
 | `GET /api/availability?species=deer&start=2026-10-17&end=2026-10-18&weapon=all&tags=mine\|<id,id>&include_untagged=0` | **Core query.** Returns `{range:{start,end,days}, species, weapon, include_untagged, tags, units:{"39":{status,reasons:[],days_open,seasons:[…]}}, summary:{open,restricted,untagged,closed}}`. Every unit appears (`closed` when no season applies). Each season entry carries its own `status`, `reasons` and `tag_ids` (the tags that unlock it) besides the §12 T-06 fields. Defaults: the profile's species, the coming weekend, `weapon=all`, `tags=mine`. **T-27** extends `species` to a comma-separated list (max 4) with `species_mode=any|all`; the response then echoes `species` as a list and adds `per_species` to each unit. |
-| `GET /api/units/<unit>/seasons?year=2026` | All published seasons for the Unit Brief. |
+| `GET /api/units/<unit>/seasons?year=2026` | All published seasons for the Unit Brief (every species), for documents covering `year` (`license_year ≤ year ≤ year_end`). Returns `{unit:{id, elk_zone, region, area_acres, idfg_url}, year, held_species, seasons:[{id, species_id, species_label, tag_type, tag_type_label, zone, hunt_number, hunt_area, hunt_class, weapon, sex, start, end, restrictions, bag_limit, notes, coverage, coverage_note, source_page, document_id, document_title, …}]}`; 404 `unknown_unit`. |
 | `GET /api/seasons?year&species&status=published` | Season Table. `POST`, `PUT /<id>`, `DELETE /<id>` for manual edits (creates or updates rows under a `manual` source document). |
 | `GET /api/tags?year=2026` · `POST /api/tags` · `PUT /api/tags/<id>` · `DELETE /api/tags/<id>` · `POST /api/tags/copy?from=2025&to=2026` | My Tags. |
 | `GET/PUT /api/permits?year=2026` · `GET/PUT /api/profile` | Permits and profile. |
@@ -740,7 +742,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ### T-08 · Results table, Unit Brief drawer, map zoom
 **Depends on:** T-07 · **Size:** M
-**Description:** `results.js`: a sortable table (Unit natural sort, Status, Days open, Weapons, Earliest start) of units with status ≠ closed, with season badges and restriction badges (labels from `/api/meta`) and a `p.N` link opening the PDF at that page. Hovering a row highlights the unit on the map. Includes CSV export and a print stylesheet (map + table on one landscape page, light theme). `drawer.js`: the Unit Brief from §4.3. It fetches `/api/units/<id>/seasons?year=`, renders a timeline (inline SVG, Aug 1 → Jan 31, one bar per season colored by weapon, selected range as a translucent `--gold` band, today as a line), the list of seasons with notes, and links (IDFG Hunt Planner search for the unit, source PDF). Map zoom: wheel and pinch on the viewBox, clamped to 1×–8×, plus a reset button.
+**Description:** `results.js`: a sortable table (Unit natural sort, Status, Days open, Weapons, Earliest start) of units with status ≠ closed, with season badges and restriction badges (labels from `/api/meta`) and a `p.N` link opening the PDF at that page. Hovering a row highlights the unit on the map. Includes CSV export and a print stylesheet (map + table on one landscape page, light theme). `drawer.js`: the Unit Brief from §4.3. It fetches `/api/units/<id>/seasons?year=`, renders a timeline (inline SVG, Aug 1 → Jan 31, one bar per season colored by weapon, selected range as a translucent `--gold` band, today as a line), the list of seasons with notes, and links (IDFG Hunt Planner page for the unit, source PDF). Map zoom: wheel and pinch on the viewBox, clamped to 1×–8×, plus a reset button.
 **Acceptance criteria:**
 - Sorting is stable and natural (4, 4A, 5, 10, 10A).
 - The drawer closes on Esc and on outside click, and is focus-trapped.

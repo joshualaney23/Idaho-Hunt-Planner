@@ -94,3 +94,32 @@ a {
   outline: 2px solid var(--gold2);
   outline-offset: 2px;
 }
+
+/* Print (T-08): a light theme so the page is readable on paper and doesn't burn ink.
+   Same variable names, so app.css needs no print-specific colors. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --bg2: #ffffff;
+    --bg3: #f1f2ec;
+    --bg4: #dcdfd6;
+    --bg5: #b9beb0;
+    --text: #111311;
+    --text2: #3d4438;
+    --text3: #5c6553;
+    --gold: #8a6a12;
+    --gold2: #6f540c;
+    --tl-green: #4f6a1f;
+    --tl-green2: #3f5718;
+    --open: #4fbf8a;
+    --restricted: #e3d45a;
+    --closed: #dcdfd6;
+    --map-label: rgba(17, 19, 17, 0.85);
+    --badge-any-fg: #1f5677;
+    --badge-muzzleloader-fg: #8a4b10;
+    --sc3: #6e6510;
+    --sc5: #1d6f4a;
+    --bow: #6e5f12;
+    color-scheme: light;
+  }
+}
