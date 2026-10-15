@@ -27,7 +27,9 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 
 from planner.dates import to_iso
-from planner.importer import CheckResult, ParseContext, ParsedSeason, UnitRef, common, parser
+from planner.importer import ParseContext, ParsedSeason, UnitRef, common, parser
+from planner.importer.checks import Coverage, DateCell, SectionFacts, TwoPath
+from planner.importer.checks.shared import controlled_only
 from planner.importer.extract import Page, Table, Word
 from planner.importer.textlayer import (
     COLUMN_GUTTER_PT,
@@ -42,6 +44,7 @@ from planner.importer.textlayer import (
 
 __all__ = [
     "COLUMN_GUTTER_PT",
+    "controlled_only",
     "ROW_GAP_PT",
     "TextLine",
     "column_blocks",
@@ -348,11 +351,32 @@ def _qualifier_window(cell: str, this: common.DateRange, following: common.DateR
     return cell[end : min(limit, end + QUALIFIER_WINDOW)]
 
 
-def table_seasons(table: DeerTable, ctx: ParseContext) -> list[RowSeason]:
-    """Every season in one table, carrying the unit list down continuation rows (§12 T-11)."""
+@dataclass(frozen=True)
+class CellSeasons:
+    """One date cell of a table and the seasons it produced (§8.7 accounting)."""
+
+    units_text: str
+    column: str
+    text: str
+    seasons: tuple[RowSeason, ...] = ()
+    bbox: tuple[float, float, float, float] | None = None
+
+    @property
+    def leftovers(self) -> tuple[str, ...]:
+        """Date/qualifier text in this cell that nothing explained (D3)."""
+        return tuple(dict.fromkeys(left for s in self.seasons for left in s.leftovers))
+
+
+def table_cells(table: DeerTable, ctx: ParseContext) -> list[CellSeasons]:
+    """Every date cell of one table with the seasons read from it, carrying the unit
+    list down continuation rows (§12 T-11).
+
+    A cell the parser produced nothing from is still returned, so `date_token_accounting`
+    sees a dropped date instead of never hearing about the cell (D3).
+    """
     info = table.title
     tag_type = info.tag_type_id or ""
-    out: list[RowSeason] = []
+    out: list[CellSeasons] = []
     units: tuple[str, ...] = ()
     unknown: tuple[str, ...] = ()
     units_text = ""
@@ -362,21 +386,21 @@ def table_seasons(table: DeerTable, ctx: ParseContext) -> list[RowSeason]:
             units = tuple(parsed.units)
             unknown = tuple(parsed.unknown)
             units_text = row.units_text
-        if not units and not unknown:
-            continue
         notes_text = _cell(row.cells.get("notes", ""))
         for column, sex in SEX_COLUMNS:
             cell = row.cells.get(column, "")
-            if common.is_no_season(cell):
+            if (not units and not unknown) or common.is_no_season(cell):
+                out.append(CellSeasons(units_text, column, cell, (), row.bbox))
                 continue
             ranges = common.parse_date_ranges(cell, ctx.license_year)
             leftovers = list(common.leftover_date_text(cell, ranges))
+            seasons: list[RowSeason] = []
             for i, found in enumerate(ranges):
                 window = _qualifier_window(
                     cell, found, ranges[i + 1] if i + 1 < len(ranges) else None
                 )
                 quals = common.qualifiers(window)
-                out.append(
+                seasons.append(
                     RowSeason(
                         tag_type_id=tag_type,
                         weapon=info.weapon,
@@ -393,7 +417,13 @@ def table_seasons(table: DeerTable, ctx: ParseContext) -> list[RowSeason]:
                         bbox=row.bbox,
                     )
                 )
+            out.append(CellSeasons(units_text, column, cell, tuple(seasons), row.bbox))
     return out
+
+
+def table_seasons(table: DeerTable, ctx: ParseContext) -> list[RowSeason]:
+    """Every season in one table (the cells of `table_cells`, flattened)."""
+    return [season for cell in table_cells(table, ctx) for season in cell.seasons]
 
 
 def notes_codes(notes: str, units: Sequence[str]) -> tuple[list[str], dict[str, str]]:
@@ -491,9 +521,7 @@ class DeerState:
     unknown_units: list[tuple[int, str]] = field(default_factory=list)
     disagreements: list[dict[str, object]] = field(default_factory=list)
     compared: int = 0
-    tokens: int = 0
-    consumed: int = 0
-    leftovers: list[dict[str, object]] = field(default_factory=list)
+    date_cells: list[DateCell] = field(default_factory=list)
     controlled_text: list[str] = field(default_factory=list)
 
 
@@ -515,10 +543,6 @@ def matches(page: Page) -> bool:
     return not page.rotated and ("Deer" in page.text or "Hunt No." in page.text)
 
 
-def _count_tokens(texts: Iterable[str], license_year: int) -> int:
-    return sum(len(common.parse_date_ranges(text, license_year)) for text in texts)
-
-
 def parse_page(page: Page, ctx: ParseContext) -> Iterator[ParsedSeason]:
     """Parse one page with both paths, compare them, and yield the seasons to stage."""
     state = state_for(ctx)
@@ -535,7 +559,8 @@ def parse_page(page: Page, ctx: ParseContext) -> Iterator[ParsedSeason]:
         return
     state.pages.append(page.number)
 
-    rows_a = [s for table in rules for s in table_seasons(table, ctx)]
+    cells_a = [cell for table in rules for cell in table_cells(table, ctx)]
+    rows_a = [s for cell in cells_a for s in cell.seasons]
     rows_b = [s for table in text for s in table_seasons(table, ctx)]
     by_group_b: dict[tuple[str, str, tuple[str, ...]], list[RowSeason]] = {}
     for row in rows_b:
@@ -544,16 +569,19 @@ def parse_page(page: Page, ctx: ParseContext) -> Iterator[ParsedSeason]:
     # are printed per date row, so they are keyed by the exact season they sit beside.
     notes_by_key = {r.key: (r.notes_text, r.bbox) for r in rows_b}
 
-    # §8.7 date_token_accounting: tokens printed in the date columns vs seasons produced.
-    state.tokens += _count_tokens(
-        (c for table in rules for c in table.date_cell_texts), ctx.license_year
-    )
-    state.consumed += len(rows_a)
-    for row in rows_a:
-        if row.leftovers:
-            state.leftovers.append(
-                {"page": page.number, "units": row.units_text, "text": list(row.leftovers)}
-            )
+    # §8.7 date_token_accounting: every date cell printed in the table, with the
+    # seasons it produced. The registry's check does the counting (T-22a).
+    state.date_cells += [
+        DateCell(
+            page=page.number,
+            texts=(cell.text,),
+            seasons=len(cell.seasons),
+            label=f"{cell.units_text} {cell.column}".strip(),
+            leftovers=cell.leftovers,
+            bbox=cell.bbox,
+        )
+        for cell in cells_a
+    ]
 
     for group, rows in _grouped(rows_a).items():
         peers = by_group_b.get(group, [])
@@ -594,60 +622,25 @@ def _describe(row: RowSeason) -> str:
     return f"{row.sex} {to_iso(row.start)}–{to_iso(row.end)} {'+'.join(row.codes)}".strip()
 
 
-def controlled_only(unit: str, texts: Sequence[str]) -> bool:
-    """Does a controlled deer table or hunt-area description name this unit (§8.7)?"""
-    row = re.compile(_CONTROLLED_ROW_RE.format(unit=re.escape(unit)))
-    area = re.compile(_CONTROLLED_AREA_RE.format(unit=re.escape(unit)))
-    return any(row.search(text) or area.search(text) for text in texts)
-
-
-def finalize(ctx: ParseContext) -> list[CheckResult]:
-    """The §8.7 invariants for `deer_general`, run once per document."""
+def finalize(ctx: ParseContext) -> SectionFacts | None:
+    """What `deer_general` measured — the §8.7 checks themselves live in the registry."""
     state = state_for(ctx)
-    checks = [
-        CheckResult(
-            name="two_path_agreement",
-            status="pass" if not state.disagreements else "fail",
-            expected=f"{state.compared} rows agree",
-            actual=f"{state.compared - sum(len(d['tables']) for d in state.disagreements)} agree",  # type: ignore[arg-type]
-            detail=state.disagreements or None,
+    return SectionFacts(
+        section=SECTION,
+        two_path=TwoPath(
+            compared=state.compared,
+            disagreeing=sum(len(d["tables"]) for d in state.disagreements),  # type: ignore[arg-type]
+            disagreements=state.disagreements,
         ),
-        CheckResult(
-            name="date_token_accounting",
-            status="pass" if state.tokens == state.consumed and not state.leftovers else "fail",
-            expected=f"{state.tokens} date tokens consumed",
-            actual=f"{state.consumed} seasons, {len(state.leftovers)} cells with leftover text",
-            detail=state.leftovers or None,
+        date_cells=state.date_cells,
+        unknown_units=state.unknown_units,
+        coverage=Coverage(
+            covered=frozenset(state.covered),
+            all_units=tuple(ctx.units),
+            excluded=frozenset({CLOSED_UNIT}),
+            texts=tuple(state.controlled_text),
         ),
-        CheckResult(
-            name="unit_tokens_valid",
-            status="pass" if not state.unknown_units else "fail",
-            expected="every unit token is a GMU in `units`",
-            actual=f"{len(state.unknown_units)} unknown tokens",
-            detail=[{"page": p, "token": t} for p, t in state.unknown_units] or None,
-        ),
-    ]
-    missing = [
-        unit
-        for unit in sorted(set(ctx.units) - state.covered - {CLOSED_UNIT}, key=common.natural_key)
-        if not controlled_only(unit, state.controlled_text)
-    ]
-    controlled = sorted(
-        set(ctx.units) - state.covered - {CLOSED_UNIT} - set(missing), key=common.natural_key
     )
-    checks.append(
-        CheckResult(
-            name="general_coverage",
-            status="pass" if not missing else "fail",
-            expected=f"{len(ctx.units) - 1} units covered or controlled-only",
-            actual=f"{len(state.covered)} with a general Regular deer season,"
-            f" {len(controlled)} controlled-only, {len(missing)} unexplained",
-            detail={"controlled_only": controlled, "missing": missing}
-            if controlled or missing
-            else None,
-        )
-    )
-    return checks
 
 
 deer_general = parser(
