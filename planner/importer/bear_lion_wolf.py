@@ -33,7 +33,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from collections.abc import Iterable, Iterator, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from planner.dates import to_iso
 from planner.importer import ParseContext, ParsedSeason, UnitRef, common, parser
@@ -739,8 +739,15 @@ def parse_page_for(spec: SectionSpec, page: Page, ctx: ParseContext) -> Iterator
         ]
 
     keys_b = {r.key for r in rows_b}
+    # Path A reads pdfplumber's ruled cells, which are plain strings with no geometry,
+    # so a staged row would have no `source_bbox` and the review screen could not point
+    # at the printed row (§8.6). Path B read the same row from word positions, so take
+    # the box from its twin — the value is only ever used to highlight, never compared.
+    boxes_b = {r.key: r.bbox for r in rows_b if r.bbox}
     for row in rows_a:
         agree = row.key in keys_b
+        if row.bbox is None and (box := boxes_b.get(row.key)):
+            row = replace(row, bbox=box)
         state.compared += 1
         if not agree:
             state.disagreements.append(
