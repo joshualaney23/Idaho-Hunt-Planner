@@ -527,6 +527,11 @@ def run_import(
                 if spec.section not in sections:
                     sections.append(spec.section)
 
+            # Every section's `finalize` runs before any check does: a section can
+            # rewrite another's staged rows (T-17b resolves the controlled hunts'
+            # `season_units` from the hunt-area descriptions), and a check that reads
+            # the database (`golden_match`) must see the finished rows.
+            measured: list[tuple[ParserSpec, SectionFacts | None]] = []
             for spec in specs:
                 bad = [e for e in result.errors if e.section == spec.section]
                 staged = sum(1 for s, sp in rows if sp is spec) - len(bad)
@@ -540,7 +545,9 @@ def run_import(
                     detail=[{"page": e.page, "reason": e.reason, "detail": e.detail} for e in bad]
                     or None,
                 )
-                facts = _section_facts(spec, ctx, result)
+                measured.append((spec, _section_facts(spec, ctx, result)))
+
+            for spec, facts in measured:
                 for check in checks.run_checks(ctx, spec.section, facts):
                     _record_check(
                         doc_id,
