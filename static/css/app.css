@@ -972,6 +972,298 @@ dialog.drawer[open] {
   vertical-align: -1px;
 }
 
+/* ---- review screen (T-15c, §8.4): accuracy panel, rows, editors, publish --- */
+.review {
+  display: block;
+  outline: none;
+}
+.review-head h2 {
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
+  margin: 6px 0 2px;
+}
+.review-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: 12px;
+  align-items: start;
+}
+.pdf-viewer {
+  width: 100%;
+  height: 72vh;
+  border: 1px solid var(--bg5);
+  border-radius: 6px;
+  background: var(--bg2);
+  position: sticky;
+  top: 12px;
+}
+.accuracy-section {
+  border-top: 1px solid var(--bg4);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.accuracy-section:first-child {
+  border-top: 0;
+  margin-top: 0;
+}
+.accuracy-section h3,
+.row-species h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
+  margin: 2px 0;
+}
+.check-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.check {
+  border-left: 3px solid var(--bg5);
+  padding: 2px 0 2px 8px;
+  margin-bottom: 6px;
+}
+.check-fail {
+  border-left-color: var(--sc1);
+}
+.check-warn {
+  border-left-color: var(--sc3);
+}
+.check-pass {
+  border-left-color: var(--sc5);
+}
+.check-head,
+.check-vs,
+.check-links,
+.check-waiver {
+  margin: 1px 0;
+}
+.check-vs,
+.check-waiver {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text2);
+}
+.row-groups h4,
+.row-groups h5 {
+  margin: 6px 0 2px;
+  color: var(--text2);
+  font-weight: 600;
+}
+.row-groups h5 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.review-row {
+  border: 1px solid var(--bg4);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 6px 0;
+  background: var(--bg2);
+  outline: none;
+}
+.review-row[aria-current="true"],
+.review-row[data-selected="1"] {
+  border-color: var(--gold2);
+  box-shadow: var(--shadow);
+}
+.review-row.status-approved {
+  border-left: 3px solid var(--open);
+}
+.review-row.status-rejected {
+  border-left: 3px solid var(--closed);
+}
+.review-row.status-staged {
+  border-left: 3px solid var(--restricted);
+}
+.row-head,
+.row-units,
+.row-facts,
+.row-badges,
+.row-actions {
+  margin: 2px 0;
+}
+.chip.static {
+  cursor: default;
+}
+.fact {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text2);
+  margin-right: 10px;
+}
+.fact.dates {
+  color: var(--text);
+}
+.conf.sc1 {
+  color: var(--sc1);
+}
+.conf.sc2 {
+  color: var(--sc2);
+}
+.conf.sc3 {
+  color: var(--sc3);
+}
+.conf.sc4 {
+  color: var(--sc4);
+}
+.conf.sc5 {
+  color: var(--sc5);
+}
+.row-changes {
+  margin: 2px 0 2px 14px;
+  padding: 0;
+}
+.change,
+.removed-row {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text2);
+}
+.row-source {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  /* --text3 is 3.96:1 on --bg: below AA for text under 18px (§4.1 note). */
+  color: var(--text2);
+  margin: 2px 0;
+  white-space: pre-wrap;
+}
+.btn {
+  background: var(--bg4);
+  border: 1px solid var(--bg5);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 2px 10px;
+  margin-right: 6px;
+  cursor: pointer;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--gold2);
+  color: var(--gold2);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn.primary {
+  background: var(--gold);
+  border-color: var(--gold);
+  /* Dark ink on gold: --chip-on-bg is a translucent *background*, and using it here
+     left the label at 1.08:1 (Lighthouse color-contrast, T-15c). */
+  color: var(--bg);
+}
+.btn.small {
+  font-size: 11.5px;
+  padding: 1px 8px;
+}
+button.link {
+  background: none;
+  border: 0;
+  padding: 0 6px 0 0;
+  color: var(--gold2);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.row-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 6px 10px;
+  margin: 4px 0;
+}
+.row-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.row-field-label {
+  color: var(--text2);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.6px;
+}
+.unit-input,
+.date-input,
+.row-select {
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 2px 6px;
+}
+.row-select.restrictions {
+  min-height: 92px;
+}
+.row-editor .row-actions {
+  grid-column: 1 / -1;
+}
+.publish-bar {
+  margin: 10px 0;
+}
+.gate-reasons {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+.gate-reason,
+.gate-reasons .ok {
+  font-size: 12px;
+  color: var(--text2);
+}
+.gate-reason::before {
+  content: "✗ ";
+  color: var(--sc1);
+}
+.gate-reasons .ok::before {
+  content: "✓ ";
+  color: var(--sc5);
+}
+.waive-dialog,
+.publish-dialog {
+  border: 1px solid var(--bg5);
+  border-radius: 8px;
+  background: var(--bg2);
+  color: var(--text);
+  max-width: 520px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.waive-reason {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 6px;
+}
+.err-line {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  margin: 1px 0;
+}
+.removed-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+@media (max-width: 1099px) {
+  .review-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pdf-viewer {
+    height: 50vh;
+    position: static;
+  }
+}
+
 /* ---- print (T-08): map + table on one landscape page, light theme ---------- */
 @page {
   size: landscape;
