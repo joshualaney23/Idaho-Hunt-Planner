@@ -747,6 +747,82 @@ table.results .ws {
   display: none; /* short weapon labels: print only */
 }
 
+/* ---- Regulations tab (T-15b, §8.4) ---------------------------------------- */
+.dropzone {
+  border: 1px dashed var(--bg5);
+  border-radius: 6px;
+  padding: 16px 18px;
+  transition: border-color 120ms ease-in-out;
+}
+.dropzone[data-over] {
+  border-color: var(--gold);
+  background: var(--bg3);
+}
+.dropzone[data-tone="success"] {
+  border-color: var(--sc5);
+}
+.dropzone[data-tone="warn"] {
+  border-color: var(--sc3);
+}
+.dropzone[data-tone="error"] {
+  border-color: var(--sc1);
+}
+.dropzone[aria-busy="true"] .dz-title::after {
+  content: " ⏳";
+}
+.dz-title {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+.dz-msg {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--text2);
+}
+.dz-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+.dropzone .field {
+  margin-top: 12px;
+}
+.docs-year + .docs-year {
+  margin-top: 18px;
+}
+.docs-year h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--text2);
+}
+table.docs .muted {
+  margin-top: 2px;
+}
+/* Document status badges (§5 `source_documents.status`). */
+.b-uploaded,
+.b-superseded {
+  background: var(--bg5);
+  color: var(--text2);
+}
+.b-parsing {
+  background: var(--badge-any-bg);
+  color: var(--badge-any-fg);
+}
+.b-needs-review {
+  background: var(--badge-restricted-bg);
+  color: var(--sc3);
+}
+.b-published {
+  background: var(--badge-ok-bg);
+  color: var(--sc5);
+}
+.b-failed,
+.b-unknown {
+  background: var(--badge-error-bg);
+  color: var(--sc1);
+}
+
 /* ---- Unit Brief drawer (T-08, §4.3) ---------------------------------------- */
 dialog.drawer {
   position: fixed;

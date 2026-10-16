@@ -6,6 +6,9 @@
 // T-08 replaces the brief stub with results.js (sortable table, CSV, print) and
 // drawer.js (the Unit Brief), and adds wheel/pinch zoom to the map.
 //
+// T-15b mounts the Regulations tab (regs.js): the upload card and the documents
+// table, plus the `#/regs/<docId>` route whose detail panel T-15c fills in.
+//
 // T-09 mounts the My Tags tab (tags.js) and subscribes the map tab to
 // TAGS_CHANGED, so filling or deleting a tag updates the tag filter and the
 // breadcrumb at once (the shared state that invalidates availability).
@@ -14,6 +17,7 @@ import { card, textEl, toast } from "./ui.js";
 import { TABS, parseRoute, tabHash } from "./router.js";
 import { localToday, toISO } from "./dates.js";
 import { PERMITS_CHANGED, TAGS_CHANGED, initTags } from "./tags.js";
+import { initRegs } from "./regs.js";
 import { getJSON, putJSON } from "./api.js";
 import {
   availabilityPath,
@@ -75,12 +79,16 @@ const PLACEHOLDERS = {
     "Season Table",
     "A sortable, filterable table of every published season arrives in T-16.",
   ],
-  regs: [
-    "Regulations",
-    "Upload the IDFG PDFs, review parsed rows and publish them here (T-10, T-15).",
-  ],
   settings: ["Settings", "Default species, weekend definition and backups arrive in T-21."],
 };
+
+// T-15b mounts the Regulations tab (regs.js) on first visit; it owns `#/regs`
+// and `#/regs/<docId>`, so the route's rest segments are handed to it.
+let regsTab = null;
+function ensureRegs(rest) {
+  if (!regsTab) regsTab = initRegs();
+  regsTab.applyRoute(rest);
+}
 
 let tagsMounted = false;
 function ensureTags() {
@@ -397,7 +405,7 @@ async function initMapTab() {
 }
 
 // ---- tabs + hash routing -----------------------------------------------------
-function activate(tab, { focus = false } = {}) {
+function activate(tab, { focus = false, rest = [] } = {}) {
   for (const t of TABS) {
     const on = t.id === tab;
     const a = document.getElementById(`tab-${t.id}`);
@@ -407,6 +415,7 @@ function activate(tab, { focus = false } = {}) {
     if (on && focus) a.focus();
   }
   if (tab === "tags") ensureTags();
+  else if (tab === "regs") ensureRegs(rest);
   else if (tab !== "map") renderPlaceholder(tab);
   const label = TABS.find((t) => t.id === tab).label;
   document.title = `${label} · Idaho Hunt Planner`;
@@ -419,7 +428,7 @@ function route({ focus = false } = {}) {
     // Normalize without adding a history entry, so Back still leaves the app.
     history.replaceState(null, "", tabHash(r.tab));
   }
-  activate(r.tab, { focus });
+  activate(r.tab, { focus, rest: r.rest });
   if (r.tab === "map" && mapTab) mapTab.applyRoute(r.query);
 }
 
