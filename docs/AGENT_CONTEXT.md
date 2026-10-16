@@ -53,7 +53,7 @@ One line per path: what it owns, and the ticket that brought it. Open the file f
 | `planner/diff.py` | Year-over-year season diff (§8.4): identity match on species/tag/zone/hunt no./weapon/sex + unit **set**, rows tagged `new`/`changed`/`same` plus `removed`. Pure, read-only (T-15a) |
 | `planner/dates.py` | Date-range helpers and presets; twin of `static/js/dates.js` (§7.3) (T-05) |
 | `planner/backup.py` | DB snapshot/validate/restore/reset via `sqlite3.Connection.backup`, keeping `planner.db.bak-<timestamp>` (T-21) |
-| `planner/golden.py` · `scripts/make_golden.py` · `scripts/make_verification_checklist.py` | §8.7 golden harness: the canonical row form + diffs · dump a section / `--check` it · render every cited page and write the `VERIFICATION.md` log a human signs (T-22c) |
+| `planner/golden.py` · `scripts/make_golden.py` · `scripts/make_verification_checklist.py` · `scripts/make_verification_sheet.py` | §8.7 golden harness: the canonical row form + diffs · dump a section / `--check` it · render every cited page and write the `VERIFICATION.md` log a human signs · the per-page `review.html` (every parsed row under its page image) the human reads while signing (T-22c, T-22d) |
 | `planner/db.py`, `schema.sql`, `migrations/`, `seed.py` | §5 schema, migrations, seed from `static/data/units_seed.json` (T-04); `002_publish_gate.sql` adds `seasons.section`/`reviewed_at` + `import_checks.waived_by`/`waived_at` (T-22b) |
 | `planner/importer/__init__.py` | §8 pipeline: `@parser` registry, `ParsedSeason`/`UnitRef`/`ParseContext`, `run_import()`, `validate`, `PARSER_VERSION`. Rows land `staged`; a rejected row becomes a failing `import_checks` row (T-10) |
 | `planner/importer/extract.py` | §8.2 page extraction → `Page` (text, ruled + cell tables, small chars, footer, rotation) and the `data/cache/<sha>/` page cache — bump `CACHE_VERSION` when you add a field (T-10, T-17a). The side crop is adaptive (`tab_margins`): `tables`/`words`/`text` keep the old fixed 40 pt view, the tab-only view is opt-in via `full_tables`/`full_words`/`full_text` (T-13) |
@@ -70,7 +70,7 @@ One line per path: what it owns, and the ticket that brought it. Open the file f
 | `scripts/build_hunt_area_coverage.py` | §9/T-17b GIS overlay: MapServer/4 hunt-area polygons × GMUs → the fraction of each GMU inside each controlled-hunt area, per species and `geometry_year` (2026 runs on 2025 polygons) |
 | `tests/` | `conftest.py` (temp-DB `app`/`client`), one `test_*.py` per area, `test_review_e2e.py` (upload the deer fixture → gate → waive → publish → availability), `test_api_backup.py` (backup → reset → restore keeps availability identical), `test_startup.py` (boots `python -m planner`), `test_static_shell.py` (tokens, no color literals, runs the node tests), `js/fakedom.mjs` (the DOM stand-in the node twins render into — tags, `#id`, `.class`, `[data-x]` selectors and `<dialog>`) |
 | `tests/fixtures/` | Synthetic PDFs **generated** by `make_*_fixture(s).py` (byte-stable, no writer dependency), plus real 2026 brochure pages with hand-verified `*_expected/*.json` |
-| `tests/golden/<year>/` | Human-verified golden data (T-22d–f) + `VERIFICATION.md`; `fixture_controlled_deer.json` (81 rows) proves the harness; `sources.json` lists the source PDFs CI caches. **Never mark a golden row verified yourself** |
+| `tests/golden/<year>/` | Human-verified golden data (T-22d–f) + `VERIFICATION.md`; `deer_general.json` (235 rows, signed 2026-10-16) · `fixture_controlled_deer.json` (81 rows) proves the harness; `sources.json` lists the source PDFs CI caches. **Never mark a golden row verified yourself** |
 | `docs/seasons_template.csv` | The 3-row example CSV the Season Table links to, served by `GET /api/seasons/template.csv` (T-16) |
 | `docs/mockup.html` · `spike_*_parser.py` | UI mockup with real 2026 deer data (also the seed source for map demos) · proven parser spikes that parser tickets productionize |
 | `docs/tools/` | `section.py` prints a §/ticket · `make_issues.py` syncs issues from §12 (`--dry-run`/`--create`/`--link`) · `issue_map.json` ticket → issue number |
@@ -122,7 +122,10 @@ python scripts/build_hunt_area_coverage.py --year 2026 --check    # stale? (--sp
 python scripts/make_golden.py controlled_deer --pdf tests/fixtures/bg2026_controlled.pdf \
     --as fixture_controlled_deer            # add --check to diff instead of write (exit 1)
 python scripts/make_verification_checklist.py controlled_deer --pdf <pdf>  # pages + VERIFICATION.md
-# `golden_match` is `skipped` until that year/section has a committed golden file.
+python scripts/make_verification_sheet.py deer_general   # data/verify/2026/deer_general/review.html
+# `golden_match` is `skipped` until that year/section has a committed golden file. The real
+# brochure is read from data/pdf_cache/<sha256(url)[:16]>.pdf (git-ignored, `--url` fetches it
+# once); tests/test_golden.py re-parses it and skips loudly when it is missing.
 ```
 
 ## Facts that cost time to rediscover
