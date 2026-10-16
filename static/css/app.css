@@ -1062,6 +1062,7 @@ dialog.drawer[open] {
   background: var(--bg2);
   outline: none;
 }
+.review-row[aria-current="true"],
 .review-row[data-selected="1"] {
   border-color: var(--gold2);
   box-shadow: var(--shadow);
@@ -1122,7 +1123,8 @@ dialog.drawer[open] {
 .row-source {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text3);
+  /* --text3 is 3.96:1 on --bg: below AA for text under 18px (§4.1 note). */
+  color: var(--text2);
   margin: 2px 0;
   white-space: pre-wrap;
 }
@@ -1148,7 +1150,9 @@ dialog.drawer[open] {
 .btn.primary {
   background: var(--gold);
   border-color: var(--gold);
-  color: var(--chip-on-bg);
+  /* Dark ink on gold: --chip-on-bg is a translucent *background*, and using it here
+     left the label at 1.08:1 (Lighthouse color-contrast, T-15c). */
+  color: var(--bg);
 }
 .btn.small {
   font-size: 11.5px;

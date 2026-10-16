@@ -426,9 +426,12 @@ test("the screen opens an editor on the selected row and saves through the API",
 
 // ---- keyboard, selection and the PDF viewer ----------------------------------
 
-test("pdfPageHref points the iframe at one page", () => {
-  assert.equal(pdfPageHref(4, 12), "/api/documents/4/pdf#page=12");
-  assert.equal(pdfPageHref(4, null), "/api/documents/4/pdf#page=1");
+test("pdfPageHref carries the page in the query as well as the fragment", () => {
+  // Hash-only src changes don't navigate, so Chrome's PDF viewer would never move
+  // (verified in Chrome, T-15c). The query makes every page a distinct URL.
+  assert.equal(pdfPageHref(4, 12), "/api/documents/4/pdf?page=12#page=12");
+  assert.equal(pdfPageHref(4, null), "/api/documents/4/pdf?page=1#page=1");
+  assert.notEqual(pdfPageHref(4, 12).split("#")[0], pdfPageHref(4, 13).split("#")[0]);
 });
 
 test("j and k walk the rows and the iframe follows the selection", async () => {
@@ -437,18 +440,18 @@ test("j and k walk the rows and the iframe follows the selection", async () => {
   await screen.ready;
   const viewer = screen.el.querySelector("#review-pdf");
   assert.equal(screen.selected(), 1);
-  assert.equal(viewer.getAttribute("src"), "/api/documents/4/pdf#page=12");
+  assert.equal(viewer.getAttribute("src"), "/api/documents/4/pdf?page=12#page=12");
 
   screen.keydown({ key: "j", target: { tagName: "DIV" } });
   assert.equal(screen.selected(), 2);
-  assert.equal(viewer.getAttribute("src"), "/api/documents/4/pdf#page=13");
+  assert.equal(viewer.getAttribute("src"), "/api/documents/4/pdf?page=13#page=13");
 
   screen.keydown({ key: "j", target: { tagName: "DIV" } });
   screen.keydown({ key: "j", target: { tagName: "DIV" } }); // clamped at the end
   assert.equal(screen.selected(), 3);
   screen.keydown({ key: "k", target: { tagName: "DIV" } });
   assert.equal(screen.selected(), 2);
-  assert.equal(viewer.getAttribute("src"), "/api/documents/4/pdf#page=13");
+  assert.equal(viewer.getAttribute("src"), "/api/documents/4/pdf?page=13#page=13");
 });
 
 test("a and r review the focused row; the shortcuts never fire inside a field", async () => {
@@ -469,14 +472,47 @@ test("a and r review the focused row; the shortcuts never fire inside a field", 
   assert.equal(screen.keydown({ key: "x", target: { tagName: "DIV" } }), false);
 });
 
-test("the selected row is the one marked aria-selected", async () => {
+test("focus returns to the selected row after a repaint, so a/r keep working", async () => {
+  const { screen, calls } = mount({ body: body({ seasons: [season({ id: 1 }), season({ id: 2 })] }) });
+  await screen.ready;
+  screen.el.querySelectorAll("[data-season-id]")[0].focus();
+  assert.equal(document.activeElement.dataset.seasonId, "1");
+
+  // `a` approves and repaints — the row element is replaced, but focus must survive,
+  // or every shortcut after the first one is swallowed (found in Chrome, T-15c).
+  screen.keydown({ key: "a", target: document.activeElement });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(document.activeElement.dataset.seasonId, "1");
+  // …and on the *live* element, not the detached one the repaint threw away.
+  assert.ok(screen.el.contains(document.activeElement));
+  screen.keydown({ key: "r", target: document.activeElement });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls, [
+    ["review", 1, { status: "approved" }],
+    ["review", 1, { status: "rejected" }],
+  ]);
+});
+
+test("a repaint never steals focus from an open editor", async () => {
+  const { screen } = mount();
+  await screen.ready;
+  screen.el.querySelector("[data-season-id]").focus();
+  screen.keydown({ key: "e", target: document.activeElement });
+  const input = screen.el.querySelector(".unit-input");
+  input.focus();
+  await screen.refresh();
+  assert.equal(document.activeElement, input);
+});
+
+test("the selected row is the one marked aria-current (not aria-selected)", async () => {
   const { screen } = mount({ body: body({ seasons: [season({ id: 1 }), season({ id: 2 })] }) });
   await screen.ready;
   screen.select(2);
-  const marked = screen.el
-    .querySelectorAll("[data-season-id]")
-    .filter((n) => n.getAttribute("aria-selected") === "true");
+  const rows = screen.el.querySelectorAll("[data-season-id]");
+  const marked = rows.filter((n) => n.getAttribute("aria-current") === "true");
   assert.deepEqual(marked.map((n) => n.dataset.seasonId), ["2"]);
+  // aria-selected is only legal inside a listbox/grid; these rows are grouped sections.
+  assert.ok(rows.every((n) => n.getAttribute("aria-selected") === null));
 });
 
 // ---- the publish gate --------------------------------------------------------

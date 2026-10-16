@@ -295,10 +295,18 @@ const button = (cls, text, onClick, title) => {
   return b;
 };
 
-/** `/api/documents/<id>/pdf#page=N` — the embedded viewer's src (§8.4). */
+/**
+ * `/api/documents/<id>/pdf?page=N#page=N` — the embedded viewer's src (§8.4).
+ *
+ * The query parameter looks redundant and is not: Chrome's PDF viewer only honours
+ * `#page=` on a real navigation, and assigning an `iframe.src` that differs from the
+ * current one **only** in its fragment navigates nothing, so the viewer silently stays
+ * on page 1 (verified in Chrome, T-15c). Changing the query makes it a new URL, so the
+ * viewer reloads and lands on the page. The API ignores unknown query arguments.
+ */
 export function pdfPageHref(docId, page) {
   const n = Number(page) || 1;
-  return `/api/documents/${docId}/pdf#page=${n}`;
+  return `/api/documents/${docId}/pdf?page=${n}#page=${n}`;
 }
 
 /**
@@ -366,7 +374,10 @@ function checkLine(view, { onWaive, onJump } = {}) {
   line.dataset.check = String(view.id);
   line.dataset.status = view.status;
   const head = el("p", "check-head");
-  head.append(badge(view.kind, `${view.icon} ${view.status}`), " ", el("strong", null, view.name));
+  // Neutral badge on purpose: the shared `b-error` palette is only 3.05:1 at this size,
+  // so the status rides on the glyph and the colored left border (§4.4 never relies on
+  // color alone anyway).
+  head.append(badge("neutral", `${view.icon} ${view.status}`), " ", el("strong", null, view.name));
   if (view.waived) head.append(" ", badge("warn", "⚠ manually verified"));
   line.appendChild(head);
 
@@ -409,7 +420,7 @@ export function renderAccuracyPanel(host, views, handlers = {}) {
     block.dataset.section = section.section;
     const h = el("h3", null, section.label);
     if (section.waived) h.append(" ", badge("warn", "⚠ manually verified"));
-    if (section.blocking.length) h.append(" ", badge("error", "blocks publish"));
+    if (section.blocking.length) h.append(" ", badge("neutral", "✗ blocks publish"));
     const counts = Object.entries(section.counts)
       .map(([status, n]) => `${CHECK_ICONS[status] || "?"} ${n} ${status}`)
       .join(" · ");
@@ -597,7 +608,9 @@ export function createRowEditor(row, { units = [], tagTypes = [], onSave, onCanc
   return form;
 }
 
-const STATUS_KINDS = { staged: "warn", approved: "ok", rejected: "error" };
+//: Row status -> badge kind. `rejected` stays neutral (its red left border carries the
+//: signal); the shared `b-error` badge misses WCAG AA at badge size.
+const STATUS_KINDS = { staged: "warn", approved: "ok", rejected: "neutral" };
 
 /**
  * The whole review screen. `options` injects every network call, so the node twin and
@@ -626,7 +639,6 @@ export function createReviewScreen(docId, options = {}) {
   const accuracyHost = el("div", "accuracy-host");
   const rowsHost = el("div", "review-rows");
   rowsHost.id = "review-rows";
-  rowsHost.setAttribute("role", "list");
   const removedHost = el("div", "review-removed");
   const gateHost = el("div", "publish-bar");
   const viewer = el("iframe", "pdf-viewer");
@@ -698,9 +710,11 @@ export function createReviewScreen(docId, options = {}) {
     const item = el("article", `review-row status-${row.status}`);
     item.dataset.seasonId = String(row.id);
     item.dataset.page = String(row.source_page || "");
-    item.setAttribute("role", "listitem");
     item.setAttribute("tabindex", "-1");
-    item.setAttribute("aria-selected", "false");
+    // `aria-current`, not `aria-selected`: the rows are grouped by species / table /
+    // page, so they are not a flat listbox, and `aria-selected` is not allowed outside
+    // one (Lighthouse `aria-allowed-attr`, T-15c).
+    item.setAttribute("aria-current", "false");
 
     const head = el("p", "row-head");
     head.append(badge(STATUS_KINDS[row.status] || "neutral", row.status));
@@ -871,7 +885,7 @@ export function createReviewScreen(docId, options = {}) {
   function markSelection() {
     for (const node of rowsHost.querySelectorAll("article")) {
       const on = node.dataset.seasonId === String(selectedId);
-      node.setAttribute("aria-selected", on ? "true" : "false");
+      node.setAttribute("aria-current", on ? "true" : "false");
       node.dataset.selected = on ? "1" : "";
     }
     const row = order.find((r) => Number(r.id) === Number(selectedId));
@@ -951,12 +965,26 @@ export function createReviewScreen(docId, options = {}) {
       sections: body.sections || [],
       publish: body.publish || null,
     };
+    // Every repaint replaces the row elements, which drops focus to <body> and would
+    // silently kill the keyboard shortcuts right after the first `a` or `r`. Remember
+    // whether the user was driving from the keyboard and hand focus back afterwards.
+    const hadFocus = root === document.activeElement || root.contains(document.activeElement);
     paintHeader();
     paintAccuracy();
     paintRows();
     paintGate();
+    restoreFocus(hadFocus);
     document.body.dataset.reviewReady = "1";
     return state;
+  }
+
+  /** Put focus back on the selected row after a repaint (never over an open editor). */
+  function restoreFocus(had) {
+    if (!had || editing !== null) return;
+    const node = [...rowsHost.querySelectorAll("article")].find(
+      (n) => n.dataset.seasonId === String(selectedId),
+    );
+    if (node && node.focus) node.focus();
   }
 
   async function loadExtras() {
