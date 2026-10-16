@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import datetime as dt
 import fnmatch
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
@@ -29,11 +29,13 @@ if TYPE_CHECKING:  # pragma: no cover - typing only (the parse context lives one
     from planner.importer import ParseContext
 
 __all__ = [
+    "AreaFacts",
     "CheckContext",
     "CheckResult",
     "CheckSpec",
     "Coverage",
     "DateCell",
+    "HuntAreaCoverage",
     "SeasonRef",
     "SectionFacts",
     "TwoPath",
@@ -99,6 +101,53 @@ class Coverage:
 
 
 @dataclass(frozen=True)
+class AreaFacts:
+    """One controlled hunt area, as the §12 T-17b checks read it.
+
+    `described_units` are the GMU tokens printed in the area's own description;
+    `resolved_units` are the ones it was resolved to (the GIS polygon's units when it
+    has one, else the described ones), and `fractions` is the share of each GMU that
+    lies inside the polygon.
+    """
+
+    area_id: str
+    #: Printed page of the description (what a reviewer turns to), `None` when undescribed.
+    page: int | None = None
+    described_units: tuple[str, ...] = ()
+    resolved_units: tuple[str, ...] = ()
+    fractions: Mapping[str, float] = field(default_factory=dict)
+    partial_units: tuple[str, ...] = ()
+    #: `gis` | `description` | `area_id` — what the units were resolved from.
+    source: str = "area_id"
+    geometry_year: int | None = None
+    has_description: bool = False
+    #: The description's own wording restricts the hunt to part of a unit.
+    portion_in_text: bool = False
+    #: Footnote `a` printed on the hunt row.
+    includes_other_units: bool = False
+    #: Footnote `b` printed on the hunt row.
+    portion_only: bool = False
+    #: Staged seasons whose `season_units` this area resolved.
+    seasons: int = 0
+
+    @property
+    def has_polygon(self) -> bool:
+        return self.source == "gis"
+
+
+@dataclass(frozen=True)
+class HuntAreaCoverage:
+    """What one `hunt_areas_<species>` section resolved (§12 T-17b)."""
+
+    species_id: str
+    license_year: int
+    #: The committed coverage file has polygons for this species.
+    has_geometry: bool
+    coverage_file: str
+    areas: Sequence[AreaFacts] = ()
+
+
+@dataclass(frozen=True)
 class SeasonRef:
     """A parsed season, reduced to what the year-over-year check reads."""
 
@@ -145,6 +194,8 @@ class SectionFacts:
     corrections_pages: Sequence[int] | None = None
     #: `hunt_areas_written` — what the parser wrote while finalizing.
     hunt_areas: dict[str, int] | None = None
+    #: `gis_area_match` / `unit_coverage` / `footnote_consistency` / `geometry_year` (T-17b).
+    hunt_area_coverage: HuntAreaCoverage | None = None
     #: Room for a section-specific check that has no shared field yet.
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -248,4 +299,9 @@ def run_checks(parse: ParseContext, section: str, facts: SectionFacts | None) ->
 
 # Importing the check modules registers them. Kept last so the registry API above is
 # fully defined when they import it.
-from planner.importer.checks import controlled, golden, shared  # noqa: E402,F401  (side effect)
+from planner.importer.checks import (  # noqa: E402,F401  (side effect)
+    controlled,
+    golden,
+    hunt_areas,
+    shared,
+)
