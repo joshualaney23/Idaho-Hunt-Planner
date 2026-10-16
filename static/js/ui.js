@@ -171,6 +171,62 @@ export function toast(msg, level = "info", { ms = 4000 } = {}) {
   return t;
 }
 
+/**
+ * A labelled form row: `<div class="field"><label><control><p class="err">`.
+ *
+ * `id` wires the label, the control and an initially hidden error paragraph
+ * (`aria-describedby`) together. The returned wrapper carries `.control` and
+ * `.error` so callers can read the value and show a field-level message.
+ * Shared by My Tags (T-09) and Settings (T-21), which render the same profile form.
+ */
+export function field(labelText, control, id) {
+  const wrap = document.createElement("div");
+  wrap.className = "field";
+  const l = document.createElement("label");
+  l.textContent = labelText;
+  l.htmlFor = id;
+  control.id = id;
+  const err = textEl("p", "", "err");
+  err.id = `${id}-err`;
+  err.hidden = true;
+  control.setAttribute("aria-describedby", err.id);
+  wrap.append(l, control, err);
+  wrap.control = control;
+  wrap.error = err;
+  return wrap;
+}
+
+/** A `<select>` from `[[value, label]]`, with `value` preselected. */
+export function select(options, value) {
+  const s = document.createElement("select");
+  for (const [v, label] of options) {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = label;
+    s.appendChild(o);
+  }
+  if (value !== undefined && value !== null) s.value = String(value);
+  return s;
+}
+
+/** A `<button type=button>` with a class and a click handler. */
+export function button(text, cls, onClick, { type = "button" } = {}) {
+  const b = document.createElement("button");
+  b.type = type;
+  b.className = cls;
+  b.textContent = text;
+  if (onClick) b.addEventListener("click", onClick);
+  return b;
+}
+
+/** Show (or clear) a field's error message, toggling `aria-invalid`. */
+export function fieldError(f, message) {
+  f.error.textContent = message || "";
+  f.error.hidden = !message;
+  if (message) f.control.setAttribute("aria-invalid", "true");
+  else f.control.removeAttribute("aria-invalid");
+}
+
 /** Create `<tag class=cls>text</tag>`. */
 export function textEl(tag, text, cls) {
   const e = document.createElement(tag);

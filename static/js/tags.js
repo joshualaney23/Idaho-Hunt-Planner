@@ -9,17 +9,13 @@
 // from the tags filter and invalidates the availability query (T-07 subscribes here).
 
 import { ApiError, deleteJSON, getJSON, postJSON, putJSON } from "./api.js";
-import { card, textEl, toast } from "./ui.js";
+import { button, card, field, fieldError as showError, select, textEl, toast } from "./ui.js";
+import { WEEKEND_DEFS, createProfileCard } from "./settings.js";
 
 export const TAGS_CHANGED = "ihp:tags-changed";
 // Permits saved from either side (this tab or the map's permit chips, T-07):
 // detail `{year, permits, source}` where source is "tags" or "map".
 export const PERMITS_CHANGED = "ihp:permits-changed";
-
-const WEEKEND_DEFS = [
-  ["fri_sun", "Fri – Sun (default)"],
-  ["sat_sun", "Sat – Sun"],
-];
 
 /** Tags that still count for availability: the unfilled ones (§7.2). */
 export function activeTags(tags) {
@@ -65,51 +61,7 @@ export function tagsSummary(tags) {
   return active.map(tagChipLabel).join(" · ");
 }
 
-// ---- small form helpers ----------------------------------------------------
-function field(labelText, control, id) {
-  const wrap = document.createElement("div");
-  wrap.className = "field";
-  const l = document.createElement("label");
-  l.textContent = labelText;
-  l.htmlFor = id;
-  control.id = id;
-  const err = textEl("p", "", "err");
-  err.id = `${id}-err`;
-  err.hidden = true;
-  control.setAttribute("aria-describedby", err.id);
-  wrap.append(l, control, err);
-  wrap.control = control;
-  wrap.error = err;
-  return wrap;
-}
-
-function select(options, value) {
-  const s = document.createElement("select");
-  for (const [v, label] of options) {
-    const o = document.createElement("option");
-    o.value = v;
-    o.textContent = label;
-    s.appendChild(o);
-  }
-  if (value !== undefined && value !== null) s.value = String(value);
-  return s;
-}
-
-function button(text, cls, onClick, { type = "button" } = {}) {
-  const b = document.createElement("button");
-  b.type = type;
-  b.className = cls;
-  b.textContent = text;
-  if (onClick) b.addEventListener("click", onClick);
-  return b;
-}
-
-function showError(f, message) {
-  f.error.textContent = message || "";
-  f.error.hidden = !message;
-  if (message) f.control.setAttribute("aria-invalid", "true");
-  else f.control.removeAttribute("aria-invalid");
-}
+// ---- small form helpers: field/select/button/showError now live in ui.js ----
 
 // ---- state -----------------------------------------------------------------
 const state = {
@@ -340,48 +292,17 @@ function permitsCard() {
   );
 }
 
+// The profile panel is the same form the Settings tab shows (T-21); it lives in
+// settings.js so the two tabs can never drift apart.
 function profileCard() {
-  const youth = document.createElement("input");
-  youth.type = "checkbox";
-  youth.id = "profile-youth";
-  youth.checked = Boolean(state.profile.youth);
-  const youthLine = document.createElement("label");
-  youthLine.className = "checkline";
-  youthLine.append(youth, textEl("span", "Youth hunter (youth-only hunts count as open)"));
-
-  const weekend = field("Weekend", select(WEEKEND_DEFS, state.profile.weekend_def), "profile-weekend");
-  const species = field(
-    "Default species",
-    select(
-      state.species.map((s) => [s.id, `${s.icon} ${s.label}`]),
-      state.profile.default_species,
-    ),
-    "profile-species",
-  );
-
-  async function save() {
-    try {
-      const saved = await putJSON("/api/profile", {
-        youth: youth.checked,
-        weekend_def: weekend.control.value,
-        default_species: species.control.value,
-      });
-      state.profile = saved.profile;
-      toast("Profile saved.", "success");
-    } catch (e) {
-      announce(e);
-    }
-  }
-  for (const el of [youth, weekend.control, species.control]) {
-    el.addEventListener("change", save);
-  }
-  return card(
-    "Profile",
-    youthLine,
-    weekend,
-    species,
-    textEl("p", "Residents only — there is no resident/nonresident setting (D1).", "muted"),
-  );
+  return createProfileCard({
+    profile: state.profile,
+    species: state.species,
+    idPrefix: "profile",
+    onSaved: (saved) => {
+      state.profile = saved;
+    },
+  });
 }
 
 // ---- tab -------------------------------------------------------------------

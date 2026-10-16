@@ -475,7 +475,7 @@ Species with no hunting season are never shown. That includes closed species (e.
 | `POST /api/documents/<id>/publish` | Approved → published. Returns 409 if the §8.7 gate isn't satisfied. Marks overlapping rows from lower-priority docs as superseded (§8.5). |
 | `DELETE /api/documents/<id>` | Remove a document and its seasons. |
 | `GET /api/export.csv?year=` · `POST /api/import.csv` | Season CSV round-trip (manual fallback). |
-| `GET /api/backup` · `POST /api/restore` | Download or upload `planner.db`. |
+| `GET /api/backup` · `POST /api/restore` · `POST /api/reset` | Download a consistent `planner.db` snapshot (`sqlite3.Connection.backup`); upload one back (validated: SQLite header, integrity check, the planner's own tables and a `schema_version` this build understands — an older one is migrated forward); erase all user data and re-seed the reference tables, only when the body repeats `{"confirm": "RESET"}`. The last two keep the database they replaced as `planner.db.bak-<timestamp>` (T-21). |
 
 Errors use `{error: {code, message, detail}}` with HTTP 4xx/5xx. The server binds to `127.0.0.1` only.
 
