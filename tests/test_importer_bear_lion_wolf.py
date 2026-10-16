@@ -31,7 +31,8 @@ import pytest
 
 from planner import importer
 from planner.dates import to_iso
-from planner.importer import ParseContext, bear_lion_wolf as blw, common
+from planner.importer import ParseContext, common
+from planner.importer import bear_lion_wolf as blw
 from planner.importer.checks import run_checks
 from planner.importer.extract import SIDE_CROP_PT, iter_pages, tab_margins
 
@@ -309,8 +310,10 @@ def test_windows_in_license_year_clips_and_recurs() -> None:
             ["general_methods"],
         ),
         ("See Note 1, Page 76", ["see_notes"]),  # a note this parser does not read
-        ("Bait prohibited, Take season limited to on or within 1 mile of private lands",
-         ["bait_prohibited", "see_notes"]),  # fmt: skip
+        (
+            "Bait prohibited, Take season limited to on or within 1 mile of private lands",
+            ["bait_prohibited", "see_notes"],
+        ),
     ],
 )
 def test_notes_codes_explain_or_flag_every_notes_cell(notes: str, codes: list[str]) -> None:
