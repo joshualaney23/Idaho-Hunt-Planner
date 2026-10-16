@@ -17,6 +17,7 @@ import {
   confidenceClass,
   createReviewScreen,
   createRowEditor,
+  accuracyToggleView,
   createWaiveDialog,
   diffIndex,
   gateReasons,
@@ -207,6 +208,43 @@ test("a waived check shows the reason, who waived it and when — and no Waive b
   assert.match(text, /manually verified/);
   const buttons = screen.el.querySelector("#accuracy-panel").querySelectorAll("button");
   assert.equal(buttons.filter((b) => b.textContent === "Waive…").length, 0);
+});
+
+test("accuracyToggleView says what a click will do", () => {
+  assert.deepEqual(accuracyToggleView(false), {
+    label: "Hide accuracy checks ▴",
+    expanded: "true",
+    bodyHidden: false,
+  });
+  assert.deepEqual(accuracyToggleView(true), {
+    label: "Show accuracy checks ▾",
+    expanded: "false",
+    bodyHidden: true,
+  });
+});
+
+test("the Accuracy card folds away, keeps Staged rows in view, and stays folded on repaint", async () => {
+  const { screen } = mount();
+  await screen.ready;
+  const toggle = screen.el.querySelector("#accuracy-toggle");
+  const host = screen.el.querySelector("#accuracy-host");
+  const rows = screen.el.querySelector("#review-rows-card");
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+  assert.equal(host.hidden, false);
+
+  toggle.click();
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  assert.equal(toggle.textContent, "Show accuracy checks ▾");
+  assert.equal(host.hidden, true);
+  assert.equal(rows.hidden, false, "Staged rows stay visible while Accuracy is folded");
+
+  // A repaint (approve, reject, edit…) must not reopen the panel.
+  await screen.refresh();
+  assert.equal(screen.el.querySelector("#accuracy-host").hidden, true);
+  assert.equal(screen.el.querySelector("#accuracy-toggle").getAttribute("aria-expanded"), "false");
+
+  screen.el.querySelector("#accuracy-toggle").click();
+  assert.equal(screen.el.querySelector("#accuracy-host").hidden, false);
 });
 
 // ---- the waive dialog --------------------------------------------------------

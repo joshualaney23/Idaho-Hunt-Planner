@@ -988,6 +988,33 @@ dialog.drawer[open] {
   gap: 12px;
   align-items: start;
 }
+.accuracy-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.accuracy-heading h2 {
+  margin: 0 0 8px;
+}
+.accuracy-toggle {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text2);
+  background: none;
+  border: 1px solid var(--bg5);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.accuracy-toggle:hover {
+  color: var(--text);
+}
+.accuracy-toggle:focus-visible {
+  outline: 2px solid var(--gold2);
+  outline-offset: 2px;
+}
 .pdf-viewer {
   width: 100%;
   height: 72vh;

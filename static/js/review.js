@@ -319,6 +319,19 @@ export function publishCounts(seasons) {
   return counts;
 }
 
+/**
+ * The Accuracy panel's collapsed state, as the toggle shows it: the button label, the
+ * `aria-expanded` value and whether the body is hidden. Pure, so the wording is tested
+ * without a browser.
+ */
+export function accuracyToggleView(collapsed) {
+  return {
+    label: collapsed ? "Show accuracy checks ▾" : "Hide accuracy checks ▴",
+    expanded: collapsed ? "false" : "true",
+    bodyHidden: Boolean(collapsed),
+  };
+}
+
 // ---- DOM --------------------------------------------------------------------
 
 const el = (tag, cls, text) => {
@@ -746,8 +759,27 @@ export function createReviewScreen(docId, options = {}) {
   viewer.setAttribute("title", "The source page for the selected row");
   viewer.setAttribute("loading", "lazy");
 
-  const accuracyCard = card("Accuracy", accuracyHost);
+  // The Accuracy card can be folded away so the Staged rows are reachable at once.
+  // The toggle sits in the card's heading; the collapsed state survives repaints.
+  let accuracyCollapsed = false;
+  const accuracyToggle = button("accuracy-toggle", "", () => {
+    accuracyCollapsed = !accuracyCollapsed;
+    paintAccuracyToggle();
+  });
+  accuracyToggle.id = "accuracy-toggle";
+  const accuracyHeading = el("div", "accuracy-heading");
+  accuracyHeading.append(el("h2", null, "Accuracy"), accuracyToggle);
+  const accuracyCard = card(null, accuracyHeading, accuracyHost);
   accuracyCard.id = "accuracy-panel";
+  function paintAccuracyToggle() {
+    const view = accuracyToggleView(accuracyCollapsed);
+    accuracyToggle.textContent = view.label;
+    accuracyToggle.setAttribute("aria-expanded", view.expanded);
+    accuracyToggle.setAttribute("aria-controls", "accuracy-host");
+    accuracyHost.id = "accuracy-host";
+    accuracyHost.hidden = view.bodyHidden;
+  }
+  paintAccuracyToggle();
   const rowsCard = card("Staged rows", rowsHost, removedHost);
   rowsCard.id = "review-rows-card";
   const split = el("div", "review-split");
