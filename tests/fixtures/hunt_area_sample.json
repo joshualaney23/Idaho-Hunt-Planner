@@ -1,0 +1,385 @@
+{
+ "gmu": [
+  {
+   "type": "Feature",
+   "properties": {
+    "NAME": "1"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -116.0,
+       45.0
+      ],
+      [
+       -115.9,
+       45.0
+      ],
+      [
+       -115.9,
+       45.1
+      ],
+      [
+       -116.0,
+       45.1
+      ],
+      [
+       -116.0,
+       45.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "NAME": "2"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.9,
+       45.0
+      ],
+      [
+       -115.80000000000001,
+       45.0
+      ],
+      [
+       -115.80000000000001,
+       45.1
+      ],
+      [
+       -115.9,
+       45.1
+      ],
+      [
+       -115.9,
+       45.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "NAME": "3"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.8,
+       45.0
+      ],
+      [
+       -115.7,
+       45.0
+      ],
+      [
+       -115.7,
+       45.1
+      ],
+      [
+       -115.8,
+       45.1
+      ],
+      [
+       -115.8,
+       45.0
+      ]
+     ]
+    ]
+   }
+  }
+ ],
+ "hunt_areas": [
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Deer",
+    "HuntArea": "A-full",
+    "Year": 2025
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -116.0,
+       45.0
+      ],
+      [
+       -115.9,
+       45.0
+      ],
+      [
+       -115.9,
+       45.1
+      ],
+      [
+       -116.0,
+       45.1
+      ],
+      [
+       -116.0,
+       45.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Deer",
+    "HuntArea": "A-half",
+    "Year": 2025
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.9,
+       45.0
+      ],
+      [
+       -115.85,
+       45.0
+      ],
+      [
+       -115.85,
+       45.1
+      ],
+      [
+       -115.9,
+       45.1
+      ],
+      [
+       -115.9,
+       45.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Deer",
+    "HuntArea": "A-tiny",
+    "Year": 2025
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.78,
+       45.05
+      ],
+      [
+       -115.7795,
+       45.05
+      ],
+      [
+       -115.7795,
+       45.0505
+      ],
+      [
+       -115.78,
+       45.0505
+      ],
+      [
+       -115.78,
+       45.05
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Deer",
+    "HuntArea": "A-multipart",
+    "Year": 2025
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -116.0,
+       45.05
+      ],
+      [
+       -115.9,
+       45.05
+      ],
+      [
+       -115.9,
+       45.1
+      ],
+      [
+       -116.0,
+       45.1
+      ],
+      [
+       -116.0,
+       45.05
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Deer",
+    "HuntArea": "A-multipart",
+    "Year": 2025
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.9,
+       45.05
+      ],
+      [
+       -115.8,
+       45.05
+      ],
+      [
+       -115.8,
+       45.1
+      ],
+      [
+       -115.9,
+       45.1
+      ],
+      [
+       -115.9,
+       45.05
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Deer",
+    "HuntArea": "A-noise",
+    "Year": 2025
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.8002,
+       45.0
+      ],
+      [
+       -115.7,
+       45.0
+      ],
+      [
+       -115.7,
+       45.1
+      ],
+      [
+       -115.8002,
+       45.1
+      ],
+      [
+       -115.8002,
+       45.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Deer",
+    "HuntArea": "A-full",
+    "Year": 2023
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -115.8,
+       45.0
+      ],
+      [
+       -115.7,
+       45.0
+      ],
+      [
+       -115.7,
+       45.1
+      ],
+      [
+       -115.8,
+       45.1
+      ],
+      [
+       -115.8,
+       45.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "BigGame": "Elk",
+    "HuntArea": "E-1 ",
+    "Year": 2023
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -116.0,
+       45.0
+      ],
+      [
+       -115.9,
+       45.0
+      ],
+      [
+       -115.9,
+       45.1
+      ],
+      [
+       -116.0,
+       45.1
+      ],
+      [
+       -116.0,
+       45.0
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

@@ -158,7 +158,7 @@ Idaho-Hunt-Planner/
 │           └── *.py
 ├── scripts/
 │   ├── build_gmu_geometry.py   # IDFG GIS → static/data/gmu.json
-│   ├── build_hunt_area_coverage.py # GIS MapServer/4 polygons × GMUs → data/hunt_area_coverage/<year>.json
+│   ├── build_hunt_area_coverage.py # GIS MapServer/4 polygons × GMUs → static/data/hunt_area_coverage/<year>.json
 │   ├── build_county_overlay.py # TIGER counties × GMUs → static/data/county_units.json
 │   ├── build_idfg_unit_links.py # IDFG Hunt Planner unit pages → static/data/idfg_units.json (T-08)
 │   ├── make_golden.py          # dump a section to tests/golden/<year>/<section>.json; --check diffs it (T-22c)
@@ -646,6 +646,11 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 
 `scripts/build_county_overlay.py`: download US Census cartographic-boundary counties (cb_*_us_county_500k, filter STATEFP=16), project, intersect with GMUs, and write `{"Ada":{"38":0.62,"39":0.04,…},…}` as fractions of each **unit's** area.
 
+`scripts/build_hunt_area_coverage.py --year YYYY` (T-17b): same overlay method for controlled-hunt areas — MapServer/4 polygons × GMUs → `static/data/hunt_area_coverage/<year>.json`, committed like `gmu.json`. Three rules the implementation settled (§12 T-17b):
+- **Page the service.** An unpaged MapServer/4 query returns 2000 of its 2162 features with `exceededTransferLimit: true` and no error — a plausible-but-wrong year inventory. Years are inventoried with a `returnGeometry=false` query first, so geometry is downloaded only for the year each species actually uses (~4 min for deer+elk+pronghorn).
+- **`geometry_year` is per species**, the newest polygon year not after the license year. 2026 has no big-game polygons, so all three MVP species build on 2025 and every area carries the review flag.
+- **The sliver cut is two-sided:** keep a (hunt area, GMU) pair when the overlap is ≥ 0.5 % of the GMU **or** ≥ 2 % of the hunt area. A GMU-only cut deletes small real hunt areas — deer `38-1` lies entirely inside unit 38 and is 0.17 % of it.
+
 ---
 
 ## 10. Phasing
@@ -884,7 +889,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 ### T-17b · Hunt-area descriptions & unit coverage (MVP)
 **Depends on:** T-17a, T-02 · **Size:** L
 **Description:**
-1. `scripts/build_hunt_area_coverage.py --year YYYY`: download GIS `MapServer/4` features (`BigGame`, `HuntArea`, `Year`, geometry, `outSR=4326`) for the year, falling back to the latest year that has big-game polygons (2025 as of today) and recording `geometry_year`. Project to EPSG:8826, intersect each hunt-area polygon with each GMU, and write `data/hunt_area_coverage/<year>.json`: `{"deer":{"1-1":{"geometry_year":2025,"units":{"1":1.0,"2":1.0,…}}}}`, where each value is the fraction of the **GMU's** area inside the hunt area. Drop slivers < 0.5 % (boundary noise from simplification).
+1. `scripts/build_hunt_area_coverage.py --year YYYY`: download GIS `MapServer/4` features (`BigGame`, `HuntArea`, `Year`, geometry, `outSR=4326`), **paging past the service's 2000-record transfer limit**, falling back **per species** to the latest year that has that species' polygons (2025 for deer/elk/pronghorn as of today) and recording `geometry_year`. Project to EPSG:8826, union the features that share one area id (multipart areas arrive as several rows), intersect each hunt-area polygon with each GMU, and write `static/data/hunt_area_coverage/<year>.json` — **committed like `gmu.json`**, since the importer, tests and CI all need it and `data/` is git-ignored: `{"license_year":2026,"species":{"deer":{"1-1":{"geometry_year":2025,"units":{"1":1.0,"2":1.0,…}}}},"generated":…,"source":…}`, where each value is the fraction of the **GMU's** area inside the hunt area. Drop boundary slivers, keeping a pair when the overlap is ≥ 0.5 % of the GMU **or** ≥ 2 % of the hunt area (a GMU-only cut drops small real areas: deer `38-1` is 0.17 % of unit 38 and lies entirely inside it). `--check` fails when the committed file is stale; `--input`/`--save-raw` run the build offline.
 2. `importer/hunt_areas.py`: parse the description pages (deer pp. 32–34, elk 60–62, pronghorn 68 in 2026; locate by the heading "CONTROLLED HUNT AREA DESCRIPTIONS"). These are **two-column**: split at the gutter (§8.2). Entries start with `Hunt Area <id> —`. Store the full verbatim text in `hunt_areas.description`. Also extract the unit tokens mentioned ("All of Units 1, 2, 3…", "That portion of Unit 48…").
 3. Build `season_units`: units with fraction ≥ 0.98 → `full`; 0.005–0.98 → `partial` with `coverage_frac`; `coverage_note` = the first sentence of the description plus `(see p. N)`.
 4. Checks for each section `hunt_areas_<species>`: `gis_area_match` (every area id has a polygon; fail otherwise); `unit_coverage` (the unit tokens in the description text must equal the set of GIS units with fraction ≥ 0.02; any difference is `fail` with both lists shown); footnote consistency (footnote `b` ⇒ at least one unit `partial`; footnote `a` ⇒ ≥ 2 units **or** described units ≠ the base unit; no footnote ⇒ exactly one unit at ≥ 0.98, i.e. "All of Unit X"). `geometry_year < license_year` → `warn` on every affected area.
