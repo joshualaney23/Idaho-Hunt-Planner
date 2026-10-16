@@ -353,7 +353,7 @@ TAG_TITLES: tuple[tuple[str, str, str], ...] = (
     ("zone b elk", "elk_zone_b", "elk"),
     ("elk zone a", "elk_zone_a", "elk"),
     ("elk zone b", "elk_zone_b", "elk"),
-    ("pronghorn", "pronghorn_general", "pronghorn"),
+    ("pronghorn", "controlled", "pronghorn"),
     ("black bear", "black_bear", "black_bear"),
     ("mountain lion", "mountain_lion", "mountain_lion"),
     ("gray wolf", "wolf", "wolf"),
