@@ -1183,9 +1183,9 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 | T-22a | [#45](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/45) | Check registry & shared invariant checks |
 | T-22b | [#46](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/46) | Publish gate & waiver API |
 | T-22c | [#47](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/47) | Golden harness: dump, diff, `golden_match` & verification checklist |
-| T-22d | [#48](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/48) | Golden dataset: general deer 2026 (human verification) |
-| T-22e | [#49](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/49) | Golden dataset: controlled deer & elk 2026 (human verification) |
-| T-22f | [#50](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/50) | Golden dataset: controlled pronghorn, bear & hunt areas 2026 (human verification) |
+| T-22d | [#48](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/48) | Golden dataset: general deer 2026 (one-time human verification) |
+| T-22e | [#49](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/49) | Golden dataset: controlled deer & elk 2026 (one-time human verification) |
+| T-22f | [#50](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/50) | Golden dataset: controlled pronghorn, bear & hunt areas 2026 (one-time human verification) |
 | T-23 | [#25](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/25) | Wild turkey: general + controlled hunts |
 | T-24 | [#26](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/26) | Small game, furbearer hunting, predatory/unprotected, falconry |
 | T-25 | [#27](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/27) | Moose, bighorn sheep & mountain goat brochure |
