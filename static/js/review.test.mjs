@@ -22,6 +22,7 @@ import {
   gateReasons,
   groupRows,
   groupRowsForReview,
+  nextStagedAfter,
   pdfPageHref,
   publishCounts,
   restrictionLabel,
@@ -290,6 +291,20 @@ test("groupRowsForReview moves approved rows to the bottom, keeping the rest in 
   assert.deepEqual(rowOrder(groups).map((r) => r.id), [2, 3, 4, 1, 5]);
 });
 
+test("nextStagedAfter picks the next staged row, else the one before, else null", () => {
+  const order = [
+    season({ id: 1, status: "staged" }),
+    season({ id: 2, status: "staged" }),
+    season({ id: 3, status: "rejected" }),
+    season({ id: 4, status: "staged" }),
+  ];
+  assert.equal(nextStagedAfter(order, 1), 2);
+  assert.equal(nextStagedAfter(order, 2), 4);
+  assert.equal(nextStagedAfter(order, 4), 2);
+  assert.equal(nextStagedAfter([season({ id: 9, status: "staged" })], 9), null);
+  assert.equal(nextStagedAfter(order, 42), null);
+});
+
 test("confidenceClass walks the §4.1 ramp", () => {
   assert.deepEqual(
     [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1].map(confidenceClass),
@@ -492,16 +507,17 @@ test("focus returns to the selected row after a repaint, so a/r keep working", a
 
   // `a` approves and repaints — the row element is replaced, but focus must survive,
   // or every shortcut after the first one is swallowed (found in Chrome, T-15c).
+  // Approving 1 moves the selection to the next staged row (2), not the approved one.
   screen.keydown({ key: "a", target: document.activeElement });
   await new Promise((r) => setTimeout(r, 0));
-  assert.equal(document.activeElement.dataset.seasonId, "1");
+  assert.equal(document.activeElement.dataset.seasonId, "2");
   // …and on the *live* element, not the detached one the repaint threw away.
   assert.ok(screen.el.contains(document.activeElement));
   screen.keydown({ key: "r", target: document.activeElement });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepEqual(calls, [
     ["review", 1, { status: "approved" }],
-    ["review", 1, { status: "rejected" }],
+    ["review", 2, { status: "rejected" }],
   ]);
 });
 
