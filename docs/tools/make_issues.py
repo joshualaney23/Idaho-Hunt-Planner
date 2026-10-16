@@ -31,7 +31,7 @@ PHASE_OF = {}
 for t in ["T-01", "T-02", "T-03", "T-04", "T-05"]: PHASE_OF[t] = 0
 for t in ["T-06", "T-07", "T-08", "T-09", "T-10", "T-11", "T-15a", "T-15b", "T-15c", "T-16",
           "T-17a", "T-17b", "T-17c",
-          "T-22a", "T-22b", "T-22c", "T-22d", "T-22e", "T-22f"]: PHASE_OF[t] = 1
+          "T-22a", "T-22b", "T-22c", "T-22d", "T-22e", "T-22f", "T-22g"]: PHASE_OF[t] = 1
 for t in ["T-12", "T-13", "T-18"]: PHASE_OF[t] = 2
 for t in ["T-14", "T-23"]: PHASE_OF[t] = 3
 PHASE_OF["T-24"] = 4
@@ -40,7 +40,7 @@ for t in ["T-19", "T-20", "T-21", "T-27", "T-28", "T-29", "T-30"]: PHASE_OF[t] =
 
 BUILD_ORDER = [["T-01"], ["T-02", "T-03", "T-05"], ["T-04"], ["T-10"], ["T-11", "T-17a"], ["T-22a"],
                ["T-22b", "T-22c"], ["T-22d", "T-22e"], ["T-17b"], ["T-22f"], ["T-06"],
-               ["T-09", "T-15a", "T-15b"], ["T-15c"], ["T-07"], ["T-08"], ["T-17c"], ["T-16"]]
+               ["T-09", "T-15a", "T-15b"], ["T-15c"], ["T-22g"], ["T-07"], ["T-08"], ["T-17c"], ["T-16"]]
 SEPARATE_PARSERS = {"T-11", "T-17a", "T-17b", "T-12", "T-14", "T-23", "T-24", "T-25", "T-26"}
 GOLDEN_TICKETS = {"T-22d", "T-22e", "T-22f"}  # human page-by-page verification (§8.7)
 
@@ -57,7 +57,7 @@ AREA = {  # area labels
     "T-21": ["backend", "frontend", "documentation"],
     "T-22a": ["importer", "accuracy"], "T-22b": ["backend", "accuracy"],
     "T-22c": ["importer", "accuracy"], "T-22d": ["accuracy"], "T-22e": ["accuracy"],
-    "T-22f": ["accuracy"],
+    "T-22f": ["accuracy"], "T-22g": ["backend", "frontend", "accuracy"],
     "T-23": ["importer", "accuracy"], "T-24": ["importer", "gis", "accuracy"],
     "T-25": ["importer", "accuracy"], "T-26": ["importer", "gis", "accuracy"],
     "T-27": ["backend", "frontend"],
