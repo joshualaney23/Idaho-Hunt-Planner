@@ -1825,8 +1825,10 @@ SEASON_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "docs" / "season
 @api.get("/seasons/template.csv")
 def seasons_template():
     """The example CSV, so the import flow starts from a file with the right header."""
+    # Bytes, not `read_text`: universal newlines would turn the file's CRLF into LF and
+    # the served template would no longer be the file we ship.
     return Response(
-        SEASON_TEMPLATE_PATH.read_text(encoding="utf-8"),
+        SEASON_TEMPLATE_PATH.read_bytes(),
         mimetype="text/csv",
         headers={"Content-Disposition": 'attachment; filename="seasons_template.csv"'},
     )
