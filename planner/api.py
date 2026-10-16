@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import datetime as _dt
+import io
 import json
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, Response, current_app, jsonify, request, send_file
 
-from planner import __version__, db, diff, engine, importer
+from planner import __version__, backup, db, diff, engine, importer
 from planner import seasons as seasons_csv
 from planner.dates import DEFAULT_WEEKEND_DEF, WEEKEND_DEFS, default_range, parse_iso, to_iso
 
@@ -738,6 +740,91 @@ def put_profile():
         species,
     )
     return jsonify({"profile": _profile()})
+
+
+# ───────── backup / restore / reset (T-21, §6) ─────────
+#: `POST /api/reset` only fires when the body repeats this word, so the UI can put the
+#: one destructive button behind a typed confirmation instead of a second "are you sure".
+RESET_PHRASE = "RESET"
+
+
+def _db_path() -> Path:
+    return Path(current_app.config["DB_PATH"])
+
+
+def _uploaded_bytes() -> bytes:
+    """The restore payload: multipart `file` if present, else the raw request body."""
+    upload = request.files.get("file")
+    raw = upload.read() if upload is not None and upload.filename else (request.get_data() or b"")
+    if not raw:
+        raise ApiError("missing_file", "attach the backup as the `file` field", {"field": "file"})
+    if len(raw) > backup.MAX_BACKUP_BYTES:
+        raise ApiError(
+            "file_too_large",
+            f"backups are limited to {backup.MAX_BACKUP_BYTES // (1024 * 1024)} MB",
+            {"bytes": len(raw), "limit": backup.MAX_BACKUP_BYTES},
+            status=413,
+        )
+    return raw
+
+
+@api.get("/backup")
+def get_backup():
+    """Download a consistent snapshot of `planner.db` (`sqlite3.Connection.backup`)."""
+    data = backup.snapshot_bytes(db.current())
+    name = backup.download_name()
+    response = send_file(
+        io.BytesIO(data),
+        mimetype="application/vnd.sqlite3",
+        as_attachment=True,
+        download_name=name,
+        etag=False,
+        last_modified=None,
+    )
+    response.headers["Content-Length"] = str(len(data))
+    return response
+
+
+@api.post("/restore")
+def post_restore():
+    """Replace the database with an uploaded backup, keeping the old one aside.
+
+    The upload is validated first (SQLite header, `quick_check`, the planner's core
+    tables and a `schema_version` this build understands); nothing is touched when it
+    fails. The replaced DB stays as `planner.db.bak-<timestamp>`, and a backup from an
+    older schema is migrated forward after it lands.
+    """
+    data = _uploaded_bytes()
+    if not backup.looks_like_sqlite(data):
+        raise ApiError("invalid_backup", "that file is not a SQLite database", status=415)
+    with tempfile.TemporaryDirectory(prefix="ihp-restore-") as tmp:
+        staged = Path(tmp) / "upload.db"
+        staged.write_bytes(data)
+        try:
+            result = backup.restore(db.current(), staged, _db_path())
+        except backup.RestoreError as exc:
+            status = 409 if exc.code == "incompatible_backup" else 422
+            raise ApiError(exc.code, str(exc), exc.detail, status=status) from None
+    return jsonify({"restored": True, **result, "profile": _profile()})
+
+
+@api.post("/reset")
+def post_reset():
+    """Erase every tag, permit, document and season, behind a typed confirmation.
+
+    Reference data (units, species, tag types) is re-seeded, the stored PDFs and the
+    page cache are deleted, and the old database is kept as `planner.db.bak-<timestamp>`.
+    """
+    data = _body()
+    if str(data.get("confirm", "")).strip() != RESET_PHRASE:
+        raise ApiError(
+            "confirmation_required",
+            f"type {RESET_PHRASE} to confirm; nothing was deleted",
+            {"confirm": f"expected {RESET_PHRASE!r}"},
+        )
+    result = backup.reset(db.current(), _db_path())
+    removed = backup.clear_data_dir(_data_dir())
+    return jsonify({"reset": True, **result, "removed": removed, "profile": _profile()})
 
 
 # ───────── documents (T-10, §8.1) ─────────

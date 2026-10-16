@@ -9,6 +9,9 @@
 // T-15b mounts the Regulations tab (regs.js): the upload card and the documents
 // table, plus the `#/regs/<docId>` route whose detail panel T-15c fills in.
 //
+// T-21 mounts the Settings tab (settings.js): the profile form (shared with My Tags),
+// DB backup/restore and "Reset all data" behind a typed confirmation.
+//
 // T-09 mounts the My Tags tab (tags.js) and subscribes the map tab to
 // TAGS_CHANGED, so filling or deleting a tag updates the tag filter and the
 // breadcrumb at once (the shared state that invalidates availability).
@@ -19,6 +22,7 @@ import { localToday, toISO } from "./dates.js";
 import { PERMITS_CHANGED, TAGS_CHANGED, initTags } from "./tags.js";
 import { initRegs } from "./regs.js";
 import { UNITS_HIGHLIGHT, initSeasons } from "./seasons.js";
+import { initSettings } from "./settings.js";
 import { getJSON, putJSON } from "./api.js";
 import {
   availabilityPath,
@@ -74,10 +78,15 @@ async function initVersion() {
   }
 }
 
-// ---- placeholder cards for tabs owned by later tickets ---------------------
-const PLACEHOLDERS = {
-  settings: ["Settings", "Default species, weekend definition and backups arrive in T-21."],
-};
+// T-21 mounts the Settings tab (settings.js) on first visit; it owns `#/settings`.
+let settingsMounted = false;
+function ensureSettings() {
+  if (settingsMounted) return;
+  settingsMounted = true;
+  initSettings().catch(() => {
+    settingsMounted = false;
+  });
+}
 
 // T-15b mounts the Regulations tab (regs.js) on first visit; it owns `#/regs`
 // and `#/regs/<docId>`, so the route's rest segments are handed to it.
@@ -101,16 +110,6 @@ function ensureTags() {
   initTags().catch(() => {
     tagsMounted = false;
   });
-}
-
-function renderPlaceholder(tab) {
-  const panel = document.getElementById(`panel-${tab}`);
-  if (panel.childElementCount) return;
-  const [title, text] = PLACEHOLDERS[tab];
-  const wrap = document.createElement("div");
-  wrap.className = "wrap single";
-  wrap.appendChild(card(title, text, textEl("p", "Nothing here yet.", "placeholder")));
-  panel.appendChild(wrap);
 }
 
 // ---- Where Can I Hunt: filters + map (T-07) ------------------------------------
@@ -432,7 +431,7 @@ function activate(tab, { focus = false, rest = [] } = {}) {
   if (tab === "tags") ensureTags();
   else if (tab === "seasons") ensureSeasons();
   else if (tab === "regs") ensureRegs(rest);
-  else if (tab !== "map") renderPlaceholder(tab);
+  else if (tab === "settings") ensureSettings();
   const label = TABS.find((t) => t.id === tab).label;
   document.title = `${label} · Idaho Hunt Planner`;
   document.body.dataset.tab = tab;

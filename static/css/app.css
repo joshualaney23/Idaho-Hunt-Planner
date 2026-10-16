@@ -167,6 +167,16 @@
 .chip.link {
   color: var(--gold2);
 }
+/* Settings (T-21): restore and "Reset all data" replace or erase everything, so they
+   read as destructive. --err-text, not --sc1: §4.1's note keeps small text above 4.5:1. */
+.chip.danger {
+  color: var(--err-text);
+  border-color: var(--sc1);
+}
+.chip.danger:hover:not(:disabled) {
+  color: var(--err-text);
+  background: var(--badge-error-bg);
+}
 .chip.more {
   border-style: dashed;
 }
