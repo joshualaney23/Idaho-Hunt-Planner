@@ -1818,6 +1818,20 @@ def export_csv():
     )
 
 
+#: The 3-row example file the UI links to (shipped in `docs/`, §12 T-16).
+SEASON_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "docs" / "seasons_template.csv"
+
+
+@api.get("/seasons/template.csv")
+def seasons_template():
+    """The example CSV, so the import flow starts from a file with the right header."""
+    return Response(
+        SEASON_TEMPLATE_PATH.read_text(encoding="utf-8"),
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="seasons_template.csv"'},
+    )
+
+
 @api.post("/import.csv")
 def import_csv():
     """Import a season CSV: every row is **staged** under its year's `manual` document.

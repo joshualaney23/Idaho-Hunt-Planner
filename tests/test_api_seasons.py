@@ -295,6 +295,15 @@ def test_import_accepts_a_multipart_upload(client, published) -> None:
     assert resp.status_code == 201 and resp.get_json()["imported"] == 2
 
 
+def test_the_template_is_served_and_matches_the_shipped_file(client) -> None:
+    from pathlib import Path
+
+    resp = client.get("/api/seasons/template.csv")
+    assert resp.status_code == 200 and resp.mimetype == "text/csv"
+    template = Path(__file__).resolve().parent.parent / "docs" / "seasons_template.csv"
+    assert resp.get_data() == template.read_bytes()
+
+
 def test_the_shipped_template_imports_cleanly(client) -> None:
     from pathlib import Path
 
