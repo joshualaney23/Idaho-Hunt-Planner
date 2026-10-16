@@ -997,6 +997,25 @@ REVIEW_STATUSES = ("approved", "rejected")
 #: Row states review can still change (a published or superseded row is history).
 REVIEWABLE_STATUSES = ("staged", "approved", "rejected")
 
+# ───────── inline row edits (T-15c, §8.4) ─────────
+#: The `seasons` CHECK vocabularies, mirrored so an edit is rejected with a field name
+#: instead of an opaque IntegrityError. Keep in step with `planner/schema.sql`.
+WEAPONS = ("any", "archery", "muzzleloader", "short_range", "shotgun", "falconry")
+SEXES = ("antlered", "antlerless", "either", "any", "male", "na")
+#: Free-text columns the review screen lets a human correct. `None` clears them.
+EDITABLE_TEXT_FIELDS = ("zone", "hunt_number", "hunt_area", "sub_species", "bag_limit", "notes")
+#: Everything `PUT …/seasons/<sid>` accepts besides `status`.
+EDITABLE_FIELDS = (
+    "units",
+    "start_date",
+    "end_date",
+    "tag_type_id",
+    "weapon",
+    "sex",
+    "restrictions",
+    *EDITABLE_TEXT_FIELDS,
+)
+
 
 def _check_row(doc_id: int, check_id: int):
     row = db.q1("SELECT * FROM import_checks WHERE id = ? AND document_id = ?", check_id, doc_id)
@@ -1167,13 +1186,114 @@ def waive_check(doc_id: int, check_id: int):
     return jsonify({"check": waived, "publish": _publish_state(doc_id)})
 
 
+def _edit_choice(value: Any, field: str, allowed: tuple[str, ...]) -> str:
+    if not isinstance(value, str) or value not in allowed:
+        raise ApiError(
+            "validation_failed",
+            f"{field} must be one of {', '.join(allowed)}",
+            {field: "invalid"},
+        )
+    return value
+
+
+def _edit_units(value: Any) -> list[str]:
+    """A row's unit set, validated against the seeded GMUs — never invent a unit (D3)."""
+    if not isinstance(value, list) or not value:
+        raise ApiError(
+            "validation_failed", "units must be a non-empty list of unit ids", {"units": "invalid"}
+        )
+    wanted = sorted({str(u).strip() for u in value}, key=_unit_sort)
+    if any(not u for u in wanted):
+        raise ApiError("validation_failed", "a unit id cannot be blank", {"units": "invalid"})
+    known = {str(r["id"]) for r in db.q("SELECT id FROM units")}
+    missing = [u for u in wanted if u not in known]
+    if missing:
+        raise ApiError(
+            "unknown_unit",
+            f"no such unit: {', '.join(missing)}",
+            {"units": missing},
+        )
+    return wanted
+
+
+def _edit_restrictions(value: Any) -> list[str]:
+    """§5.1 is a closed vocabulary: an unknown code is a typo, not a new rule."""
+    if not isinstance(value, list):
+        raise ApiError(
+            "validation_failed", "restrictions must be a list of codes", {"restrictions": "invalid"}
+        )
+    codes = [str(c) for c in value]
+    unknown = sorted({c for c in codes if c not in engine.RESTRICTIONS})
+    if unknown:
+        raise ApiError(
+            "unknown_restriction",
+            f"not in the §5.1 vocabulary: {', '.join(unknown)}",
+            {"restrictions": unknown},
+        )
+    return engine.sort_reasons(codes)
+
+
+def _season_edits(row, body: dict[str, Any]) -> tuple[dict[str, Any], list[str] | None]:
+    """Validate the edit half of a `PUT …/seasons/<sid>` body.
+
+    Returns the `seasons` column updates and, when the units were edited, the new unit
+    set (it lives in `season_units`, so it is written separately).
+    """
+    cols: dict[str, Any] = {}
+    units: list[str] | None = None
+    for field in EDITABLE_FIELDS:
+        if field not in body:
+            continue
+        value = body[field]
+        if field == "units":
+            units = _edit_units(value)
+        elif field == "restrictions":
+            cols["restrictions"] = json.dumps(_edit_restrictions(value))
+        elif field in ("start_date", "end_date"):
+            cols[field] = to_iso(_parse_date(field, str(value)))
+        elif field == "weapon":
+            cols["weapon"] = _edit_choice(value, "weapon", WEAPONS)
+        elif field == "sex":
+            cols["sex"] = _edit_choice(value, "sex", SEXES)
+        elif field == "tag_type_id":
+            cols["tag_type_id"] = _edit_choice(
+                value, "tag_type_id", tuple(t["id"] for t in _tag_types())
+            )
+        else:
+            cols[field] = _text(value, field)
+    start = cols.get("start_date", row["start_date"])
+    end = cols.get("end_date", row["end_date"])
+    if start > end:
+        raise ApiError(
+            "validation_failed",
+            f"start_date {start} is after end_date {end}",
+            {"start_date": "invalid", "end_date": "invalid"},
+        )
+    return cols, units
+
+
 @api.put("/documents/<int:doc_id>/seasons/<int:season_id>")
 def review_season(doc_id: int, season_id: int):
-    """Approve or reject one staged row by hand (§8.4; this is what clears `extract_agree = 0`)."""
+    """Review and/or correct one staged row by hand (§8.4).
+
+    `{"status": "approved"|"rejected"}` is the review action — this is what clears an
+    `extract_agree = 0` row for the publish gate. Any of `EDITABLE_FIELDS` corrects the
+    row in place (T-15c's inline editors); an edit on its own deliberately does **not**
+    approve the row, so a corrected row is still reviewed explicitly. Both halves may
+    arrive in one request, which is what `e` → edit → `a` does from the keyboard.
+    """
     _document_row(doc_id)
     row = _season_row(doc_id, season_id)
-    status = _body().get("status")
-    if status not in REVIEW_STATUSES:
+    body = _body()
+    status = body.get("status")
+    edits = [f for f in EDITABLE_FIELDS if f in body]
+    if status is None and not edits:
+        raise ApiError(
+            "validation_failed",
+            f"send a status ({'/'.join(REVIEW_STATUSES)}) or one of: {', '.join(EDITABLE_FIELDS)}",
+            {"status": "missing"},
+        )
+    if status is not None and status not in REVIEW_STATUSES:
         raise ApiError(
             "validation_failed",
             f"status must be one of {', '.join(REVIEW_STATUSES)}",
@@ -1186,13 +1306,26 @@ def review_season(doc_id: int, season_id: int):
             {"season_id": season_id, "status": row["status"]},
             status=409,
         )
-    db.exec(
-        "UPDATE seasons SET status = ?, reviewed_by_user = 1, reviewed_at = ? WHERE id = ?",
-        status,
-        _now(),
-        season_id,
+    cols, units = _season_edits(row, body)
+    if status is not None:
+        cols.update({"status": status, "reviewed_by_user": 1, "reviewed_at": _now()})
+    with db.tx():
+        if cols:
+            assignments = ", ".join(f"{c} = ?" for c in cols)
+            db.exec(f"UPDATE seasons SET {assignments} WHERE id = ?", *cols.values(), season_id)
+        if units is not None:
+            db.exec("DELETE FROM season_units WHERE season_id = ?", season_id)
+            db.exec_many(
+                "INSERT INTO season_units (season_id, unit_id) VALUES (?, ?)",
+                [(season_id, u) for u in units],
+            )
+    return jsonify(
+        {
+            "season": _season_dict(doc_id, season_id),
+            "edited": sorted(edits),
+            "publish": _publish_state(doc_id),
+        }
     )
-    return jsonify({"season": _season_dict(doc_id, season_id), "publish": _publish_state(doc_id)})
 
 
 @api.post("/documents/<int:doc_id>/approve-all")

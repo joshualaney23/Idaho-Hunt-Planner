@@ -206,6 +206,8 @@ def test_index_and_assets_are_served(client):
         "filters.test.mjs",
         "results.test.mjs",
         "drawer.test.mjs",
+        "regs.test.mjs",
+        "review.test.mjs",
     ],
 )
 def test_js_components_under_node(name: str):

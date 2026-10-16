@@ -2,7 +2,7 @@
 //
 // Owns `#panel-regs`: a drag-and-drop upload card that posts to POST /api/documents
 // (§6) and, below it, the documents table grouped by license year. `#/regs/<docId>`
-// renders a placeholder detail panel that T-15c replaces with the review screen.
+// renders the document header and mounts T-15c's review screen (review.js) under it.
 //
 // Every decision about *what* is shown is a pure function — `uploadView`,
 // `groupByYear`, `statusBadge`, `docCounts`, `regsRoute` — so regs.test.mjs covers
@@ -10,6 +10,7 @@
 // verified in real Chrome in the T-15b PR.
 
 import { getJSON, postFile } from "./api.js";
+import { createReviewScreen } from "./review.js";
 import { badge, card, textEl } from "./ui.js";
 
 /** Where the documents live (§6). */
@@ -430,10 +431,12 @@ export function renderDocuments(container, documents) {
 }
 
 /**
- * The `#/regs/<docId>` placeholder (T-15c fills it in): what is known about the
- * document from the list, a link to the stored PDF and a way back.
+ * The `#/regs/<docId>` detail panel. T-15c's review screen (review.js) owns it; what
+ * is known from the document list is shown as a header while it loads, and a document
+ * that failed to import never gets a review screen — there is nothing to review.
  */
-export function renderDocumentDetail(container, docId, doc) {
+export function renderDocumentDetail(container, docId, doc, options = {}) {
+  const { mount = createReviewScreen } = options;
   const body = [];
   if (doc) {
     const head = document.createElement("p");
@@ -445,13 +448,6 @@ export function renderDocumentDetail(container, docId, doc) {
     body.push(head);
     if (doc.sha256) body.push(textEl("p", `sha256 ${shortSha(doc.sha256)}`, "muted"));
   }
-  body.push(
-    textEl(
-      "p",
-      "The review screen — staged rows, the accuracy panel and Publish — arrives in T-15c.",
-      "placeholder",
-    ),
-  );
   const links = document.createElement("p");
   const pdf = document.createElement("a");
   pdf.href = `${DOCUMENTS_URL}/${docId}/pdf`;
@@ -463,9 +459,19 @@ export function renderDocumentDetail(container, docId, doc) {
   back.textContent = "← All documents";
   links.append(back, " · ", pdf);
   body.push(links);
+
   const detail = card(doc ? doc.title || `Document ${docId}` : `Document ${docId}`, ...body);
   detail.id = "regs-detail";
-  container.replaceChildren(detail);
+  if (doc && doc.status === "failed") {
+    detail.appendChild(
+      textEl("p", doc.error || "This import failed, so it has no rows to review.", "err"),
+    );
+    container.replaceChildren(detail);
+    return container;
+  }
+  const review = mount(docId);
+  container.replaceChildren(detail, review.el);
+  container.review = review;
   return container;
 }
 
@@ -475,7 +481,7 @@ export function renderDocumentDetail(container, docId, doc) {
  * `body[data-regs-ready]` when it lands. Returns `{el, refresh, applyRoute, upload}`.
  */
 export function initRegs(panel = document.getElementById("panel-regs"), options = {}) {
-  const { load = () => fetchDocuments(), upload = postDocument } = options;
+  const { load = () => fetchDocuments(), upload = postDocument, mount } = options;
   const wrap = document.createElement("div");
   wrap.className = "wrap single";
 
@@ -500,19 +506,27 @@ export function initRegs(panel = document.getElementById("panel-regs"), options 
 
   let documents = [];
   let route = { view: "list" };
+  //: Which document the detail host currently holds. The review screen owns its own
+  //: state (selection, edits, polled gate), so it is mounted once per document and
+  //: never rebuilt by a document-list refresh underneath the user.
+  let mountedDoc = null;
 
   function paintRoute() {
     const isDoc = route.view === "document";
     detailHost.hidden = !isDoc;
     listCard.hidden = isDoc;
     if (isDoc) {
+      if (mountedDoc === route.docId) return;
       renderDocumentDetail(
         detailHost,
         route.docId,
         documents.find((d) => Number(d.id) === route.docId) || null,
+        mount ? { mount } : {},
       );
+      mountedDoc = route.docId;
     } else {
       detailHost.replaceChildren();
+      mountedDoc = null;
     }
   }
 

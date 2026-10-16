@@ -121,12 +121,13 @@ class FakeElement {
     for (const e of this.walk()) if (e === other) return true;
     return false;
   }
-  /** Only bare tag selectors ("button") and "#id" are supported. */
+  /** Tag, `#id`, `.class` and `[data-attr]` selectors (no combinators). */
   querySelectorAll(sel) {
     const out = [];
     for (const e of this.walk()) {
       if (e === this) continue;
-      if (sel.startsWith("#") ? e.id === sel.slice(1) : e.tagName.toLowerCase() === sel) out.push(e);
+      if (e.tagName === "#text") continue;
+      if (matches(e, sel)) out.push(e);
     }
     return out;
   }
@@ -138,10 +139,38 @@ class FakeElement {
     if (this.tagName === "BUTTON" && this.disabled) return;
     for (const fn of this.listeners.click || []) fn({ type: "click", target: this });
   }
+  // <dialog> (T-15c's waive and publish modals). `open` reflects the attribute, as in
+  // a browser, so a test can assert the modal state without a layout engine.
+  showModal() {
+    this.open = true;
+    this.setAttribute("open", "true");
+  }
+  close(returnValue) {
+    this.open = false;
+    this.returnValue = returnValue ?? "";
+    this.removeAttribute("open");
+    this.dispatch("close");
+  }
   *walk() {
     yield this;
     for (const c of this.children) yield* c.walk();
   }
+}
+
+/** Match one element against the subset of CSS the twins use. */
+function matches(el, sel) {
+  const s = sel.trim();
+  if (s.startsWith("#")) return el.id === s.slice(1);
+  if (s.startsWith(".")) return String(el.className || "").split(/\s+/).includes(s.slice(1));
+  if (s.startsWith("[")) {
+    // [data-foo] and [data-foo="bar"]
+    const m = /^\[([^\]=]+)(?:=["']?([^\]"']*)["']?)?\]$/.exec(s);
+    if (!m) return false;
+    const key = m[1].replace(/^data-/, "").replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    const have = m[1].startsWith("data-") ? el.dataset[key] : el.getAttribute(m[1]);
+    return m[2] === undefined ? have !== undefined && have !== null : String(have) === m[2];
+  }
+  return el.tagName.toLowerCase() === s.toLowerCase();
 }
 
 export function installFakeDom() {

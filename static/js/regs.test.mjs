@@ -8,6 +8,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
 import { installFakeDom } from "../../tests/js/fakedom.mjs";
+import { textEl } from "./ui.js";
 import {
   UPLOAD_IDLE,
   createUploadCard,
@@ -396,18 +397,38 @@ test("an empty list says so instead of rendering an empty table", () => {
   assert.match(host.textContent, /No regulation PDFs yet/);
 });
 
-test("the document detail is a T-15c placeholder with the PDF and a way back", () => {
+test("the document detail heads the review screen with the PDF and a way back", () => {
   const host = document.createElement("div");
-  renderDocumentDetail(host, 1, doc());
-  assert.match(host.textContent, /arrives in T-15c/);
+  const mounted = [];
+  const mount = (id) => {
+    mounted.push(id);
+    return { el: textEl("div", "review screen", "review") };
+  };
+  renderDocumentDetail(host, 1, doc(), { mount });
+  assert.deepEqual(mounted, [1]); // T-15c's screen is mounted for this document
   assert.match(host.textContent, /sha256 aaaaaaaaaaaa/);
+  assert.match(host.textContent, /review screen/);
   const hrefs = host.querySelectorAll("a").map((a) => a.getAttribute("href"));
   assert.deepEqual(hrefs, ["#/regs", "/api/documents/1/pdf"]);
 
-  // Unknown document (deep link before the list loads): still renders.
+  // Unknown document (deep link before the list loads): still renders and still mounts.
   const bare = document.createElement("div");
-  renderDocumentDetail(bare, 9, null);
+  renderDocumentDetail(bare, 9, null, { mount });
   assert.match(bare.textContent, /Document 9/);
+  assert.deepEqual(mounted, [1, 9]);
+});
+
+test("a failed import gets its error instead of a review screen", () => {
+  const host = document.createElement("div");
+  let mounts = 0;
+  renderDocumentDetail(host, 3, doc({ status: "failed", error: "unreadable PDF" }), {
+    mount: () => {
+      mounts += 1;
+      return { el: textEl("div", "nope") };
+    },
+  });
+  assert.equal(mounts, 0);
+  assert.match(host.textContent, /unreadable PDF/);
 });
 
 // ---- the tab -----------------------------------------------------------------
@@ -418,6 +439,9 @@ test("initRegs renders the list, and #/regs/<id> swaps in the detail panel", asy
   const tab = initRegs(panel, {
     load: async () => ({ documents: [doc({ id: 1 }), doc({ id: 2, license_year: 2025 })] }),
     upload: async () => ({ document: doc(), import: {} }),
+    // The review screen has its own twin (review.test.mjs); here it is a stub, so this
+    // test stays about routing.
+    mount: () => ({ el: textEl("div", "review screen", "review") }),
   });
   await tab.ready;
   assert.equal(document.body.dataset.regsReady, "1");
@@ -431,7 +455,7 @@ test("initRegs renders the list, and #/regs/<id> swaps in the detail panel", asy
   tab.applyRoute(["2"]);
   assert.equal(list.hidden, true);
   assert.equal(detailHost.hidden, false);
-  assert.match(detailHost.textContent, /arrives in T-15c/);
+  assert.match(detailHost.textContent, /review screen/);
   assert.equal(detailHost.querySelector("a").getAttribute("href"), "#/regs");
 
   tab.applyRoute([]);
