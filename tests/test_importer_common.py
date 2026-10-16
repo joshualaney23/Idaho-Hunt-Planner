@@ -256,7 +256,7 @@ def test_page_pointers_and_dates_are_not_qualifiers() -> None:
             "general",
         ),
         ("2026 Controlled Deer Hunts", "controlled", "any", "controlled"),
-        ("2026 Pronghorn General Seasons", "pronghorn_general", "any", "general"),
+        ("2026 Pronghorn Controlled Hunts", "controlled", "any", "controlled"),
         ("2026 Black Bear General Seasons", "black_bear", "any", "general"),
         ("2026 Wild Turkey General Seasons", "turkey_general", "any", "general"),
         ("2026 Elk Zone A Any Weapon Seasons", "elk_zone_a", "any", "general"),

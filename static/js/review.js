@@ -97,6 +97,26 @@ export const RESTRICTIONS = [
 
 const RESTRICTION_LABELS = new Map(RESTRICTIONS);
 
+/**
+ * §5.1 informational codes: they show as neutral badges, never yellow (same rule as
+ * `planner/engine.py::RESTRICTIONS` and the map). Bait/dogs/calls are "how you may hunt"
+ * notes, not narrowing.
+ */
+export const INFORMATIONAL_RESTRICTIONS = new Set([
+  "bait_prohibited",
+  "dogs_prohibited",
+  "electronic_calls",
+  "grizzly_caution",
+  "expanded_methods",
+  "general_methods",
+  "second_tag_allowed",
+]);
+
+/** The badge kind for a restriction code: yellow only for narrowing codes (D3: unknown narrows). */
+export function restrictionBadgeKind(code) {
+  return INFORMATIONAL_RESTRICTIONS.has(String(code)) ? "neutral" : "restricted";
+}
+
 /** A restriction code's label; an unknown code keeps its code, never a guess (D3). */
 export function restrictionLabel(code) {
   return RESTRICTION_LABELS.get(String(code)) || String(code);
@@ -508,7 +528,8 @@ function rowSummary(row, { diff, waivedSection } = {}) {
   wrap.appendChild(facts);
 
   const marks = el("p", "row-badges");
-  for (const code of row.restrictions || []) marks.append(badge("restricted", restrictionLabel(code)), " ");
+  for (const code of row.restrictions || [])
+    marks.append(badge(restrictionBadgeKind(code), restrictionLabel(code)), " ");
   const conf = badge("neutral", `confidence ${Number(row.confidence ?? 1).toFixed(2)}`);
   // The §4.1 confidence ramp is a class, never a literal color (theme.css owns --sc1…--sc5).
   conf.className = `badge b-neutral conf ${confidenceClass(row.confidence)}`;

@@ -287,10 +287,11 @@ CREATE TABLE species (
 
 CREATE TABLE tag_types (
   id               TEXT PRIMARY KEY, -- 'deer_regular','deer_whitetail','elk_zone_a','elk_zone_b','controlled',
-                                     -- 'pronghorn_general','black_bear','mountain_lion','wolf','turkey_general',
+                                     -- 'black_bear','mountain_lion','wolf','turkey_general',
                                      -- 'hunting_license' (upland birds/animals, furbearers, predatory, ducks/geese/snipe/coot/dove/crow: no species tag)
                                      -- 'sandhill_crane' (area-specific crane tag; requires_zone = 1, zone = crane hunt area)
                                      -- moose/sheep/goat/swan are controlled-only → 'controlled'
+                                     -- pronghorn is controlled-only too (no general season) → 'controlled'
   species_id       TEXT REFERENCES species(id),   -- NULL for 'controlled' (species comes from hunt)
   label            TEXT NOT NULL,
   requires_zone    INTEGER NOT NULL DEFAULT 0,    -- elk A/B

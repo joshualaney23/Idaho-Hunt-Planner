@@ -71,7 +71,6 @@ TAG_TYPES: list[tuple[str, str | None, str, int, int]] = [
     ("elk_zone_b", "elk", "Elk B tag", 1, 0),
     # Species comes from the hunt; moose/sheep/goat/swan are controlled-only.
     ("controlled", None, "Controlled hunt tag", 0, 1),
-    ("pronghorn_general", "pronghorn", "Pronghorn general tag", 0, 0),
     ("black_bear", "black_bear", "Black bear tag", 0, 0),
     ("mountain_lion", "mountain_lion", "Mountain lion tag", 0, 0),
     ("wolf", "wolf", "Gray wolf tag", 0, 0),

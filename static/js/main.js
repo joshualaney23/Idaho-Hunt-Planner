@@ -353,7 +353,10 @@ async function initMapTab() {
       const statuses = Object.fromEntries(
         Object.entries(data.units).map(([id, u]) => [id, u.status]),
       );
-      map.setStatuses(statuses);
+      const notes = Object.keys(data.units).filter((id) =>
+        (data.units[id].reasons || []).includes("see_notes"),
+      );
+      map.setStatuses(statuses, notes);
       renderLegend(legend, data.summary, data.include_untagged);
       renderSide();
       // Test hooks: the query the map shows, and a counter that ticks on every repaint.
