@@ -129,7 +129,8 @@ def meta():
             "version": __version__,
             "species": species,
             "tag_types": tag_types,
-            "weapons": list(engine.WEAPONS),
+            # The Season Table filter speaks the `seasons.weapon` vocabulary ('any', not 'all').
+            "weapons": list(WEAPONS),
             "restrictions": engine.RESTRICTIONS,
             "reasons": {
                 code: {"label": label, "severity": "narrowing"}
