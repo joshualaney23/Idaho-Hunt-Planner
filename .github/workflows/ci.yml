@@ -14,21 +14,58 @@ jobs:
         python-version: ["3.12"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Docs-only PRs (every changed file is under docs/ or is a *.md file)
+      # skip the heavy steps below. This job still runs and reports success,
+      # so the required `test (3.12)` check passes without lint or tests.
+      - name: Detect docs-only change
+        id: scope
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "docs_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}")
+          docs_only=true
+          if [ -z "$changed" ]; then docs_only=false; fi
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              docs/*|*.md) ;;
+              *) docs_only=false ;;
+            esac
+          done <<< "$changed"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
+          echo "Docs-only change: $docs_only"
       - uses: actions/setup-python@v5
+        if: steps.scope.outputs.docs_only != 'true'
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
           cache-dependency-path: |
             requirements.txt
             requirements-dev.txt
-      - run: pip install -r requirements.txt -r requirements-dev.txt
-      - run: ruff check .
-      - run: ruff format --check .
+      - name: Install dependencies
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Ruff check
+        if: steps.scope.outputs.docs_only != 'true'
+        run: ruff check .
+      - name: Ruff format check
+        if: steps.scope.outputs.docs_only != 'true'
+        run: ruff format --check .
       - uses: actions/setup-node@v4
+        if: steps.scope.outputs.docs_only != 'true'
         with:
           node-version: "22"
-      - run: pytest -q
+      - name: Pytest
+        if: steps.scope.outputs.docs_only != 'true'
+        run: pytest -q
       # JS twins of Python modules (T-05). Boise time zone so DST bugs surface.
-      - run: node --test static/js/*.test.mjs
+      - name: Node tests
+        if: steps.scope.outputs.docs_only != 'true'
+        run: node --test static/js/*.test.mjs
         env:
           TZ: America/Boise
