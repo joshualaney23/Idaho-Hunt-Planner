@@ -53,6 +53,19 @@ RESTRICTIONS: Final[dict[str, Restriction]] = {
     "cwd_testing": {"label": "CWD testing required", "severity": "informational"},
     "motorized_rule": {"label": "Motorized hunting rule", "severity": "informational"},
     "second_tag_prohibited": {"label": "Second tag prohibited", "severity": "informational"},
+    # §12 T-13 — the bear/lion/wolf tables' printed method rules. They say how you may
+    # hunt (bait, dogs, calls, expanded methods) or warn about grizzlies; none of them
+    # changes where or when the season is open, so all are informational (§5.1).
+    "second_tag_allowed": {"label": "Second tag may be used", "severity": "informational"},
+    "bait_prohibited": {"label": "Bait prohibited", "severity": "informational"},
+    "dogs_prohibited": {"label": "Dogs prohibited", "severity": "informational"},
+    "electronic_calls": {"label": "Electronic calls may be used", "severity": "informational"},
+    "grizzly_caution": {"label": "Grizzly bears may be encountered", "severity": "informational"},
+    "expanded_methods": {
+        "label": "Expanded hunting methods allowed",
+        "severity": "informational",
+    },
+    "general_methods": {"label": "General hunting rules apply", "severity": "informational"},
     "see_notes": {"label": "See notes", "severity": "narrowing"},
 }
 

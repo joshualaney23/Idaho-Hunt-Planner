@@ -623,6 +623,7 @@ def _null_context() -> Iterator[None]:
 # Importing the check registry and the parser modules registers them (§8.1 section
 # router, §8.7 checks). Kept last so the API above is fully defined when they import it.
 from planner.importer import (  # noqa: E402,F401  (side effect)
+    bear_lion_wolf,
     checks,
     controlled,
     deer,

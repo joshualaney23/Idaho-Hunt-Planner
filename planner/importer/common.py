@@ -130,6 +130,18 @@ _UNIT_NOISE_RE = re.compile(
 _PAGE_REF_RE = re.compile(r"\(?\s*see\s+(?:pg|page)s?\.?\s*\d+\s*\)?", re.IGNORECASE)
 
 
+#: `Statewide`, `All units`, `All GMUs` — the whole state rather than a list (§12 T-13).
+_ALL_UNITS_RE = re.compile(
+    r"\b(?:statewide|state-?wide|all\s+(?:units?|gmus?|of\s+the\s+state)|entire\s+state)\b",
+    re.IGNORECASE,
+)
+#: `All units except 1, 2` / `Statewide except Units 10A` — what the state excludes.
+_EXCEPT_RE = re.compile(r"\bexcept(?:\s+(?:in|for))?\b", re.IGNORECASE)
+#: Units no season may cover: Yellowstone National Park is closed to hunting, so
+#: `Statewide` never means it (§8.7 `general_coverage` excludes it for the same reason).
+CLOSED_UNITS: frozenset[str] = frozenset({"YNP"})
+
+
 @dataclass(frozen=True)
 class UnitList:
     """Units named by a cell, plus the tokens that aren't real GMUs (§8.3)."""
@@ -137,9 +149,18 @@ class UnitList:
     units: list[str] = field(default_factory=list)
     unknown: list[str] = field(default_factory=list)
     text: str = ""
+    #: The cell said `Statewide` / `All units` instead of listing them (§12 T-13).
+    all_units: bool = False
+    #: Units an `All units except …` cell took back out.
+    excluded: list[str] = field(default_factory=list)
 
     def __bool__(self) -> bool:
         return bool(self.units)
+
+
+def names_all_units(text: str) -> bool:
+    """Does this cell say `Statewide` / `All units` rather than list units (§12 T-13)?"""
+    return bool(_ALL_UNITS_RE.search(text or ""))
 
 
 def natural_key(unit_id: str) -> tuple[int, str]:
@@ -172,12 +193,39 @@ def _expand_range(a: str, b: str, known: Sequence[str] | None) -> list[str] | No
     return [str(n) for n in range(ka[0], kb[0] + 1)]
 
 
+def _parse_all_units(text: str, known: Iterable[str] | None) -> UnitList:
+    """`Statewide` / `All units except 10, 12` → every known unit minus the exceptions."""
+    raw = (text or "").replace("\n", " ")
+    valid = sorted({u.upper() for u in known}, key=natural_key) if known is not None else []
+    excluded: list[str] = []
+    unknown: list[str] = []
+    if match := _EXCEPT_RE.search(raw):
+        taken = parse_units(raw[match.end() :], known)
+        excluded = list(taken.units)
+        unknown = list(taken.unknown)
+    units = [u for u in valid if u not in set(excluded) and u not in CLOSED_UNITS]
+    return UnitList(
+        units=units,
+        unknown=unknown,
+        text=raw.strip(),
+        all_units=True,
+        excluded=excluded,
+    )
+
+
 def parse_units(text: str, known: Iterable[str] | None = None) -> UnitList:
     """Parse `1, 2, 3, 4A`, `Units 16A, 17, 19, and 20`, `21-21A` into unit ids.
 
     Every token is validated against `known` (the `units` table) when it is given;
     tokens that aren't real GMUs come back in `unknown` instead of being dropped.
+
+    `Statewide` / `All units` means every unit in `known`, and `All units except 10, 12`
+    means every unit but those — the lion and wolf tables are printed that way (§12
+    T-13). Without `known` the state cannot be expanded, so `units` stays empty and
+    `all_units` says why (D3: an un-expandable cell is reported, never guessed).
     """
+    if names_all_units(text):
+        return _parse_all_units(text, known)
     raw = _PAGE_REF_RE.sub(" ", (text or "").replace("\n", " "))
     valid = {u.upper() for u in known} if known is not None else None
     order = sorted(valid, key=natural_key) if valid else None
@@ -231,6 +279,16 @@ QUALIFIER_PATTERNS: tuple[tuple[str, str], ...] = (
         r"second\s+(?:white[\s-]?tailed\s+)?(?:deer\s+)?tag\s+may\s+not\s+be\s+used",
         "second_tag_prohibited",
     ),
+    # §12 T-13: the bear, lion and wolf tables print method rules in their Notes cell.
+    # Every one of them is a *prohibition* or a *permission* the brochure states
+    # outright — none is inferred from an absence (D3).
+    (r"second\s+\w+\s+tag\s+may\s+be\s+used", "second_tag_allowed"),
+    (r"bait\s+(?:and\s+dogs\s+)?(?:is\s+)?prohibited", "bait_prohibited"),
+    (r"dogs\s+(?:and\s+bait\s+)?(?:are\s+)?prohibited", "dogs_prohibited"),
+    (r"electronic\s+calls\s+may\s+be\s+used", "electronic_calls"),
+    (r"caution:?\s+grizzly\s+bears?\s+may\s+be\s+encountered", "grizzly_caution"),
+    (r"expanded\s+hunting\s+methods\s+allowed", "expanded_methods"),
+    (r"general\s+hunting\s+rules\s+apply", "general_methods"),
 )
 _QUALIFIER_RES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(p, re.IGNORECASE), code) for p, code in QUALIFIER_PATTERNS

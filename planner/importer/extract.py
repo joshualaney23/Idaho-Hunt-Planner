@@ -34,7 +34,10 @@ from typing import IO, Any
 
 import pdfplumber
 
-#: Points cropped off each side before extraction (§8.2).
+#: Most a side may be cropped before extraction (§8.2). The crop is *adaptive*: it
+#: reaches exactly as far as the rotated section tab printed in that margin, and no
+#: further, because a fixed 40 pt also cuts through real content (2026 p. 72: `60A` is
+#: read as `0A` and the Notes column's right rule is lost).
 SIDE_CROP_PT = 40.0
 #: Share of sideways chars that makes a page a rotated layout (§8.2 → T-12).
 ROTATED_SHARE = 0.30
@@ -44,7 +47,7 @@ SUPERSCRIPT_SHARE = 0.75
 #: number there, in the margin the side crop removes (T-17a printed → physical map).
 FOOTER_BAND_PT = 40.0
 #: Bumped whenever the cached shape changes, which invalidates older cache files.
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 Table = list[list[str | None]]
 
@@ -127,10 +130,32 @@ class Page:
     small_chars: list[Word] = field(default_factory=list)
     #: The uncropped bottom band, which carries the brochure's printed page number.
     footer: str = ""
+    #: The same page under the **tab-only** crop (`tab_margins`, §8.2), filled in only
+    #: when the fixed crop cuts content that crop keeps. Read them through
+    #: `full_tables`/`full_words`/`full_text`; `tables`/`words`/`text` stay on the fixed
+    #: crop, so parsers written before T-13 see exactly what they always saw.
+    wide_tables: list[Table] = field(default_factory=list)
+    wide_words: list[Word] = field(default_factory=list)
+    wide_text: str = ""
 
     @property
     def lines(self) -> list[str]:
         return [ln for ln in self.text.splitlines() if ln.strip()]
+
+    @property
+    def full_tables(self) -> list[Table]:
+        """Ruled tables from the least-cropped view of this page (§8.2)."""
+        return self.wide_tables or self.tables
+
+    @property
+    def full_words(self) -> list[Word]:
+        """Text-layer words from the least-cropped view of this page (§8.2)."""
+        return self.wide_words or self.words
+
+    @property
+    def full_text(self) -> str:
+        """Page text from the least-cropped view of this page (§8.2)."""
+        return self.wide_text or self.text
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -149,6 +174,9 @@ class Page:
             ],
             "small_chars": [w.to_json() for w in self.small_chars],
             "footer": self.footer,
+            "wide_tables": self.wide_tables,
+            "wide_words": [w.to_json() for w in self.wide_words],
+            "wide_text": self.wide_text,
         }
 
     @classmethod
@@ -168,6 +196,9 @@ class Page:
             ],
             small_chars=[Word.from_json(w) for w in data.get("small_chars") or ()],
             footer=str(data.get("footer") or ""),
+            wide_tables=[[list(row) for row in t] for t in data.get("wide_tables") or ()],
+            wide_words=[Word.from_json(w) for w in data.get("wide_words") or ()],
+            wide_text=str(data.get("wide_text") or ""),
         )
 
 
@@ -214,11 +245,59 @@ def without_superscripts(page: Any, body_size: float | None = None) -> Any:
     )
 
 
+def tab_margins(page: Any, cap: float = SIDE_CROP_PT) -> tuple[float, float]:
+    """How far the rotated section tab reaches into each side, capped at `cap` (§8.2).
+
+    The tabs ("DEER / REGULAR") are printed sideways in the margin, and `find_tables`
+    detects them as *the* table — that is what the crop is for. Cropping a fixed
+    distance instead cuts real content: on the 2026 black bear page the units cell
+    starts 30.7 pt in (`60A` becomes `0A`, `68` becomes `8` — valid-looking and silently
+    wrong) and the Notes column's right rule sits 4 pt outside the crop, which makes
+    `find_tables` drop that column. A side with no tab is therefore not cropped at all.
+    """
+    width = float(page.width)
+    left = right = 0.0
+    for char in page.chars:
+        if char.get("upright", True):
+            continue
+        x0, x1 = float(char["x0"]), float(char["x1"])
+        if x1 <= cap:
+            left = max(left, x1)
+        if x0 >= width - cap:
+            right = max(right, width - x0)
+    return (min(left, cap), min(right, cap))
+
+
+def crop_page(page: Any, left: float, right: float) -> Any:
+    """Crop `left`/`right` points off the page's sides (§8.2)."""
+    if left <= 0 and right <= 0:
+        return page
+    if page.width <= left + right:
+        return page
+    return page.crop((left, 0, page.width - right, page.height))
+
+
+def crop_tabs(page: Any, margin: float = SIDE_CROP_PT) -> Any:
+    """Crop only as far as the section tabs reach, never more than `margin` (§8.2)."""
+    return crop_page(page, *tab_margins(page, margin))
+
+
 def crop_sides(page: Any, margin: float = SIDE_CROP_PT) -> Any:
-    """Crop `margin` points off the left and right edges (§8.2)."""
+    """Crop a fixed `margin` off both sides — the §8.2 crop every parser reads (T-10)."""
     if margin <= 0 or page.width <= 2 * margin:
         return page
     return page.crop((margin, 0, page.width - margin, page.height))
+
+
+def _word(word: dict[str, Any]) -> Word:
+    """One pdfplumber word as the cached `Word`."""
+    return Word(
+        text=word["text"],
+        x0=round(float(word["x0"]), 2),
+        top=round(float(word["top"]), 2),
+        x1=round(float(word["x1"]), 2),
+        bottom=round(float(word["bottom"]), 2),
+    )
 
 
 def small_chars(page: Any, body_size: float | None = None) -> list[Word]:
@@ -282,16 +361,19 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
     if found and any(margin <= w.x0 <= page.width - margin for w in small):
         found = list(crop_sides(without_superscripts(body, size), margin).find_tables())
     cell_tables = [table_cells(t) for t in found]
-    words = [
-        Word(
-            text=w["text"],
-            x0=round(float(w["x0"]), 2),
-            top=round(float(w["top"]), 2),
-            x1=round(float(w["x1"]), 2),
-            bottom=round(float(w["bottom"]), 2),
-        )
-        for w in cropped.extract_words(**opts)
-    ]
+    words = [_word(w) for w in cropped.extract_words(**opts)]
+    # The fixed crop also cuts real content (§8.2 `tab_margins`). Where the tab-only
+    # crop keeps more of the page, that wider view is extracted too and parsers that
+    # want it read `full_tables`/`full_words`/`full_text`. Only table pages pay for it.
+    wide_tables: list[Table] = []
+    wide_words: list[Word] = []
+    wide_text = ""
+    left, right = tab_margins(body, margin)
+    if tables and (left, right) != (margin, margin):
+        wide = crop_page(body, left, right)
+        wide_tables = [list(t.extract()) for t in wide.find_tables()]
+        wide_words = [_word(w) for w in wide.extract_words(**opts)]
+        wide_text = wide.extract_text(**opts) or ""
     return Page(
         number=number,
         text=text,
@@ -304,6 +386,9 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
         cell_tables=cell_tables,
         small_chars=small,
         footer=footer_text(body),
+        wide_tables=wide_tables,
+        wide_words=wide_words,
+        wide_text=wide_text,
     )
 
 

@@ -36,6 +36,7 @@ __all__ = [
     "Coverage",
     "DateCell",
     "HuntAreaCoverage",
+    "MethodWindow",
     "SeasonRef",
     "SectionFacts",
     "TwoPath",
@@ -86,6 +87,28 @@ class DateCell:
     #: This cell must yield at least one season (a controlled hunt always prints one);
     #: an empty deer cell (`No Season`) legitimately yields none.
     must_produce: bool = False
+
+
+@dataclass(frozen=True)
+class MethodWindow:
+    """A date window that rules a *method*, not a season (§12 T-13).
+
+    The bear and lion tables print `Dogs Prohibited` and `Dog Training` windows beside
+    the take season. They never produce a season row, so `date_token_accounting` must
+    not see them — but every date printed in the brochure still has to be accounted
+    for (§8.7 principle 4), which is what `method_window_accounting` does with these.
+    """
+
+    page: int
+    #: `dogs_prohibited` / `dog_training` — which column it came from.
+    name: str
+    text: str
+    #: Date ranges the parser read out of `text`.
+    windows: int
+    #: Unit list of the row the window belongs to.
+    label: str = ""
+    #: Date text in the cell nothing explained (D3).
+    leftovers: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -303,5 +326,6 @@ from planner.importer.checks import (  # noqa: E402,F401  (side effect)
     controlled,
     golden,
     hunt_areas,
+    method_windows,
     shared,
 )
