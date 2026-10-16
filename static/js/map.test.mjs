@@ -318,3 +318,18 @@ test("enableZoom: buttons/wheel change the viewBox, reset restores it, a drag ne
   svg.listeners.click[0]({ type: "click", stopPropagation: () => (stopped = true), preventDefault() {} });
   assert.equal(stopped, false);
 });
+
+test("see_notes units get a dot and an aria note; the status color is unchanged", () => {
+  const m = createMap(svg, GMU);
+  m.setStatuses({ 1: "restricted", 39: "restricted" }, ["39"]);
+  const dotsOf = () => svg.querySelectorAll("circle");
+  const dots = dotsOf();
+  assert.equal(dots.length, 1);
+  assert.equal(dots[0].getAttribute("cx"), String(GMU.units["39"].label[0]));
+  assert.equal(dots[0].getAttribute("cy"), String(GMU.units["39"].label[1] - 7));
+  assert.equal(m.paths["39"].getAttribute("class"), "u-restricted");
+  assert.equal(m.paths["39"].getAttribute("aria-label"), "Unit 39, restricted, see notes");
+  assert.equal(m.paths["1"].getAttribute("aria-label"), "Unit 1, restricted");
+  m.setStatuses({ 39: "open" }, []);
+  assert.equal(dotsOf().length, 0);
+});

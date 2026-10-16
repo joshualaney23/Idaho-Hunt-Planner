@@ -324,6 +324,13 @@ input[type="date"] {
 .gmu-map path[data-unit].u-closed {
   fill: var(--closed);
 }
+/* "See notes" marker (§4.3): a small dot above the unit label; the fill is unchanged. */
+.gmu-map .note-dots .note-dot {
+  fill: var(--text);
+  stroke: var(--bg);
+  stroke-width: 0.6;
+  pointer-events: none;
+}
 /* Open only for a tag you don't hold: closed fill plus a 2 px dashed gold outline (§4.3),
    drawn as .overlay .ut so neighbouring fills can't cover half of it. */
 .gmu-map path[data-unit].u-untagged {
