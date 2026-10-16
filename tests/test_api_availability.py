@@ -235,7 +235,7 @@ def build_perf_db(conn, n: int = 5000, *, worst_case: bool = False, seed: int = 
     species_tags = {
         "deer": ["deer_regular", "deer_whitetail", "controlled"],
         "elk": ["elk_zone_a", "elk_zone_b", "controlled"],
-        "pronghorn": ["pronghorn_general", "controlled"],
+        "pronghorn": ["controlled"],
         "black_bear": ["black_bear", "controlled"],
     }
     seasons, sus = [], []

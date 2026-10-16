@@ -46,7 +46,7 @@ def test_list_is_empty_but_carries_form_metadata(client):
     assert body["years"] == sorted(body["years"], reverse=True)
 
     by_id = {t["id"]: t for t in body["tag_types"]}
-    assert len(by_id) == 12
+    assert len(by_id) == 11  # pronghorn_general retired (003 migration)
     assert by_id["deer_regular"]["species_label"] == "Deer"
     assert by_id["deer_regular"]["icon"] == "🦌"
     assert by_id["elk_zone_a"]["requires_zone"] is True
