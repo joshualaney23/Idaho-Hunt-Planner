@@ -120,3 +120,4 @@ python scripts/build_gmu_geometry.py --check   # committed geometry stale? (same
 4. Gates green: `pytest -q`, `ruff check .`, `ruff format --check .`.
 5. Stage explicit paths (`git add <files>`, not `-A`), push, then `gh pr create` titled `T-XX: <title>` with `Closes #N`, listing **every acceptance criterion with real evidence** (command output, spot-check values, screenshots in `docs/images/`, linked by commit SHA so they survive branch deletion).
 6. **Update this file in the same PR** when you change commands, layout, environment, or add a path — one line, no API detail. Keep the whole file under ~10 KB: every future ticket re-reads it. Detail belongs in the module, the PR description, or DESIGN.md.
+probe 1792168154
