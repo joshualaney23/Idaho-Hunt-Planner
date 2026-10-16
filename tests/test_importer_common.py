@@ -187,6 +187,14 @@ QUALIFIER_CASES: list[tuple[str, str]] = [
     ("Chronic Wasting Disease Testing Required", "cwd_testing"),
     ("Motorized Hunting Rule Applies", "motorized_rule"),
     ("Second deer tag may not be used", "second_tag_prohibited"),
+    # §12 T-13 — printed in the bear, lion and wolf tables' Notes cells.
+    ("Second bear tag may be used", "second_tag_allowed"),
+    ("Bait prohibited", "bait_prohibited"),
+    ("Bait and dogs prohibited", "dogs_prohibited"),
+    ("Electronic calls may be used", "electronic_calls"),
+    ("Caution: grizzly bears may be encountered", "grizzly_caution"),
+    ("Expanded hunting methods allowed", "expanded_methods"),
+    ("General hunting rules apply", "general_methods"),
 ]
 
 
