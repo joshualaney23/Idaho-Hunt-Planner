@@ -95,7 +95,9 @@ def test_the_canonical_form_is_stable_and_carries_no_volatile_field(imported, co
     first = rows[0]
     assert (first["hunt_number"], first["source_page"]) == ("1001", 1)
     assert (first["start_date"], first["end_date"]) == ("2026-08-30", "2026-12-01")
-    assert first["units"] == ["1"] and first["tag_quota"] == 60
+    # T-17b resolves a controlled hunt's area to its real GMUs (deer area 1-1).
+    assert first["units"] == ["1", "2", "3", "4", "4A", "5", "6", "7", "9"]
+    assert first["tag_quota"] == 60
 
 
 def test_make_golden_check_is_clean_against_the_committed_file(imported) -> None:

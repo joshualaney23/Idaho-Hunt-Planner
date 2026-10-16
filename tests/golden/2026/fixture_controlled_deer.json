@@ -26,15 +26,16 @@
       "tag_quota": 60,
       "source_page": 1,
       "units": [
-        "1"
-      ],
-      "partial_units": {
-        "1": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 1-1 — includes other units (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+        "1",
+        "2",
+        "3",
+        "4",
+        "4A",
+        "5",
+        "6",
+        "7",
+        "9"
+      ]
     },
     {
       "species_id": "deer",
@@ -55,14 +56,7 @@
       "source_page": 1,
       "units": [
         "11"
-      ],
-      "partial_units": {
-        "11": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 11 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -83,14 +77,7 @@
       "source_page": 1,
       "units": [
         "11"
-      ],
-      "partial_units": {
-        "11": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 11 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -113,14 +100,7 @@
       "source_page": 1,
       "units": [
         "11A"
-      ],
-      "partial_units": {
-        "11A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 11A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -143,14 +123,7 @@
       "source_page": 1,
       "units": [
         "11A"
-      ],
-      "partial_units": {
-        "11A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 11A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -173,14 +146,7 @@
       "source_page": 1,
       "units": [
         "13"
-      ],
-      "partial_units": {
-        "13": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 13 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -203,14 +169,7 @@
       "source_page": 1,
       "units": [
         "14"
-      ],
-      "partial_units": {
-        "14": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 14 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -233,14 +192,7 @@
       "source_page": 1,
       "units": [
         "14"
-      ],
-      "partial_units": {
-        "14": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 14 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -263,14 +215,7 @@
       "source_page": 1,
       "units": [
         "18"
-      ],
-      "partial_units": {
-        "18": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 18 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -293,14 +238,7 @@
       "source_page": 1,
       "units": [
         "18"
-      ],
-      "partial_units": {
-        "18": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 18 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -321,14 +259,7 @@
       "source_page": 1,
       "units": [
         "19A"
-      ],
-      "partial_units": {
-        "19A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 19A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -351,14 +282,7 @@
       "source_page": 1,
       "units": [
         "20A"
-      ],
-      "partial_units": {
-        "20A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 20A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -379,14 +303,7 @@
       "source_page": 1,
       "units": [
         "21"
-      ],
-      "partial_units": {
-        "21": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 21 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -407,14 +324,7 @@
       "source_page": 1,
       "units": [
         "22"
-      ],
-      "partial_units": {
-        "22": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 22 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -437,14 +347,7 @@
       "source_page": 1,
       "units": [
         "23"
-      ],
-      "partial_units": {
-        "23": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 23 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -465,14 +368,7 @@
       "source_page": 1,
       "units": [
         "25"
-      ],
-      "partial_units": {
-        "25": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 25 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -495,14 +391,7 @@
       "source_page": 1,
       "units": [
         "26"
-      ],
-      "partial_units": {
-        "26": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 26 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -525,14 +414,7 @@
       "source_page": 1,
       "units": [
         "27"
-      ],
-      "partial_units": {
-        "27": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 27 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -553,14 +435,7 @@
       "source_page": 1,
       "units": [
         "28"
-      ],
-      "partial_units": {
-        "28": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 28 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -581,14 +456,7 @@
       "source_page": 1,
       "units": [
         "30"
-      ],
-      "partial_units": {
-        "30": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 30 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -609,14 +477,7 @@
       "source_page": 1,
       "units": [
         "30A"
-      ],
-      "partial_units": {
-        "30A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 30A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -637,14 +498,7 @@
       "source_page": 1,
       "units": [
         "31"
-      ],
-      "partial_units": {
-        "31": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 31 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -668,14 +522,7 @@
       "source_page": 1,
       "units": [
         "32"
-      ],
-      "partial_units": {
-        "32": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 32 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -698,14 +545,7 @@
       "source_page": 1,
       "units": [
         "32A"
-      ],
-      "partial_units": {
-        "32A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 32A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -726,14 +566,7 @@
       "source_page": 1,
       "units": [
         "36"
-      ],
-      "partial_units": {
-        "36": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 36 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -754,14 +587,7 @@
       "source_page": 1,
       "units": [
         "36A"
-      ],
-      "partial_units": {
-        "36A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 36A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -782,14 +608,7 @@
       "source_page": 1,
       "units": [
         "36B"
-      ],
-      "partial_units": {
-        "36B": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 36B (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -817,8 +636,8 @@
       "partial_units": {
         "38": {
           "coverage": "partial",
-          "note": "Controlled hunt area 38-1 (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 38 within the Deer Flat National Wildlife Refuge, defined as the areas between the south shoreline of Lake Lowell, the New York Canal on the east, the Refuge’s southern boundary, and Parking Lot 8 on the west. (see p. 32)",
+          "frac": 0.0017
         }
       }
     },
@@ -844,14 +663,7 @@
       "source_page": 2,
       "units": [
         "38"
-      ],
-      "partial_units": {
-        "38": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 38-2 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -872,14 +684,7 @@
       "source_page": 2,
       "units": [
         "39"
-      ],
-      "partial_units": {
-        "39": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 39 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -900,14 +705,7 @@
       "source_page": 2,
       "units": [
         "40"
-      ],
-      "partial_units": {
-        "40": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 40 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -930,14 +728,7 @@
       "source_page": 2,
       "units": [
         "41"
-      ],
-      "partial_units": {
-        "41": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 41 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -958,14 +749,7 @@
       "source_page": 2,
       "units": [
         "42"
-      ],
-      "partial_units": {
-        "42": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 42 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -986,14 +770,7 @@
       "source_page": 2,
       "units": [
         "44"
-      ],
-      "partial_units": {
-        "44": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 44 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1017,14 +794,7 @@
       "source_page": 2,
       "units": [
         "45"
-      ],
-      "partial_units": {
-        "45": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 45 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1045,14 +815,7 @@
       "source_page": 2,
       "units": [
         "47"
-      ],
-      "partial_units": {
-        "47": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 47 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1074,15 +837,9 @@
       "tag_quota": 10,
       "source_page": 2,
       "units": [
+        "46",
         "47"
-      ],
-      "partial_units": {
-        "47": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 47-1 — includes other units (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1103,14 +860,7 @@
       "source_page": 2,
       "units": [
         "48"
-      ],
-      "partial_units": {
-        "48": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 48 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1131,14 +881,7 @@
       "source_page": 2,
       "units": [
         "49"
-      ],
-      "partial_units": {
-        "49": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 49 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1166,8 +909,8 @@
       "partial_units": {
         "50": {
           "coverage": "partial",
-          "note": "Controlled hunt area 50-1 (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 50 west of U.S. (see p. 32)",
+          "frac": 0.743
         }
       }
     },
@@ -1192,14 +935,7 @@
       "source_page": 2,
       "units": [
         "52"
-      ],
-      "partial_units": {
-        "52": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 52 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1220,14 +956,7 @@
       "source_page": 2,
       "units": [
         "54"
-      ],
-      "partial_units": {
-        "54": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 54 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1248,14 +977,7 @@
       "source_page": 2,
       "units": [
         "54"
-      ],
-      "partial_units": {
-        "54": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 54 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1276,14 +998,7 @@
       "source_page": 2,
       "units": [
         "55"
-      ],
-      "partial_units": {
-        "55": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 55 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1304,14 +1019,7 @@
       "source_page": 2,
       "units": [
         "55"
-      ],
-      "partial_units": {
-        "55": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 55 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1332,14 +1040,7 @@
       "source_page": 2,
       "units": [
         "57"
-      ],
-      "partial_units": {
-        "57": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 57 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1360,14 +1061,7 @@
       "source_page": 2,
       "units": [
         "57"
-      ],
-      "partial_units": {
-        "57": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 57 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1389,15 +1083,10 @@
       "tag_quota": 10,
       "source_page": 2,
       "units": [
-        "58"
-      ],
-      "partial_units": {
-        "58": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 58-1 — includes other units (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+        "58",
+        "59",
+        "59A"
+      ]
     },
     {
       "species_id": "deer",
@@ -1419,13 +1108,16 @@
       "tag_quota": 40,
       "source_page": 2,
       "units": [
-        "60"
+        "60",
+        "60A",
+        "61",
+        "62A"
       ],
       "partial_units": {
-        "60": {
+        "60A": {
           "coverage": "partial",
-          "note": "Controlled hunt area 60-1 — includes other units (exact units resolved by T-17b)",
-          "frac": null
+          "note": "All of Units 60, 61, 62A and that portion of Unit 60A beyond one mile north and west of the North (Henrys) (see p. 32)",
+          "frac": 0.9407
         }
       }
     },
@@ -1448,14 +1140,7 @@
       "source_page": 2,
       "units": [
         "62"
-      ],
-      "partial_units": {
-        "62": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 62 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1478,14 +1163,7 @@
       "source_page": 2,
       "units": [
         "66"
-      ],
-      "partial_units": {
-        "66": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 66 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1508,14 +1186,7 @@
       "source_page": 2,
       "units": [
         "66A"
-      ],
-      "partial_units": {
-        "66A": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 66A (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1538,14 +1209,7 @@
       "source_page": 2,
       "units": [
         "67"
-      ],
-      "partial_units": {
-        "67": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 67 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1569,14 +1233,7 @@
       "source_page": 2,
       "units": [
         "69"
-      ],
-      "partial_units": {
-        "69": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 69 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1597,14 +1254,7 @@
       "source_page": 2,
       "units": [
         "70"
-      ],
-      "partial_units": {
-        "70": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 70 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1627,14 +1277,7 @@
       "source_page": 2,
       "units": [
         "70"
-      ],
-      "partial_units": {
-        "70": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 70 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1657,14 +1300,7 @@
       "source_page": 2,
       "units": [
         "70"
-      ],
-      "partial_units": {
-        "70": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 70 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1688,14 +1324,7 @@
       "source_page": 2,
       "units": [
         "73"
-      ],
-      "partial_units": {
-        "73": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 73 (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1719,14 +1348,7 @@
       "source_page": 3,
       "units": [
         "18"
-      ],
-      "partial_units": {
-        "18": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 18X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -1755,8 +1377,8 @@
       "partial_units": {
         "1": {
           "coverage": "partial",
-          "note": "Controlled hunt area 1-1X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 1 within Boundary County east of the Selkirk Mountains crest. (see p. 31)",
+          "frac": 0.4388
         }
       }
     },
@@ -1787,8 +1409,8 @@
       "partial_units": {
         "1": {
           "coverage": "partial",
-          "note": "Controlled hunt area 1-1X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 1 within Boundary County east of the Selkirk Mountains crest. (see p. 31)",
+          "frac": 0.4388
         }
       }
     },
@@ -1819,8 +1441,8 @@
       "partial_units": {
         "1": {
           "coverage": "partial",
-          "note": "Controlled hunt area 1-1X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 1 within Boundary County east of the Selkirk Mountains crest. (see p. 31)",
+          "frac": 0.4388
         }
       }
     },
@@ -1851,8 +1473,8 @@
       "partial_units": {
         "1": {
           "coverage": "partial",
-          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 1 within Bonner County on or within one mile of private agricultural lands except hat portion of the Priest River drainage and that portion within the Pend Orielle River drainage downstream of Priest River is closed. (see p. 31)",
+          "frac": 0.2443
         }
       }
     },
@@ -1883,8 +1505,8 @@
       "partial_units": {
         "1": {
           "coverage": "partial",
-          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 1 within Bonner County on or within one mile of private agricultural lands except hat portion of the Priest River drainage and that portion within the Pend Orielle River drainage downstream of Priest River is closed. (see p. 31)",
+          "frac": 0.2443
         }
       }
     },
@@ -1915,8 +1537,8 @@
       "partial_units": {
         "1": {
           "coverage": "partial",
-          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 1 within Bonner County on or within one mile of private agricultural lands except hat portion of the Priest River drainage and that portion within the Pend Orielle River drainage downstream of Priest River is closed. (see p. 31)",
+          "frac": 0.2443
         }
       }
     },
@@ -1947,8 +1569,8 @@
       "partial_units": {
         "1": {
           "coverage": "partial",
-          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 1 within Bonner County on or within one mile of private agricultural lands except hat portion of the Priest River drainage and that portion within the Pend Orielle River drainage downstream of Priest River is closed. (see p. 31)",
+          "frac": 0.2443
         }
       }
     },
@@ -1975,14 +1597,7 @@
       "source_page": 3,
       "units": [
         "2"
-      ],
-      "partial_units": {
-        "2": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2007,14 +1622,7 @@
       "source_page": 3,
       "units": [
         "2"
-      ],
-      "partial_units": {
-        "2": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2039,14 +1647,7 @@
       "source_page": 3,
       "units": [
         "2"
-      ],
-      "partial_units": {
-        "2": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2071,14 +1672,7 @@
       "source_page": 3,
       "units": [
         "2"
-      ],
-      "partial_units": {
-        "2": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2103,14 +1697,7 @@
       "source_page": 3,
       "units": [
         "3"
-      ],
-      "partial_units": {
-        "3": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2135,14 +1722,7 @@
       "source_page": 3,
       "units": [
         "3"
-      ],
-      "partial_units": {
-        "3": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2167,14 +1747,7 @@
       "source_page": 3,
       "units": [
         "3"
-      ],
-      "partial_units": {
-        "3": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2199,14 +1772,7 @@
       "source_page": 3,
       "units": [
         "3"
-      ],
-      "partial_units": {
-        "3": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2231,14 +1797,7 @@
       "source_page": 3,
       "units": [
         "5"
-      ],
-      "partial_units": {
-        "5": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2263,14 +1822,7 @@
       "source_page": 3,
       "units": [
         "5"
-      ],
-      "partial_units": {
-        "5": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2295,14 +1847,7 @@
       "source_page": 3,
       "units": [
         "5"
-      ],
-      "partial_units": {
-        "5": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2327,14 +1872,7 @@
       "source_page": 3,
       "units": [
         "5"
-      ],
-      "partial_units": {
-        "5": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2361,8 +1899,8 @@
       "partial_units": {
         "11": {
           "coverage": "partial",
-          "note": "Controlled hunt area 11-1X (exact units resolved by T-17b)",
-          "frac": null
+          "note": "That portion of Unit 11 within one mile of cultivated fields and north of the following boundary: Beginning at the Nez Perce County/Lewis County line on U.S. (see p. 31)",
+          "frac": 0.2979
         }
       }
     },
@@ -2388,14 +1926,7 @@
       "source_page": 3,
       "units": [
         "14"
-      ],
-      "partial_units": {
-        "14": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 14X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     },
     {
       "species_id": "deer",
@@ -2419,14 +1950,7 @@
       "source_page": 3,
       "units": [
         "14"
-      ],
-      "partial_units": {
-        "14": {
-          "coverage": "partial",
-          "note": "Controlled hunt area 14X (exact units resolved by T-17b)",
-          "frac": null
-        }
-      }
+      ]
     }
   ]
 }
