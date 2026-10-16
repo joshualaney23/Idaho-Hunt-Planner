@@ -248,4 +248,4 @@ def run_checks(parse: ParseContext, section: str, facts: SectionFacts | None) ->
 
 # Importing the check modules registers them. Kept last so the registry API above is
 # fully defined when they import it.
-from planner.importer.checks import controlled, shared  # noqa: E402,F401  (side effect)
+from planner.importer.checks import controlled, golden, shared  # noqa: E402,F401  (side effect)

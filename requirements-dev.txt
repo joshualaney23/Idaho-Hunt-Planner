@@ -4,3 +4,4 @@ shapely>=2
 pyproj
 requests
 pypdf
+pypdfium2
