@@ -174,6 +174,9 @@ def _tag_matches(
         # Hunt numbers are reused across years: a 2025 #1001 never matches 2026's #1001.
         if int(tag["license_year"]) != int(season["license_year"]):
             return False
+        # §7.2 step 2 ("controlled tags whose hunt's species matches") needs no check here:
+        # a controlled tag has no species of its own, and `evaluate` only ever offers it
+        # seasons of the queried species, so the hunt it matches *is* that species' hunt.
     return True
 
 

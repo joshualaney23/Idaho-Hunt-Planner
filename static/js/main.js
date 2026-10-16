@@ -19,7 +19,7 @@
 import { card, textEl, toast } from "./ui.js";
 import { TABS, parseRoute, tabHash } from "./router.js";
 import { localToday, toISO } from "./dates.js";
-import { PERMITS_CHANGED, TAGS_CHANGED, initTags } from "./tags.js";
+import { PERMITS_CHANGED, TAGS_CHANGED, initTags, tagChipLabel } from "./tags.js";
 import { initRegs } from "./regs.js";
 import { UNITS_HIGHLIGHT, initSeasons } from "./seasons.js";
 import { initSettings } from "./settings.js";
@@ -303,6 +303,9 @@ async function initMapTab() {
   };
   function paintFilters() {
     const s = store.get();
+    // T-17c: season lines say which tag unlocks them, so the labels carry the tags held
+    // in the range (`tag_ids` on every availability season entry → "via 🦌 …").
+    labels.tags = Object.fromEntries(tagsInRange(s).map((t) => [t.id, tagChipLabel(t)]));
     filters.update(s, ctxFor(s));
     renderViewing(viewing, s, meta.species, tagsInRange(s));
   }

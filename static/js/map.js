@@ -178,18 +178,27 @@ export function pageLink(s) {
 /**
  * One season line, shared by the tooltip, the results table and the brief: weapon
  * badge, sex, dates, narrowing reasons (yellow), informational restrictions (neutral),
- * source page. `labels` = `{restrictions, reasons}` from `/api/meta`. With
- * `{link: true}` the page is a `p.N` link to the PDF (the tooltip can't be clicked).
+ * source page. `labels` = `{restrictions, reasons, tags}` from `/api/meta` plus the
+ * tags held (`{<tag id>: "🦌 Regular deer tag"}`, T-17c), which is what lets a line say
+ * *which* tag unlocks it when a controlled and a general tag both apply (§7.2).
+ * With `{link: true}` the page is a `p.N` link to the PDF (the tooltip can't be
+ * clicked); `{coverage: false}` drops the partial-coverage note for callers that
+ * already show it (the Unit Brief).
  */
-export function seasonLine(s, labels = {}, { link = false } = {}) {
+export function seasonLine(s, labels = {}, { link = false, coverage = true } = {}) {
   const restr = labels.restrictions || {};
   const reasons = labels.reasons || {};
+  const tagLabels = labels.tags || {};
   const label = (code) => restr[code]?.label || reasons[code]?.label || code.replace(/_/g, " ");
   const row = document.createElement("div");
   row.className = "sline";
   const weapon = WEAPON_BADGE[s.weapon] || "short-range";
   row.appendChild(badge(weapon, s.weapon.replace(/_/g, "-")));
-  const what = [s.sex && s.sex !== "either" ? s.sex : null, seasonDates(s)].filter(Boolean);
+  const what = [
+    s.hunt_number ? `Controlled #${s.hunt_number}` : null,
+    s.sex && s.sex !== "either" ? s.sex : null,
+    seasonDates(s),
+  ].filter(Boolean);
   row.appendChild(textEl("span", `${what.join(" ")} `));
   if (s.status === "untagged") row.appendChild(badge("untagged", "no tag"));
   const narrowing = new Set(s.reasons || []);
@@ -201,6 +210,13 @@ export function seasonLine(s, labels = {}, { link = false } = {}) {
     row.append(" ", pageLink(s));
   } else if (s.source_page) {
     row.appendChild(textEl("span", ` p.${s.source_page}`, "muted"));
+  }
+  const via = (s.tag_ids || []).map((id) => tagLabels[id]).filter(Boolean);
+  if (via.length) row.appendChild(textEl("div", `via ${via.join(" · ")}`, "muted"));
+  // §7.2: a controlled hunt that covers only part of the unit carries the brochure's own
+  // area description and the page it is printed on — never a bare "portion of unit".
+  if (coverage && s.coverage === "partial" && s.coverage_note) {
+    row.appendChild(textEl("div", s.coverage_note, "muted"));
   }
   return row;
 }
