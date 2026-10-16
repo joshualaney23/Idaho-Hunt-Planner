@@ -218,6 +218,19 @@ export function groupRows(seasons) {
     }));
 }
 
+/**
+ * The Staged rows list order: every row that is not yet approved, grouped as
+ * `groupRows` does, then the approved rows grouped the same way at the bottom. An
+ * approved row therefore drops to the end of the section when it is approved, and
+ * the species blocks repeat once for the approved tail.
+ */
+export function groupRowsForReview(seasons) {
+  const list = seasons || [];
+  const pending = list.filter((r) => r.status !== "approved");
+  const approved = list.filter((r) => r.status === "approved");
+  return [...groupRows(pending), ...groupRows(approved)];
+}
+
 /** Flatten `groupRows` back to render order — the order `j` / `k` walk. */
 export function rowOrder(groups) {
   const out = [];
@@ -824,7 +837,7 @@ export function createReviewScreen(docId, options = {}) {
   }
 
   function paintRows() {
-    const groups = groupRows(state.seasons);
+    const groups = groupRowsForReview(state.seasons);
     order = rowOrder(groups);
     const waived = waivedSections();
     const body = el("div", "row-groups");
