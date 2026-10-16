@@ -231,6 +231,24 @@ export function groupRowsForReview(seasons) {
   return [...groupRows(pending), ...groupRows(approved)];
 }
 
+/**
+ * After `seasonId` is approved, the row the selection should move to: the next row
+ * still `staged` after it in the current render order, else the nearest one before
+ * it, else `null`. `order` is the rows as currently shown (before the repaint).
+ */
+export function nextStagedAfter(order, seasonId) {
+  const ids = (order || []).map((r) => Number(r.id));
+  const at = ids.indexOf(Number(seasonId));
+  if (at === -1) return null;
+  const staged = (i) => {
+    const row = order[i];
+    return row && Number(row.id) !== Number(seasonId) && row.status === "staged";
+  };
+  for (let i = at + 1; i < order.length; i += 1) if (staged(i)) return Number(order[i].id);
+  for (let i = at - 1; i >= 0; i -= 1) if (staged(i)) return Number(order[i].id);
+  return null;
+}
+
 /** Flatten `groupRows` back to render order — the order `j` / `k` walk. */
 export function rowOrder(groups) {
   const out = [];
@@ -1003,6 +1021,12 @@ export function createReviewScreen(docId, options = {}) {
 
   async function decide(seasonId, status) {
     try {
+      // An approved row drops to the bottom of the list on repaint. Move the selection
+      // to the next staged row first, so focus never follows the approved row there.
+      if (status === "approved") {
+        const next = nextStagedAfter(order, seasonId);
+        selectedId = next;
+      }
       await review(seasonId, { status });
       await refresh();
       notify(`Row ${seasonId} ${status}.`, status === "approved" ? "success" : "warn");
@@ -1066,7 +1090,9 @@ export function createReviewScreen(docId, options = {}) {
     const node = [...rowsHost.querySelectorAll("article")].find(
       (n) => n.dataset.seasonId === String(selectedId),
     );
-    if (node && node.focus) node.focus();
+    // preventScroll: an approved row leaves the view when it drops to the bottom, and
+    // focusing the next row must not drag the page down to where it landed.
+    if (node && node.focus) node.focus({ preventScroll: true });
   }
 
   async function loadExtras() {
