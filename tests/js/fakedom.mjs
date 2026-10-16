@@ -58,6 +58,16 @@ class FakeElement {
   getAttribute(k) {
     return this.attributes.has(k) ? this.attributes.get(k) : null;
   }
+  removeAttribute(k) {
+    this.attributes.delete(k);
+  }
+  // `href` reflects its attribute, like an <a> in a browser (T-15b).
+  get href() {
+    return this.getAttribute("href") ?? "";
+  }
+  set href(v) {
+    this.setAttribute("href", v);
+  }
   hasAttribute(k) {
     return this.attributes.has(k);
   }

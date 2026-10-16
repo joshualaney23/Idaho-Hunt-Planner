@@ -18,15 +18,11 @@ export class ApiError extends Error {
   }
 }
 
-/** Issue a request and return the parsed body, throwing ApiError on failure. */
-export async function request(method, path, body) {
+/** Send `init` and return the parsed body, throwing ApiError on failure. */
+async function send(method, path, init) {
   let resp;
   try {
-    resp = await fetch(path, {
-      method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
+    resp = await fetch(path, { method, ...init });
   } catch {
     throw new ApiError("The planner server is not responding.", { code: "offline" });
   }
@@ -45,6 +41,26 @@ export async function request(method, path, body) {
     });
   }
   return data;
+}
+
+/** Issue a JSON request and return the parsed body, throwing ApiError on failure. */
+export function request(method, path, body) {
+  return send(method, path, {
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+/**
+ * POST a File as multipart/form-data — the PDF upload (§6, T-15b). The browser
+ * sets the multipart boundary, so this never sets Content-Type itself. Extra
+ * `fields` become form fields (e.g. the `kind`/`year` classifier overrides).
+ */
+export function postFile(path, file, fields = {}) {
+  const form = new FormData();
+  form.append("file", file);
+  for (const [k, v] of Object.entries(fields)) if (v != null) form.append(k, String(v));
+  return send("POST", path, { body: form });
 }
 
 export const getJSON = (path) => request("GET", path);
