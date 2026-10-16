@@ -10,7 +10,7 @@ from typing import Any
 
 from flask import Blueprint, Response, current_app, jsonify, request, send_file
 
-from planner import __version__, db, engine, importer
+from planner import __version__, db, diff, engine, importer
 from planner.dates import DEFAULT_WEEKEND_DEF, WEEKEND_DEFS, default_range, parse_iso, to_iso
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -825,6 +825,86 @@ def _unit_sort(unit_id: str):
     from planner.importer.common import natural_key
 
     return natural_key(unit_id)
+
+
+# A document's own rows for the diff: everything it proposes or already publishes.
+# A `rejected` row was thrown away and a `superseded` one belongs to another document.
+DIFF_STATUSES = ("staged", "approved", "published")
+
+
+def _diff_season_rows(where: str, *args: Any) -> list[dict[str, Any]]:
+    """Season rows with their unit set and per-unit coverage, for `planner.diff`."""
+    rows = _dicts(
+        "SELECT s.*, d.license_year AS license_year FROM seasons s"
+        " JOIN source_documents d ON d.id = s.document_id"
+        f" WHERE {where} ORDER BY s.id",
+        *args,
+    )
+    by_id = {row["id"]: row for row in rows}
+    for row in rows:
+        row["restrictions"] = json.loads(row["restrictions"] or "[]")
+        row["units"] = []
+        row["coverage"] = {}
+    if by_id:
+        marks = ", ".join("?" * len(by_id))
+        units = db.q(
+            "SELECT season_id, unit_id, coverage, coverage_note FROM season_units"
+            f" WHERE season_id IN ({marks}) ORDER BY season_id, unit_id",
+            *by_id,
+        )
+        for unit in units:
+            row = by_id[unit["season_id"]]
+            row["units"].append(unit["unit_id"])
+            row["coverage"][unit["unit_id"]] = [unit["coverage"], unit["coverage_note"]]
+    return rows
+
+
+def _prior_published_year(doc_row) -> int | None:
+    """The most recent license year before this document's that has published rows."""
+    row = db.q1(
+        "SELECT MAX(d.license_year) AS year FROM seasons s"
+        " JOIN source_documents d ON d.id = s.document_id"
+        " WHERE s.status = 'published' AND d.license_year < ? AND s.document_id != ?",
+        doc_row["license_year"],
+        doc_row["id"],
+    )
+    return None if row is None else row["year"]
+
+
+@api.get("/documents/<int:doc_id>/diff")
+def document_diff(doc_id: int):
+    """Diff this document's rows against the last published license year (§8.4, T-15a).
+
+    Read-only: pure SQL + Python, no parsing and no writes. A document whose year has
+    no earlier published year gets every row `new` and an empty `removed`.
+    """
+    doc_row = _document_row(doc_id)
+    marks = ", ".join("?" * len(DIFF_STATUSES))
+    current = _diff_season_rows(
+        f"s.document_id = ? AND s.status IN ({marks})", doc_id, *DIFF_STATUSES
+    )
+    prior_year = _prior_published_year(doc_row)
+    prior = (
+        _diff_season_rows(
+            "s.status = 'published' AND d.license_year = ? AND s.document_id != ?",
+            prior_year,
+            doc_id,
+        )
+        if prior_year is not None
+        else []
+    )
+    result = diff.diff_rows(current, prior)
+    return jsonify(
+        {
+            "document": {
+                "id": doc_row["id"],
+                "title": doc_row["title"],
+                "license_year": doc_row["license_year"],
+            },
+            "prior_license_year": prior_year,
+            **result,
+        }
+    )
 
 
 @api.post("/documents")
