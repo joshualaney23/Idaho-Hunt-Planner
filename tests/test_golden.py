@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -240,13 +241,40 @@ def test_golden_match_is_recorded_for_every_section_of_a_real_import(tmp_path, m
 # ───────── AC4: nothing ships verified ─────────
 
 
-def test_the_committed_verification_log_has_no_signed_page() -> None:
+def _block(text: str, section: str) -> str:
+    """One section's slice of the log, markers included."""
+    start = text.index(f"<!-- section: {section} -->")
+    return text[start : text.index(f"<!-- /section: {section} -->", start)]
+
+
+def test_the_fixture_section_of_the_committed_log_has_no_signed_page() -> None:
+    """Nothing the harness dumps ships verified: this excerpt is a harness fixture,
+    not hand-verified data (the hand-verified sections are signed by T-22d–f)."""
     text = VERIFICATION.read_text(encoding="utf-8")
     from scripts.make_verification_checklist import signed_pages
 
-    assert signed_pages(text) == []
-    assert f"<!-- section: {SECTION} -->" in text
+    assert signed_pages(_block(text, SECTION)) == []
     assert "| p001 | 27 | | | |" in text
+
+
+def test_every_committed_golden_section_is_signed_page_by_page() -> None:
+    """A golden file may only be committed once its log names a human and a date
+    for every page it cites (§8.7, T-22d)."""
+    text = VERIFICATION.read_text(encoding="utf-8")
+    from scripts.make_verification_checklist import signed_pages
+
+    for section in golden.sections_with_golden(YEAR):
+        if section.startswith("fixture_"):
+            continue
+        rows = json.loads(golden.golden_path(YEAR, section).read_text(encoding="utf-8"))["rows"]
+        pages = sorted({f"p{int(r['source_page']):03d}" for r in rows})
+        block = _block(text, section)
+        assert signed_pages(block) == pages, section
+        for line in block.splitlines():
+            cells = [c.strip() for c in line.split("|")]
+            if len(cells) == 7 and cells[1] in pages:
+                assert cells[3] and cells[4], f"{section} {cells[1]} has no verifier or date"
+                assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", cells[4]), cells
 
 
 def test_the_checklist_script_writes_an_unverified_skeleton(tmp_path) -> None:

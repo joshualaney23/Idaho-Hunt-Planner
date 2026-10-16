@@ -28,15 +28,15 @@ Source: `data/pdf_cache/da4260b617b679db.pdf` · **235 rows** on 9 pages · imag
 
 | PDF page | Rows | Verified by | Date | Corrections made |
 |---|---:|---|---|---|
-| p012 | 13 | | | |
-| p013 | 33 | | | |
-| p014 | 9 | | | |
-| p015 | 44 | | | |
-| p016 | 12 | | | |
-| p018 | 24 | | | |
-| p019 | 39 | | | |
-| p020 | 42 | | | |
-| p021 | 19 | | | |
-| **total** | **235** | | | |
+| p012 | 13 | josh | 2026-10-16 | none |
+| p013 | 33 | josh | 2026-10-16 | none |
+| p014 | 9 | josh | 2026-10-16 | none |
+| p015 | 44 | josh | 2026-10-16 | none |
+| p016 | 12 | josh | 2026-10-16 | none |
+| p018 | 24 | josh | 2026-10-16 | none |
+| p019 | 39 | josh | 2026-10-16 | none |
+| p020 | 42 | josh | 2026-10-16 | none |
+| p021 | 19 | josh | 2026-10-16 | none |
+| **total** | **235** | josh | 2026-10-16 | **none — 0 corrections** |
 
 <!-- /section: deer_general -->
