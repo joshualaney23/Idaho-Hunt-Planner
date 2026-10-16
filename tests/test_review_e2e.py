@@ -4,11 +4,14 @@ Everything here goes through the HTTP API the review screen calls, on the nine c
 general-deer pages of the 2026 Big Game brochure (`tests/fixtures/bg2026_deer_p*.pdf`):
 upload → §8.4 gate → waiver → per-row review → publish → `/api/availability`.
 
-Why a waiver is part of the happy path: the fixtures are *page excerpts*, so the
-`general_coverage` check correctly reports units it can't explain (their seasons are in
-the controlled tables, which these pages don't contain). That failure is real, and
-waiving it with a typed reason is exactly what §8.4 asks a human to do — which makes this
-the most faithful end-to-end the repo can run without the uncommittable brochure.
+Why two waivers are part of the happy path: the fixtures are *page excerpts*, so
+`general_coverage` correctly reports units it can't explain (their seasons are in the
+controlled tables, which these pages don't contain), and `golden_match` correctly reports
+every row as changed — the excerpt holds exactly the 235 verified rows of
+`tests/golden/2026/deer_general.json`, but renumbered: its pages are 1–9, the brochure's
+are 12–21 (T-22d). Both failures are real, and waiving them with a typed reason is
+exactly what §8.4 asks a human to do — which makes this the most faithful end-to-end the
+repo can run without the uncommittable brochure.
 """
 
 from __future__ import annotations
@@ -69,8 +72,26 @@ def _ids(detail) -> list[int]:
     return [s["id"] for s in detail["seasons"]]
 
 
+def _check(detail, name: str):
+    return next(c for c in detail["checks"] if c["check_name"] == name)
+
+
 def _coverage_check(detail):
-    return next(c for c in detail["checks"] if c["check_name"] == "general_coverage")
+    return _check(detail, "general_coverage")
+
+
+#: What an excerpt of the 2026 brochure cannot satisfy, in the order the API reports it.
+EXCERPT_BLOCKERS = ["general_coverage", "golden_match"]
+
+
+def _waive_excerpt_checks(client, doc_id: int, detail, reason: str) -> None:
+    """Waive both excerpt-only failures with one typed reason (§8.4)."""
+    for name in EXCERPT_BLOCKERS:
+        res = client.post(
+            f"/api/documents/{doc_id}/checks/{_check(detail, name)['id']}/waive",
+            json={"reason": reason},
+        )
+        assert res.status_code == 200, res.get_json()
 
 
 def _section(detail, name: str = "deer_general"):
@@ -105,20 +126,29 @@ def test_the_accuracy_panel_has_a_row_for_every_check(imported) -> None:
     assert sorted(deer) == [
         "date_token_accounting",
         "general_coverage",
-        # `skipped`: no 2026 golden file is committed for this section yet (T-22d–f).
+        # `fail`: the committed 2026 golden file holds these very rows, but cites the
+        # brochure's page numbers (12–21) and this excerpt's are 1–9 (T-22d).
         "golden_match",
         "row_validation",
         "two_path_agreement",
         "unit_tokens_valid",
     ]
-    assert {c["status"] for c in detail["checks"]} == {"pass", "fail", "skipped"}
+    # Nothing is `skipped` any more: deer_general has its golden file (T-22d), and the
+    # controlled sections stage no rows here, so their `golden_match` says nothing at all.
+    assert {c["status"] for c in detail["checks"]} == {"pass", "fail"}
     assert _coverage_check(detail)["status"] == "fail"
     # Every check belongs to a section the panel can group it under, and every section of
     # the panel is present — including the controlled ones that found nothing here.
     assert all(c["section"] for c in detail["checks"])
     assert {s["section"] for s in detail["sections"]} == {c["section"] for c in detail["checks"]}
-    assert _section(detail)["blocking_checks"] == ["general_coverage"]
+    assert _section(detail)["blocking_checks"] == EXCERPT_BLOCKERS
     assert _section(detail)["clean"] is False
+    # Every golden diff is the page number and nothing else: the parse itself agrees
+    # row for row with the hand-verified file (T-22d).
+    golden = _check(detail, "golden_match")
+    assert golden["actual"] == "235 parsed, 235 differ"
+    assert {d["kind"] for d in golden["detail"]} == {"changed"}
+    assert {f for d in golden["detail"] for f in d["fields"]} == {"source_page"}
 
 
 # ───────── AC: the gate blocks publishing ─────────
@@ -131,7 +161,7 @@ def test_publish_is_blocked_while_staged_rows_and_a_failing_check_remain(client,
     assert res.status_code == 409
     err = res.get_json()["error"]
     assert err["code"] == "publish_blocked"
-    assert [c["check_name"] for c in err["detail"]["checks"]] == ["general_coverage"]
+    assert [c["check_name"] for c in err["detail"]["checks"]] == EXCERPT_BLOCKERS
     assert err["detail"]["rows"] == sorted(_ids(detail))  # every staged row is named
     assert len(err["detail"]["unreviewed_rows"]) == EXPECTED_ROWS
 
@@ -144,7 +174,7 @@ def test_approving_every_row_is_not_enough_while_the_check_fails(client, importe
     assert res.status_code == 409
     detail_err = res.get_json()["error"]["detail"]
     assert detail_err["rows"] == []
-    assert [c["check_name"] for c in detail_err["checks"]] == ["general_coverage"]
+    assert [c["check_name"] for c in detail_err["checks"]] == EXCERPT_BLOCKERS
 
 
 # ───────── AC: waiving needs a typed reason, stored and shown ─────────
@@ -193,10 +223,12 @@ def test_bulk_approve_refuses_a_waived_section(client, imported) -> None:
 def published(client, imported):
     """The full §8.4 flow: waive, review every row, publish."""
     doc_id, detail = imported
-    cid = _coverage_check(detail)["id"]
-    client.post(
-        f"/api/documents/{doc_id}/checks/{cid}/waive",
-        json={"reason": "nine-page excerpt: the unexplained units are controlled-only"},
+    _waive_excerpt_checks(
+        client,
+        doc_id,
+        detail,
+        "nine-page excerpt: the unexplained units are controlled-only and the golden"
+        " file cites the brochure's page numbers",
     )
     _approve_every_row(client, doc_id, detail)
     res = client.post(f"/api/documents/{doc_id}/publish")

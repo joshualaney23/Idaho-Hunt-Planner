@@ -20,3 +20,23 @@ Source: `tests/fixtures/bg2026_controlled.pdf` · **81 rows** on 3 pages · imag
 | **total** | **81** | | | |
 
 <!-- /section: controlled_deer -->
+
+<!-- section: deer_general -->
+## `deer_general`
+
+Source: `data/pdf_cache/da4260b617b679db.pdf` · **235 rows** on 9 pages · images: `data/verify/2026/deer_general/`
+
+| PDF page | Rows | Verified by | Date | Corrections made |
+|---|---:|---|---|---|
+| p012 | 13 | josh | 2026-10-16 | none |
+| p013 | 33 | josh | 2026-10-16 | none |
+| p014 | 9 | josh | 2026-10-16 | none |
+| p015 | 44 | josh | 2026-10-16 | none |
+| p016 | 12 | josh | 2026-10-16 | none |
+| p018 | 24 | josh | 2026-10-16 | none |
+| p019 | 39 | josh | 2026-10-16 | none |
+| p020 | 42 | josh | 2026-10-16 | none |
+| p021 | 19 | josh | 2026-10-16 | none |
+| **total** | **235** | josh | 2026-10-16 | **none — 0 corrections** |
+
+<!-- /section: deer_general -->
