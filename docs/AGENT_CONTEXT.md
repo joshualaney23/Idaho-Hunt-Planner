@@ -47,8 +47,9 @@ One line per path: what it owns, and the ticket that brought it. Open the file f
 | Path | What it owns |
 |---|---|
 | `planner/app.py`, `__main__.py`, `__init__.py` | `create_app(db_path=None)`, `DATA_DIR` beside the DB (so tests never write the repo's `data/`), `python -m planner`, `__version__` (T-01) |
-| `planner/api.py` | Every JSON endpoint plus `ApiError` → `{error:{code,message,detail}}`: meta/units/availability (T-06), tags/permits/profile (T-09), unit seasons (T-08), documents + PDF serving (T-10), the §8.4 review gate — per-row approve/reject, guarded `approve-all`, check waivers, `publish` (409 `publish_blocked`) (T-22b). Spec is §6 |
+| `planner/api.py` | Every JSON endpoint plus `ApiError` → `{error:{code,message,detail}}`: meta/units/availability (T-06), tags/permits/profile (T-09), unit seasons (T-08), documents + PDF serving (T-10), the §8.4 review gate — per-row approve/reject, guarded `approve-all`, check waivers, `publish` (409 `publish_blocked`) (T-22b), year-over-year diff (T-15a). Spec is §6 |
 | `planner/engine.py` | Availability evaluation, pure over dicts (§7.2/§7.4), plus `RESTRICTIONS` — the §5.1 closed vocabulary (T-06) |
+| `planner/diff.py` | Year-over-year season diff (§8.4): identity match on species/tag/zone/hunt no./weapon/sex + unit **set**, rows tagged `new`/`changed`/`same` plus `removed`. Pure, read-only (T-15a) |
 | `planner/dates.py` | Date-range helpers and presets; twin of `static/js/dates.js` (§7.3) (T-05) |
 | `planner/db.py`, `schema.sql`, `migrations/`, `seed.py` | §5 schema, migrations, seed from `static/data/units_seed.json` (T-04); `002_publish_gate.sql` adds `seasons.section`/`reviewed_at` + `import_checks.waived_by`/`waived_at` (T-22b) |
 | `planner/importer/__init__.py` | §8 pipeline: `@parser` registry, `ParsedSeason`/`UnitRef`/`ParseContext`, `run_import()`, `validate`, `PARSER_VERSION`. Rows land `staged`; a rejected row becomes a failing `import_checks` row (T-10) |
