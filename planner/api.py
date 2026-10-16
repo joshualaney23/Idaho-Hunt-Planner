@@ -1005,7 +1005,7 @@ REVIEWABLE_STATUSES = ("staged", "approved", "rejected")
 WEAPONS = ("any", "archery", "muzzleloader", "short_range", "shotgun", "falconry")
 #: Season Table Weapon filter choices. 'rifle' is a filter-only value: it shows the seasons
 #: stored as 'any' (open to rifle hunters, not exclusively bow or muzzleloader).
-FILTER_WEAPONS = ("any", "rifle", "archery", "muzzleloader", "short_range", "shotgun", "falconry")
+FILTER_WEAPONS = ("rifle", "archery", "muzzleloader", "short_range", "falconry")
 SEXES = ("antlered", "antlerless", "either", "any", "male", "na")
 #: Free-text columns the review screen lets a human correct. `None` clears them.
 EDITABLE_TEXT_FIELDS = ("zone", "hunt_number", "hunt_area", "sub_species", "bag_limit", "notes")

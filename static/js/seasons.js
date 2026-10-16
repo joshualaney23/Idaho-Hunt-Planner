@@ -37,12 +37,10 @@ export const STATUSES = [
 
 // Season Table Weapon filter labels: capitalized like the other dropdowns' options.
 const WEAPON_LABELS = {
-  any: "Any",
   rifle: "Rifle",
   archery: "Archery",
   muzzleloader: "Muzzleloader",
   short_range: "Short-range",
-  shotgun: "Shotgun",
   falconry: "Falconry",
 };
 
