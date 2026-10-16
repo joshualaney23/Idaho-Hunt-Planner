@@ -22,8 +22,9 @@ function svgEl(tag, attrs = {}) {
 }
 
 /** The accessible name of a unit path: "Unit 39, open". */
-export function unitLabel(id, status) {
-  return `Unit ${id}, ${status === "untagged" ? "open with a tag you don't hold" : status}`;
+export function unitLabel(id, status, notes = false) {
+  const base = `Unit ${id}, ${status === "untagged" ? "open with a tag you don't hold" : status}`;
+  return notes ? `${base}, see notes` : base;
 }
 
 /**
@@ -49,6 +50,9 @@ export function createMap(svg, gmu) {
   const overlay = svgEl("g", { class: "overlay", "aria-hidden": "true" });
   const untaggedRings = svgEl("g", { class: "untagged-rings" });
   const hlRings = svgEl("g", { class: "hl-rings" });
+  // A dot over units with a `see_notes` reason: the status color is unchanged (D3 still
+  // narrows), the dot only says "read the brochure notes for this unit" (§4.3).
+  const noteDots = svgEl("g", { class: "note-dots", "aria-hidden": "true" });
   const labels = svgEl("g", { class: "labels", "aria-hidden": "true" });
   const hover = svgEl("path", { class: "hover-ring" });
   hover.setAttribute("visibility", "hidden");
@@ -102,21 +106,28 @@ export function createMap(svg, gmu) {
     labels.appendChild(t);
     texts[id] = t;
   }
-  overlay.append(untaggedRings, hlRings, hover);
+  overlay.append(untaggedRings, hlRings, noteDots, hover);
   svg.replaceChildren(fills, overlay, labels);
 
-  function setStatuses(map = {}) {
+  function setStatuses(map = {}, notes = []) {
     const rings = [];
+    const dots = [];
+    const noted = new Set(notes);
     for (const id of Object.keys(paths)) {
       const st = gmu.units[id].closed ? "closed" : map[id] || "closed";
       statuses[id] = st;
       paths[id].setAttribute("class", `u-${st}`);
-      paths[id].setAttribute("aria-label", unitLabel(id, st));
+      paths[id].setAttribute("aria-label", unitLabel(id, st, noted.has(id)));
+      if (noted.has(id)) {
+        const [x, y] = gmu.units[id].label;
+        dots.push(svgEl("circle", { cx: x, cy: y - 7, r: 2.6, class: "note-dot" }));
+      }
       // Dark text on colored fills, --text3 on closed/untagged (closed fill) units (§4.3).
       texts[id].setAttribute("class", st === "open" || st === "restricted" ? "" : "c");
       if (st === "untagged") rings.push(svgEl("path", { d: gmu.units[id].d, class: "ut" }));
     }
     untaggedRings.replaceChildren(...rings);
+    noteDots.replaceChildren(...dots);
   }
 
   function highlight(ids = []) {
