@@ -195,7 +195,15 @@ def test_meta(client, conn):
     assert species["elk"]["published_seasons"] == 0
     assert m["restrictions"] == json.loads(json.dumps(RESTRICTIONS))
     assert m["reasons"]["no_tag_next_year"]["severity"] == "narrowing"
-    assert m["weapons"] == ["any", "archery", "muzzleloader", "short_range", "shotgun", "falconry"]
+    assert m["weapons"] == [
+        "any",
+        "rifle",
+        "archery",
+        "muzzleloader",
+        "short_range",
+        "shotgun",
+        "falconry",
+    ]
     assert {t["id"] for t in m["tag_types"]} >= {"deer_regular", "controlled", "elk_zone_a"}
     assert next(t for t in m["tag_types"] if t["id"] == "elk_zone_a")["requires_zone"] is True
     start, end = default_range(date.today())

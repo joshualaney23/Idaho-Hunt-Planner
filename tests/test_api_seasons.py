@@ -88,6 +88,9 @@ def test_filters_narrow_the_table(client, published) -> None:
     _, a, b = published
     assert _get(client, "/api/seasons?species=elk")[1]["count"] == 1
     assert _get(client, "/api/seasons?weapon=muzzleloader")[1]["seasons"][0]["id"] == b
+    # 'rifle' means the seasons open to any weapon (stored as 'any'), not a value of its own.
+    assert _get(client, "/api/seasons?weapon=rifle")[1]["seasons"][0]["id"] == a
+    assert _get(client, "/api/seasons?weapon=rifle")[1]["filters"]["weapon"] == "rifle"
     assert _get(client, "/api/seasons?tag_type=deer_regular")[1]["seasons"][0]["id"] == a
     assert _get(client, "/api/seasons?year=2025")[1]["count"] == 0
     assert _get(client, "/api/seasons?q=1001")[1]["seasons"][0]["id"] == b
