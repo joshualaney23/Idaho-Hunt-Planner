@@ -1496,6 +1496,12 @@ tr.season-row:focus-visible {
 tr.season-row.manual td:first-child {
   border-left: 2px solid var(--gold);
 }
+/* Lighthouse target-size: the shared .btn.small is 22.4px tall, under the 24px
+   minimum, and two of them sit side by side in a row (T-16). */
+table.seasons-table .btn.small {
+  min-height: 24px;
+  margin-right: 8px;
+}
 .csv-errors {
   border: 1px solid var(--bg5);
   border-left: 3px solid var(--gold);

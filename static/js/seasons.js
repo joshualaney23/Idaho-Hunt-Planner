@@ -17,6 +17,7 @@
 import { deleteJSON, getJSON, postFile, postJSON, putJSON } from "./api.js";
 import { badge, card, textEl, toast } from "./ui.js";
 import { naturalCompare } from "./results.js";
+import { DEBOUNCE_MS } from "./state.js";
 import { HUNT_CLASSES, createRowEditor, restrictionLabel } from "./review.js";
 
 export { HUNT_CLASSES };
@@ -243,7 +244,14 @@ export function createSeasonsScreen(options = {}) {
   let editing = null; // season id, or "new"
 
   // ---- the filter bar --------------------------------------------------------
+  // Built ONCE. Repainting it on every refresh destroyed the focused search input, so
+  // only the first keystroke landed and the rest went to <body> (caught in Chrome).
+  let filtersPainted = false;
+  let unitTimer = null;
+
   function paintFilters() {
+    if (filtersPainted) return;
+    filtersPainted = true;
     const years = (meta.license_years || []).map((y) => [String(y), String(y)]);
     const speciesOptions = (meta.species || []).map((s) => [s.id, s.label || s.id]);
     const tagOptions = (meta.tag_types || []).map((t) => [t.id, t.label || t.id]);
@@ -253,7 +261,11 @@ export function createSeasonsScreen(options = {}) {
     unitInput.id = "seasons-unit";
     unitInput.value = filters.unit || "";
     unitInput.setAttribute("placeholder", "e.g. 39");
-    unitInput.addEventListener("input", () => setFilter("unit", unitInput.value));
+    unitInput.addEventListener("input", () => {
+      // Debounced like the map's filters (state.js): one request per pause, not per key.
+      clearTimeout(unitTimer);
+      unitTimer = setTimeout(() => setFilter("unit", unitInput.value), DEBOUNCE_MS);
+    });
     const unitWrap = el("label", "filter");
     unitWrap.append(textEl("span", "Unit", "filter-label"), unitInput);
 
@@ -284,10 +296,19 @@ export function createSeasonsScreen(options = {}) {
   }
 
   // ---- the toolbar: add, export, import --------------------------------------
+  // Also built once (the hidden file input must survive a repaint mid-upload); only the
+  // export link's href and the row count change per refresh.
+  let exportLink = null;
+
+  function syncToolbar() {
+    if (exportLink) exportLink.href = exportUrl(filters);
+  }
+
   function paintToolbar() {
+    if (exportLink) return syncToolbar();
     const addBtn = button("btn primary", "+ Add season", () => startCreate(), "Add a season by hand");
     addBtn.id = "seasons-add";
-    const exportLink = el("a", "btn", "⬇ Export CSV");
+    exportLink = el("a", "btn", "⬇ Export CSV");
     exportLink.id = "seasons-export";
     exportLink.href = exportUrl(filters);
     exportLink.setAttribute("download", "");
@@ -504,6 +525,7 @@ export function createSeasonsScreen(options = {}) {
     rows = (data && data.seasons) || [];
     paintFilters();
     paintToolbar();
+    syncToolbar();
     paintTable();
     document.body.dataset.seasonsQuery = queryString(filters);
     return rows;

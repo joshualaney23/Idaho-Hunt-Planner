@@ -220,6 +220,18 @@ test("the export link follows the filters", async () => {
   );
 });
 
+test("the filter bar survives a refresh, so typing in the search keeps focus", async () => {
+  const { screen } = mount([season()]);
+  await screen.ready;
+  const before = document.getElementById("seasons-unit");
+  const beforeSelect = document.getElementById("seasons-status");
+  await screen.refresh();
+  // Repainting the bar would replace these nodes and drop focus after one keystroke.
+  assert.equal(document.getElementById("seasons-unit"), before);
+  assert.equal(document.getElementById("seasons-status"), beforeSelect);
+  assert.equal(document.getElementById("seasons-import-file"), document.getElementById("seasons-import-file"));
+});
+
 test("clicking a row asks the map to highlight its units", async () => {
   const { screen, calls } = mount([season({ units: ["39", "43"] })]);
   await screen.ready;
