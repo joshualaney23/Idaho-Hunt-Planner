@@ -35,6 +35,15 @@ export const STATUSES = [
   ["all", "All statuses"],
 ];
 
+// Season Table Weapon filter labels: capitalized like the other dropdowns' options.
+const WEAPON_LABELS = {
+  rifle: "Rifle",
+  archery: "Archery",
+  muzzleloader: "Muzzleloader",
+  short_range: "Short-range",
+  falconry: "Falconry",
+};
+
 /** Filter keys, in the order the bar lays them out. `unit` is a prefix search. */
 export const FILTER_KEYS = ["year", "species", "tag_type", "weapon", "status", "unit"];
 
@@ -255,7 +264,7 @@ export function createSeasonsScreen(options = {}) {
     const years = (meta.license_years || []).map((y) => [String(y), String(y)]);
     const speciesOptions = (meta.species || []).map((s) => [s.id, s.label || s.id]);
     const tagOptions = (meta.tag_types || []).map((t) => [t.id, t.label || t.id]);
-    const weaponOptions = (meta.weapons || []).map((w) => [w, w.replace(/_/g, " ")]);
+    const weaponOptions = (meta.weapons || []).map((w) => [w, WEAPON_LABELS[w] || w]);
     const unitInput = el("input", "filter-input");
     unitInput.type = "search";
     unitInput.id = "seasons-unit";
@@ -286,7 +295,7 @@ export function createSeasonsScreen(options = {}) {
       select(
         "seasons-weapon",
         "Weapon",
-        [["", "All weapons"], ...weaponOptions],
+        [["", "All"], ...weaponOptions],
         filters.weapon,
         (v) => setFilter("weapon", v),
       ),
