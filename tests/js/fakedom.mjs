@@ -87,6 +87,9 @@ class FakeElement {
     this._text = "";
     this.append(...cs);
   }
+  prepend(...cs) {
+    for (const c of [...cs].reverse()) this.insertBefore(c, this.children[0] || null);
+  }
   insertBefore(c, ref) {
     if (c.parentNode) c.remove();
     const i = ref ? this.children.indexOf(ref) : -1;
@@ -106,9 +109,14 @@ class FakeElement {
   }
   /** Fire `type` listeners with a minimal event; returns the event. */
   dispatch(type, init = {}) {
-    const ev = { type, target: this, defaultPrevented: false, ...init };
+    const ev = { type, target: this, defaultPrevented: false, propagationStopped: false, ...init };
     ev.preventDefault = () => {
       ev.defaultPrevented = true;
+    };
+    // Real handlers call this on a nested button so the row behind it doesn't react
+    // (T-16). There is no bubbling here, so recording the call is enough.
+    ev.stopPropagation = () => {
+      ev.propagationStopped = true;
     };
     for (const fn of this.listeners[type] || []) fn(ev);
     return ev;
@@ -137,7 +145,7 @@ class FakeElement {
   click() {
     // Browsers never dispatch click on a disabled <button>.
     if (this.tagName === "BUTTON" && this.disabled) return;
-    for (const fn of this.listeners.click || []) fn({ type: "click", target: this });
+    return this.dispatch("click");
   }
   // <dialog> (T-15c's waive and publish modals). `open` reflects the attribute, as in
   // a browser, so a test can assert the modal state without a layout engine.
@@ -161,7 +169,13 @@ class FakeElement {
 function matches(el, sel) {
   const s = sel.trim();
   if (s.startsWith("#")) return el.id === s.slice(1);
-  if (s.startsWith(".")) return String(el.className || "").split(/\s+/).includes(s.slice(1));
+  // Compound `tag.class` / `.a.b` selectors (T-16's `tr.season-row`, `input.date-input`).
+  if (/^[a-zA-Z]*(\.[\w-]+)+$/.test(s)) {
+    const [tag, ...classes] = s.split(".");
+    const have = String(el.className || "").split(/\s+/);
+    if (tag && el.tagName.toLowerCase() !== tag.toLowerCase()) return false;
+    return classes.every((c) => have.includes(c));
+  }
   if (s.startsWith("[")) {
     // [data-foo] and [data-foo="bar"]
     const m = /^\[([^\]=]+)(?:=["']?([^\]"']*)["']?)?\]$/.exec(s);

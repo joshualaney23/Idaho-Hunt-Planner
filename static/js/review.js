@@ -66,6 +66,16 @@ export const SEXES = [
   ["na", "Not applicable"],
 ];
 
+/** `seasons.hunt_class` (§5) -> label; the Add-season editor's class select (T-16). */
+export const HUNT_CLASSES = [
+  ["general", "General"],
+  ["controlled", "Controlled"],
+  ["extra", "Extra"],
+  ["youth", "Youth"],
+  ["outfitter", "Outfitter"],
+  ["other", "Other"],
+];
+
 /** The §5.1 closed vocabulary, mirrored for the restriction multi-select. */
 export const RESTRICTIONS = [
   ["whitetail_only", "White-tailed deer only"],
@@ -484,8 +494,16 @@ function rowSummary(row, { diff, waivedSection } = {}) {
  * The inline editor for one row: unit chips with autocomplete, date inputs, selects for
  * tag/weapon/sex and a restriction multi-select. `onSave(patch)` gets only the fields
  * that changed, so an untouched field is never rewritten.
+ *
+ * `create: true` (T-16's "+ Add season") adds the columns a new row needs and that a
+ * parsed row already carries — license year, species, hunt class, hunt number, zone,
+ * notes and source page. The diff-only contract is unchanged: a blank optional field
+ * is simply not sent, and the server names anything still missing.
  */
-export function createRowEditor(row, { units = [], tagTypes = [], onSave, onCancel } = {}) {
+export function createRowEditor(
+  row,
+  { units = [], tagTypes = [], species = [], create = false, onSave, onCancel } = {},
+) {
   const form = el("form", "row-editor");
   form.setAttribute("novalidate", "true");
   const fields = new Map();
@@ -533,7 +551,9 @@ export function createRowEditor(row, { units = [], tagTypes = [], onSave, onCanc
       if (String(row[name]) === value) option.setAttribute("selected", "true");
       sel.appendChild(option);
     }
-    sel.value = row[name] || "";
+    // A new row has no value yet: a select must still read back something valid
+    // (assigning an unmatched value blanks the selection in a real browser).
+    sel.value = row[name] || (create && options.length ? options[0][0] : "");
     fields.set(name, () => sel.value);
     return sel;
   };
@@ -552,6 +572,37 @@ export function createRowEditor(row, { units = [], tagTypes = [], onSave, onCanc
     [...restrictions.children].filter((o) => o.selected).map((o) => o.value),
   );
 
+  const number = (name, label, attrs = {}) => {
+    const input = el("input", "num-input");
+    input.type = "number";
+    input.value = row[name] == null ? "" : String(row[name]);
+    for (const [k, v] of Object.entries(attrs)) input.setAttribute(k, String(v));
+    fields.set(name, () => (input.value === "" ? null : Number(input.value)));
+    return field(label, input);
+  };
+
+  const line = (name, label, hint) => {
+    const input = el("input", "text-input");
+    input.type = "text";
+    input.value = row[name] == null ? "" : String(row[name]);
+    fields.set(name, () => input.value.trim() || null);
+    return field(label, input, hint);
+  };
+
+  if (create) {
+    form.append(
+      number("license_year", "License year", { min: 1900, max: 2100, required: "true" }),
+      field(
+        "Species",
+        select(
+          "species_id",
+          species.map((s) => [s.id, s.label || s.id]),
+        ),
+      ),
+      field("Hunt class", select("hunt_class", HUNT_CLASSES)),
+    );
+  }
+
   form.append(
     field("Units", unitInput, "comma separated, autocompleted from the seeded GMUs"),
     datalist,
@@ -563,6 +614,15 @@ export function createRowEditor(row, { units = [], tagTypes = [], onSave, onCanc
     field("Restrictions", restrictions, "§5.1 codes only"),
   );
 
+  if (create) {
+    form.append(
+      line("hunt_number", "Hunt number", "controlled hunts only"),
+      line("zone", "Zone", "elk A/B seasons only"),
+      line("notes", "Notes"),
+      number("source_page", "Source page", { min: 1 }),
+    );
+  }
+
   const err = el("p", "err");
   err.hidden = true;
   const bar = el("p", "row-actions");
@@ -570,11 +630,20 @@ export function createRowEditor(row, { units = [], tagTypes = [], onSave, onCanc
   bar.append(button("btn", "Cancel", () => onCancel && onCancel()), save);
   form.append(err, bar);
 
-  /** Only the fields whose value actually moved. */
+  /**
+   * Only the fields whose value actually moved — except in `create` mode, where there
+   * is no row yet, so every field that carries a value is sent (a prefilled year must
+   * reach the server, not look "unchanged").
+   */
   function patch() {
     const out = {};
     for (const [name, read] of fields) {
       const next = read();
+      if (create) {
+        const empty = Array.isArray(next) ? !next.length : next === null || next === "";
+        if (!empty) out[name] = next;
+        continue;
+      }
       const before = row[name];
       const same = Array.isArray(next)
         ? JSON.stringify([...next].sort()) === JSON.stringify([...(before || [])].sort())

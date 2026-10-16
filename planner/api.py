@@ -11,6 +11,7 @@ from typing import Any
 from flask import Blueprint, Response, current_app, jsonify, request, send_file
 
 from planner import __version__, db, diff, engine, importer
+from planner import seasons as seasons_csv
 from planner.dates import DEFAULT_WEEKEND_DEF, WEEKEND_DEFS, default_range, parse_iso, to_iso
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -1451,4 +1452,445 @@ def publish_document(doc_id: int):
             "published": ids,
             "superseded": superseded,
         }
+    )
+
+
+# ───────── Season Table, manual rows and the CSV round-trip (T-16, §6 + §12) ─────────
+#: `source_documents.kind` for rows a human typed or imported from CSV. One per license
+#: year, created on demand; it has no PDF, so `sha256`/`stored_path` stay NULL.
+MANUAL_KIND = "manual"
+#: A manual row corrects what a brochure says, so it outranks every parsed document in
+#: §8.5 supersession (`_supersede` compares `source_documents.priority`).
+MANUAL_PRIORITY = 100
+#: Row states the Season Table can list. `published` is what the map uses, and the
+#: default; the others let the table show work in progress next to it.
+LISTABLE_STATUSES = ("published", "staged", "approved", "rejected", "superseded")
+#: `seasons.hunt_class` CHECK vocabulary, mirrored for a named error (as WEAPONS/SEXES).
+HUNT_CLASSES = ("general", "controlled", "extra", "youth", "outfitter", "other")
+#: Columns a manual row carries. Everything else on `seasons` is parser provenance.
+MANUAL_REQUIRED = (
+    "species_id",
+    "tag_type_id",
+    "hunt_class",
+    "weapon",
+    "sex",
+    "start_date",
+    "end_date",
+    "units",
+)
+
+
+def _manual_document(year: int):
+    """The `manual` source document for `year`, created on first use."""
+    row = db.q1(
+        "SELECT * FROM source_documents WHERE kind = ? AND license_year = ?", MANUAL_KIND, year
+    )
+    if row is not None:
+        return row
+    db.exec(
+        "INSERT INTO source_documents (license_year, year_end, kind, title, priority, status,"
+        " parser_version, imported_at, published_at) VALUES (?, ?, ?, ?, ?, 'published', ?, ?, ?)",
+        year,
+        year,
+        MANUAL_KIND,
+        f"Manual entries {year}",
+        MANUAL_PRIORITY,
+        MANUAL_KIND,
+        _now(),
+        _now(),
+    )
+    return db.q1(
+        "SELECT * FROM source_documents WHERE kind = ? AND license_year = ?", MANUAL_KIND, year
+    )
+
+
+def _sync_manual_document(doc_id: int) -> None:
+    """A manual doc is `needs_review` while CSV rows wait for review, else `published`."""
+    staged = db.q1(
+        "SELECT COUNT(*) AS n FROM seasons WHERE document_id = ? AND status = 'staged'", doc_id
+    )
+    status = "needs_review" if staged and staged["n"] else "published"
+    db.exec(
+        "UPDATE source_documents SET status = ?, published_at = CASE WHEN ? = 'published'"
+        " THEN IFNULL(published_at, ?) ELSE published_at END WHERE id = ?",
+        status,
+        status,
+        _now(),
+        doc_id,
+    )
+
+
+_SEASON_SELECT = (
+    "SELECT s.*, d.license_year AS license_year, d.year_end AS year_end, d.kind AS document_kind,"
+    " d.title AS document_title, sp.label AS species_label, tt.label AS tag_type_label,"
+    " GROUP_CONCAT(su.unit_id) AS units FROM seasons s"
+    " JOIN source_documents d ON d.id = s.document_id"
+    " LEFT JOIN species sp ON sp.id = s.species_id"
+    " LEFT JOIN tag_types tt ON tt.id = s.tag_type_id"
+    " LEFT JOIN season_units su ON su.season_id = s.id"
+)
+
+
+def _season_rows(where: str, *args: Any) -> list[dict[str, Any]]:
+    """Season rows for the table and the CSV, each with its unit set and labels."""
+    rows = _dicts(f"{_SEASON_SELECT} WHERE {where} GROUP BY s.id ORDER BY s.id", *args)
+    for row in rows:
+        row["restrictions"] = json.loads(row["restrictions"] or "[]")
+        raw_units = (row["units"] or "").split(",") if row["units"] else []
+        row["units"] = sorted(raw_units, key=_unit_sort)
+        row["manual"] = row["document_kind"] == MANUAL_KIND
+    return rows
+
+
+def _season_filters() -> tuple[str, list[Any], dict[str, Any]]:
+    """Translate the Season Table's query string into one WHERE clause."""
+    args = request.args
+    status = args.get("status", "published")
+    clauses: list[str] = []
+    params: list[Any] = []
+    applied: dict[str, Any] = {"status": status}
+    if status == "all":
+        marks = ", ".join("?" * len(LISTABLE_STATUSES))
+        clauses.append(f"s.status IN ({marks})")
+        params.extend(LISTABLE_STATUSES)
+    elif status in LISTABLE_STATUSES:
+        clauses.append("s.status = ?")
+        params.append(status)
+    else:
+        raise ApiError(
+            "validation_failed",
+            f"status must be 'all' or one of {', '.join(LISTABLE_STATUSES)}",
+            {"status": "invalid"},
+        )
+    if args.get("year"):
+        year = _year(args["year"])
+        clauses.append("? BETWEEN d.license_year AND d.year_end")
+        params.append(year)
+        applied["year"] = year
+    for param, column in (
+        ("species", "s.species_id"),
+        ("tag_type", "s.tag_type_id"),
+        ("weapon", "s.weapon"),
+        ("hunt_class", "s.hunt_class"),
+    ):
+        value = args.get(param)
+        if value:
+            clauses.append(f"{column} = ?")
+            params.append(value)
+            applied[param] = value
+    if args.get("document"):
+        clauses.append("s.document_id = ?")
+        params.append(int(args["document"]))
+        applied["document"] = int(args["document"])
+    unit = (args.get("unit") or "").strip()
+    if unit:
+        # Unit *search*: '1' finds 1, 1A, 10 … so typing narrows instead of jumping.
+        clauses.append(
+            "EXISTS (SELECT 1 FROM season_units f WHERE f.season_id = s.id"
+            " AND UPPER(f.unit_id) LIKE ?)"
+        )
+        params.append(f"{unit.upper()}%")
+        applied["unit"] = unit
+    q = (args.get("q") or "").strip()
+    if q:
+        clauses.append(
+            "(IFNULL(s.hunt_number,'') LIKE ? OR IFNULL(s.hunt_area,'') LIKE ?"
+            " OR IFNULL(s.notes,'') LIKE ? OR IFNULL(s.zone,'') LIKE ?)"
+        )
+        params.extend([f"%{q}%"] * 4)
+        applied["q"] = q
+    return " AND ".join(clauses), params, applied
+
+
+@api.get("/seasons")
+def list_seasons():
+    """The Season Table (§6): filter by year, species, tag type, weapon, unit and status."""
+    where, params, applied = _season_filters()
+    rows = _season_rows(where, *params)
+    rows.sort(key=seasons_csv.export_sort_key)
+    return jsonify({"seasons": rows, "count": len(rows), "filters": applied})
+
+
+def _manual_season_row(season_id: int):
+    """A season that `POST /api/seasons` created — the only kind the editor may change."""
+    row = db.q1(
+        "SELECT s.*, d.kind AS document_kind, d.license_year AS license_year FROM seasons s"
+        " JOIN source_documents d ON d.id = s.document_id WHERE s.id = ?",
+        season_id,
+    )
+    if row is None:
+        raise ApiError("unknown_season", f"no season {season_id}", {"season_id": season_id}, 404)
+    if row["document_kind"] != MANUAL_KIND:
+        raise ApiError(
+            "not_manual",
+            f"season {season_id} comes from a parsed document; correct it in the review screen",
+            {"season_id": season_id, "document_id": row["document_id"]},
+            status=409,
+        )
+    return row
+
+
+def _manual_values(body: dict[str, Any], row=None) -> tuple[int, dict[str, Any], list[str] | None]:
+    """Validate a manual-row body → (license year, `seasons` columns, unit set).
+
+    `row` is the existing row on an edit, so a PUT may send only what changed.
+    """
+    present = (lambda f: f in body) if row is not None else (lambda f: True)
+    missing = [f for f in MANUAL_REQUIRED if row is None and body.get(f) in (None, "", [])]
+    if row is None and (body.get("license_year") in (None, "")):
+        missing.insert(0, "license_year")
+    if missing:
+        raise ApiError(
+            "validation_failed",
+            f"missing required field(s): {', '.join(missing)}",
+            {f: "missing" for f in missing},
+        )
+    year = (
+        _year(body["license_year"])
+        if present("license_year") and body.get("license_year") not in (None, "")
+        else int(row["license_year"])
+    )
+    cols: dict[str, Any] = {}
+    units: list[str] | None = None
+    if present("units"):
+        units = _edit_units(body["units"])
+    if present("restrictions"):
+        cols["restrictions"] = json.dumps(_edit_restrictions(body.get("restrictions") or []))
+    for field, allowed in (
+        ("weapon", WEAPONS),
+        ("sex", SEXES),
+        ("hunt_class", HUNT_CLASSES),
+        ("species_id", tuple(s["id"] for s in _species())),
+        ("tag_type_id", tuple(t["id"] for t in _tag_types())),
+    ):
+        if present(field):
+            cols[field] = _edit_choice(body.get(field), field, allowed)
+    for field in ("start_date", "end_date"):
+        if present(field):
+            cols[field] = to_iso(_parse_date(field, str(body.get(field))))
+    for field in EDITABLE_TEXT_FIELDS + ("hunt_area",):
+        if field in body:
+            cols[field] = _text(body.get(field), field)
+    if "source_page" in body:
+        page = body["source_page"]
+        if page in (None, ""):
+            cols["source_page"] = None
+        elif not isinstance(page, int) or isinstance(page, bool) or page < 1:
+            raise ApiError(
+                "validation_failed",
+                "source_page must be a positive page number",
+                {"source_page": "invalid"},
+            )
+        else:
+            cols["source_page"] = page
+    start = cols.get("start_date", row["start_date"] if row is not None else None)
+    end = cols.get("end_date", row["end_date"] if row is not None else None)
+    if start and end and start > end:
+        raise ApiError(
+            "validation_failed",
+            f"start_date {start} is after end_date {end}",
+            {"start_date": "invalid", "end_date": "invalid"},
+        )
+    return year, cols, units
+
+
+def _insert_season(doc_id: int, values: dict[str, Any], units: list[str], status: str) -> int:
+    """Write one manual row (`seasons` + `season_units`) and return its id."""
+    cols = {
+        "document_id": doc_id,
+        "status": status,
+        "restrictions": "[]",
+        "extract_agree": 1,  # typed by a human: there is no second path to disagree with
+        "confidence": 1.0,
+        "reviewed_by_user": 1 if status != "staged" else 0,
+        "section": MANUAL_KIND,
+        **values,
+    }
+    if status != "staged":
+        cols["reviewed_at"] = _now()
+    names = ", ".join(cols)
+    marks = ", ".join("?" * len(cols))
+    cur = db.exec(f"INSERT INTO seasons ({names}) VALUES ({marks})", *cols.values())
+    season_id = int(cur.lastrowid)
+    db.exec_many(
+        "INSERT INTO season_units (season_id, unit_id) VALUES (?, ?)",
+        [(season_id, u) for u in units],
+    )
+    return season_id
+
+
+def _one_season(season_id: int) -> dict[str, Any]:
+    return _season_rows("s.id = ?", season_id)[0]
+
+
+@api.post("/seasons")
+def create_season():
+    """Add a season by hand: published at once under this year's `manual` document.
+
+    The row is typed by a human, so it skips staging — but it still goes through the
+    same §5/§5.1 validation as a review edit, and §8.5 supersession runs so it replaces
+    the brochure row it corrects.
+    """
+    body = _body()
+    year, cols, units = _manual_values(body)
+    doc = _manual_document(year)
+    with db.tx():
+        season_id = _insert_season(doc["id"], cols, units or [], "published")
+        superseded = _supersede(doc, [season_id])
+        _sync_manual_document(doc["id"])
+    return (
+        jsonify(
+            {
+                "season": _one_season(season_id),
+                "document": _document_dict(_document_row(doc["id"])),
+                "superseded": superseded,
+            }
+        ),
+        201,
+    )
+
+
+@api.put("/seasons/<int:season_id>")
+def update_season(season_id: int):
+    """Edit a manual row in place. Parsed rows stay under the review screen (409)."""
+    row = _manual_season_row(season_id)
+    body = _body()
+    year, cols, units = _manual_values(body, row)
+    doc_id = int(row["document_id"])
+    with db.tx():
+        if year != int(row["license_year"]):
+            doc_id = int(_manual_document(year)["id"])
+            cols["document_id"] = doc_id
+        if cols:
+            assignments = ", ".join(f"{c} = ?" for c in cols)
+            db.exec(f"UPDATE seasons SET {assignments} WHERE id = ?", *cols.values(), season_id)
+        if units is not None:
+            db.exec("DELETE FROM season_units WHERE season_id = ?", season_id)
+            db.exec_many(
+                "INSERT INTO season_units (season_id, unit_id) VALUES (?, ?)",
+                [(season_id, u) for u in units],
+            )
+        _sync_manual_document(doc_id)
+        if doc_id != int(row["document_id"]):
+            _sync_manual_document(int(row["document_id"]))
+    return jsonify({"season": _one_season(season_id)})
+
+
+@api.delete("/seasons/<int:season_id>")
+def delete_season(season_id: int):
+    """Delete a manual row. `season_units` goes with it (ON DELETE CASCADE)."""
+    row = _manual_season_row(season_id)
+    with db.tx():
+        db.exec("DELETE FROM season_units WHERE season_id = ?", season_id)
+        db.exec("DELETE FROM seasons WHERE id = ?", season_id)
+        _sync_manual_document(int(row["document_id"]))
+    return jsonify({"deleted": season_id})
+
+
+def _vocabulary() -> seasons_csv.Vocabulary:
+    """What the seeded database allows, for CSV validation (never invent values, D3)."""
+    return seasons_csv.Vocabulary(
+        species=frozenset(s["id"] for s in _species()),
+        tag_types=frozenset(t["id"] for t in _tag_types()),
+        units=frozenset(str(r["id"]) for r in db.q("SELECT id FROM units")),
+        restrictions=frozenset(engine.RESTRICTIONS),
+    )
+
+
+@api.get("/export.csv")
+def export_csv():
+    """Season CSV (§6). Same filters as `GET /api/seasons`; deterministic row order."""
+    where, params, applied = _season_filters()
+    rows = _season_rows(where, *params)
+    for row in rows:
+        # Canonical §5.1 order in the file, so export → import → export is byte-identical
+        # whatever order a parser happened to store the codes in.
+        row["restrictions"] = engine.sort_reasons(row["restrictions"])
+    text = seasons_csv.to_csv(rows)
+    name = f"ihp-seasons-{applied.get('year', 'all')}-{applied['status']}.csv"
+    return Response(
+        text,
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{name}"',
+            "X-Season-Count": str(len(rows)),
+        },
+    )
+
+
+#: The 3-row example file the UI links to (shipped in `docs/`, §12 T-16).
+SEASON_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "docs" / "seasons_template.csv"
+
+
+@api.get("/seasons/template.csv")
+def seasons_template():
+    """The example CSV, so the import flow starts from a file with the right header."""
+    # Bytes, not `read_text`: universal newlines would turn the file's CRLF into LF and
+    # the served template would no longer be the file we ship.
+    return Response(
+        SEASON_TEMPLATE_PATH.read_bytes(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="seasons_template.csv"'},
+    )
+
+
+@api.post("/import.csv")
+def import_csv():
+    """Import a season CSV: every row is **staged** under its year's `manual` document.
+
+    Strict by design (D3): one bad line fails the whole upload and the response names
+    every problem with its line number, so nothing half-imports.
+    """
+    upload = request.files.get("file")
+    if upload is not None and upload.filename:
+        raw = upload.read()
+    else:
+        raw = request.get_data() or b""
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise ApiError("invalid_csv", "the file is not UTF-8 text", {"errors": []}) from None
+    if not text.strip():
+        raise ApiError(
+            "invalid_csv",
+            "the file is empty: expected a header row and at least one season",
+            {"errors": [], "rows": 0},
+        )
+    parsed = seasons_csv.parse_csv(text, _vocabulary())
+    if parsed.errors:
+        raise ApiError(
+            "invalid_csv",
+            f"{len(parsed.errors)} problem(s) in the CSV; nothing was imported",
+            {
+                "errors": [e.as_dict() for e in parsed.errors],
+                "lines": sorted({e.line for e in parsed.errors}),
+                "rows_ok": len(parsed.rows),
+            },
+        )
+    if not parsed.rows:
+        raise ApiError("invalid_csv", "no season rows in the file", {"errors": [], "rows": 0})
+    created: list[int] = []
+    docs: dict[int, int] = {}
+    with db.tx():
+        for row in parsed.rows:
+            year = row.pop("license_year")
+            units = row.pop("units")
+            row["restrictions"] = json.dumps(engine.sort_reasons(row["restrictions"]))
+            if year not in docs:
+                docs[year] = int(_manual_document(year)["id"])
+            created.append(_insert_season(docs[year], row, units, "staged"))
+        for doc_id in docs.values():
+            _sync_manual_document(doc_id)
+    return (
+        jsonify(
+            {
+                "imported": len(created),
+                "season_ids": created,
+                "documents": [
+                    _document_dict(_document_row(doc_id)) for doc_id in sorted(docs.values())
+                ],
+                "status": "staged",
+            }
+        ),
+        201,
     )

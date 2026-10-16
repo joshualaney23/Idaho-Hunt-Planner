@@ -18,6 +18,7 @@ import { TABS, parseRoute, tabHash } from "./router.js";
 import { localToday, toISO } from "./dates.js";
 import { PERMITS_CHANGED, TAGS_CHANGED, initTags } from "./tags.js";
 import { initRegs } from "./regs.js";
+import { UNITS_HIGHLIGHT, initSeasons } from "./seasons.js";
 import { getJSON, putJSON } from "./api.js";
 import {
   availabilityPath,
@@ -75,10 +76,6 @@ async function initVersion() {
 
 // ---- placeholder cards for tabs owned by later tickets ---------------------
 const PLACEHOLDERS = {
-  seasons: [
-    "Season Table",
-    "A sortable, filterable table of every published season arrives in T-16.",
-  ],
   settings: ["Settings", "Default species, weekend definition and backups arrive in T-21."],
 };
 
@@ -88,6 +85,13 @@ let regsTab = null;
 function ensureRegs(rest) {
   if (!regsTab) regsTab = initRegs();
   regsTab.applyRoute(rest);
+}
+
+// T-16 mounts the Season Table (seasons.js) on first visit; it owns `#/seasons`.
+let seasonsTab = null;
+function ensureSeasons() {
+  if (seasonsTab) return;
+  seasonsTab = initSeasons();
 }
 
 let tagsMounted = false;
@@ -257,6 +261,17 @@ async function initMapTab() {
   });
   map.onClick((id) => openUnit(id));
 
+  // T-16: a Season Table row asks for its units. Switch to the map tab and ring them;
+  // the rings survive the next availability repaint because `highlight` is its own layer.
+  window.addEventListener(UNITS_HIGHLIGHT, (e) => {
+    const { units: ids = [], label } = e.detail || {};
+    if (!ids.length) return;
+    location.hash = tabHash("map");
+    map.highlight(ids);
+    document.body.dataset.highlightedUnits = ids.join(",");
+    if (label) toast(`Highlighted ${ids.length} unit(s) · ${label}`, "info");
+  });
+
   // ---- side card: summary + results table ----
   function renderSide() {
     const sum = availability?.summary;
@@ -415,6 +430,7 @@ function activate(tab, { focus = false, rest = [] } = {}) {
     if (on && focus) a.focus();
   }
   if (tab === "tags") ensureTags();
+  else if (tab === "seasons") ensureSeasons();
   else if (tab === "regs") ensureRegs(rest);
   else if (tab !== "map") renderPlaceholder(tab);
   const label = TABS.find((t) => t.id === tab).label;
