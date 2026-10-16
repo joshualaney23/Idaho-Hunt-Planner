@@ -656,9 +656,9 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
-| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, "Get latest regs" button, row highlight on the source PDF (explore) | T-19, T-20, T-21, T-27, T-28, T-29 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; T-15c → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; T-15c → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
 
 ---
 
@@ -1102,6 +1102,18 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 
 ---
 
+### T-30 · One-step install and launch (setup script + macOS double-click)
+**Depends on:** T-01 · **Size:** S
+**Description:** Today a fresh clone needs five manual commands (README "Setup"). Add one script that does them all, plus a double-clickable macOS launcher. `scripts/setup.sh` checks for Python 3.12 (and prints `brew install python@3.12` if it is missing), creates `.venv` if absent, installs `requirements.txt`, starts `python -m planner --no-browser`, waits for `/api/health` to pass, and then opens the browser. Add `Install Idaho Hunt Planner.command` at the repo root: a bash file that runs `scripts/setup.sh` from the repo directory, so Finder's double-click works. Commit the executable mode so it survives the clone. Update README "Setup" to lead with the script and keep the manual steps as a fallback. The script must not touch `data/` or any existing DB.
+**Acceptance criteria:**
+- On a fresh clone on macOS with Python 3.12 installed, `./scripts/setup.sh` creates `.venv`, installs the requirements, and serves `http://127.0.0.1:5050/api/health` with `{"ok": true, …}`. Paste the real output into the PR.
+- Running it a second time is a no-op for the install step and does not reinstall or wipe `data/`. Show both runs in the PR.
+- With Python 3.12 missing, the script exits non-zero with the `brew install python@3.12` hint and makes no changes to the repo.
+- Double-clicking `Install Idaho Hunt Planner.command` in Finder runs the same flow in Terminal. Verify it on this Mac and attach a screenshot.
+- If port 5050 is already serving the app, the script reuses it and does not start a second server. `PLANNER_PORT` is honored.
+- `shellcheck scripts/setup.sh` and the `.command` file are clean. A `pytest` test checks the script with `bash -n` and checks that the `.command` file is mode 100755 in git (`git ls-files -s` shows it).
+- README "Setup" is updated, and `docs/AGENT_CONTEXT.md`'s Repo map gets one line for the new files.
+
 ---
 
 ---
@@ -1136,7 +1148,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 - **Golden-data verification (T-22d–f) is human work.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`.
 - **Split a ticket that won't fit one session.** T-22 was one Size-L ticket bundling the check registry, the publish gate, the golden harness and the hand-verification of ~470 controlled hunts and 235 deer date ranges; it is now T-22a–f (§12). When a ticket looks bigger than one session, split it in §12 first, re-run `docs/tools/make_issues.py`, and close the old issue pointing at the new ones.
 
-**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward; later additions take the next free number instead (T-27 = #36, T-22a–f = #45–#50, T-28 = #54, T-29 = #69). The original T-22 (#24) was closed as superseded when it was split into T-22a–f. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
+**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward; later additions take the next free number instead (T-27 = #36, T-22a–f = #45–#50, T-28 = #54, T-29 = #69, T-30 = #72). The original T-22 (#24) was closed as superseded when it was split into T-22a–f. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
 
 | Ticket | Issue | Title |
 |---|---|---|
@@ -1178,6 +1190,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 | T-27 | [#36](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/36) | Multi-species intersection filter |
 | T-28 | [#54](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/54) | "Get latest regs" button (check IDFG for new regulations) |
 | T-29 | [#69](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/69) | Highlight the focused row on the source PDF page (explore) |
+| T-30 | [#72](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/72) | One-step install and launch (setup script + macOS double-click) |
 
 **Kickoff prompt template:**
 ```
