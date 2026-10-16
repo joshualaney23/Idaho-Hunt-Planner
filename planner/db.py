@@ -75,6 +75,15 @@ def current() -> sqlite3.Connection:
     raise RuntimeError("no current DB connection: wrap the call in db.use(conn) or pass conn=")
 
 
+def current_or_none() -> sqlite3.Connection | None:
+    """`current()`, or None when nothing opened a database — for callers that can say
+    nothing without one (the `golden_match` check reads the rows it compares)."""
+    try:
+        return current()
+    except RuntimeError:
+        return None
+
+
 def _conn(conn: sqlite3.Connection | None) -> sqlite3.Connection:
     return conn if conn is not None else current()
 

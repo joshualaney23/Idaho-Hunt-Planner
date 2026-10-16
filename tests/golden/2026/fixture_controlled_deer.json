@@ -1,0 +1,2432 @@
+{
+  "format": 1,
+  "section": "controlled_deer",
+  "license_year": 2026,
+  "row_count": 81,
+  "rows": [
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1001",
+      "hunt_area": "1-1",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-08-30",
+      "end_date": "2026-12-01",
+      "restrictions": [
+        "cwd_testing",
+        "portion_of_unit",
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "In a Portion of Unit 1, Chronic Wasting Disease Transport Rules Apply and Testing is Required, See Page 96",
+      "tag_quota": 60,
+      "source_page": 1,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-1 — includes other units (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1002",
+      "hunt_area": "11",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-03",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 50,
+      "source_page": 1,
+      "units": [
+        "11"
+      ],
+      "partial_units": {
+        "11": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 11 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1003",
+      "hunt_area": "11",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-10",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 25,
+      "source_page": 1,
+      "units": [
+        "11"
+      ],
+      "partial_units": {
+        "11": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 11 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1004",
+      "hunt_area": "11A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-03",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Very limited access because of private property",
+      "tag_quota": 50,
+      "source_page": 1,
+      "units": [
+        "11A"
+      ],
+      "partial_units": {
+        "11A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 11A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1005",
+      "hunt_area": "11A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Very limited access because of private property",
+      "tag_quota": 25,
+      "source_page": 1,
+      "units": [
+        "11A"
+      ],
+      "partial_units": {
+        "11A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 11A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1006",
+      "hunt_area": "13",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-03",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Very limited access because of few roads and private property",
+      "tag_quota": 125,
+      "source_page": 1,
+      "units": [
+        "13"
+      ],
+      "partial_units": {
+        "13": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 13 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1007",
+      "hunt_area": "14",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-31",
+      "restrictions": [
+        "cwd_testing"
+      ],
+      "bag_limit": null,
+      "notes": "Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 190,
+      "source_page": 1,
+      "units": [
+        "14"
+      ],
+      "partial_units": {
+        "14": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 14 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1008",
+      "hunt_area": "14",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-20",
+      "restrictions": [
+        "cwd_testing"
+      ],
+      "bag_limit": null,
+      "notes": "Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 190,
+      "source_page": 1,
+      "units": [
+        "14"
+      ],
+      "partial_units": {
+        "14": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 14 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1009",
+      "hunt_area": "18",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-17",
+      "end_date": "2026-11-09",
+      "restrictions": [
+        "cwd_testing"
+      ],
+      "bag_limit": null,
+      "notes": "Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 100,
+      "source_page": 1,
+      "units": [
+        "18"
+      ],
+      "partial_units": {
+        "18": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 18 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1010",
+      "hunt_area": "18",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "cwd_testing"
+      ],
+      "bag_limit": null,
+      "notes": "Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 25,
+      "source_page": 1,
+      "units": [
+        "18"
+      ],
+      "partial_units": {
+        "18": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 18 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1011",
+      "hunt_area": "19A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 10,
+      "source_page": 1,
+      "units": [
+        "19A"
+      ],
+      "partial_units": {
+        "19A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 19A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1012",
+      "hunt_area": "20A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-18",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Nonresident tag limit is 13 tags, See Page 109",
+      "tag_quota": null,
+      "source_page": 1,
+      "units": [
+        "20A"
+      ],
+      "partial_units": {
+        "20A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 20A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1013",
+      "hunt_area": "21",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 5,
+      "source_page": 1,
+      "units": [
+        "21"
+      ],
+      "partial_units": {
+        "21": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 21 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1014",
+      "hunt_area": "22",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 60,
+      "source_page": 1,
+      "units": [
+        "22"
+      ],
+      "partial_units": {
+        "22": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 22 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1015",
+      "hunt_area": "23",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [
+        "cwd_testing"
+      ],
+      "bag_limit": null,
+      "notes": "Chronic Wasting Disease Testing Required, See Page 96",
+      "tag_quota": 25,
+      "source_page": 1,
+      "units": [
+        "23"
+      ],
+      "partial_units": {
+        "23": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 23 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1016",
+      "hunt_area": "25",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 10,
+      "source_page": 1,
+      "units": [
+        "25"
+      ],
+      "partial_units": {
+        "25": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 25 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1017",
+      "hunt_area": "26",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-18",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Nonresident tag limit is 13 tags, See Page 109",
+      "tag_quota": null,
+      "source_page": 1,
+      "units": [
+        "26"
+      ],
+      "partial_units": {
+        "26": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 26 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1018",
+      "hunt_area": "27",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-18",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "1st choice only Unlimited Controlled Hunt, See Page 110 Nonresident tag limit is 51 tags, See Page 109",
+      "tag_quota": null,
+      "source_page": 1,
+      "units": [
+        "27"
+      ],
+      "partial_units": {
+        "27": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 27 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1019",
+      "hunt_area": "28",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 5,
+      "source_page": 1,
+      "units": [
+        "28"
+      ],
+      "partial_units": {
+        "28": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 28 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1020",
+      "hunt_area": "30",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 5,
+      "source_page": 1,
+      "units": [
+        "30"
+      ],
+      "partial_units": {
+        "30": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 30 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1021",
+      "hunt_area": "30A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-31",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 30,
+      "source_page": 1,
+      "units": [
+        "30A"
+      ],
+      "partial_units": {
+        "30A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 30A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1022",
+      "hunt_area": "31",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 30,
+      "source_page": 1,
+      "units": [
+        "31"
+      ],
+      "partial_units": {
+        "31": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 31 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1023",
+      "hunt_area": "32",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [
+        "motorized_rule",
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "See Note 1, Page 28, Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 40,
+      "source_page": 1,
+      "units": [
+        "32"
+      ],
+      "partial_units": {
+        "32": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 32 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1024",
+      "hunt_area": "32A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [
+        "motorized_rule"
+      ],
+      "bag_limit": null,
+      "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 30,
+      "source_page": 1,
+      "units": [
+        "32A"
+      ],
+      "partial_units": {
+        "32A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 32A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1025",
+      "hunt_area": "36",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-09-01",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 5,
+      "source_page": 1,
+      "units": [
+        "36"
+      ],
+      "partial_units": {
+        "36": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 36 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1026",
+      "hunt_area": "36A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 5,
+      "source_page": 1,
+      "units": [
+        "36A"
+      ],
+      "partial_units": {
+        "36A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 36A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1027",
+      "hunt_area": "36B",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 5,
+      "source_page": 1,
+      "units": [
+        "36B"
+      ],
+      "partial_units": {
+        "36B": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 36B (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1028",
+      "hunt_area": "38-1",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Short range weapons only, Deer Flat National Wildlife Refuge has specific hunting requirements, Before applying, See Note 2, Page 28",
+      "tag_quota": 5,
+      "source_page": 2,
+      "units": [
+        "38"
+      ],
+      "partial_units": {
+        "38": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 38-1 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1029",
+      "hunt_area": "38-2",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-24",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Short range weapons only, Very limited access",
+      "tag_quota": 20,
+      "source_page": 2,
+      "units": [
+        "38"
+      ],
+      "partial_units": {
+        "38": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 38-2 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1030",
+      "hunt_area": "39",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-08-15",
+      "end_date": "2026-09-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 200,
+      "source_page": 2,
+      "units": [
+        "39"
+      ],
+      "partial_units": {
+        "39": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 39 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1031",
+      "hunt_area": "40",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 200,
+      "source_page": 2,
+      "units": [
+        "40"
+      ],
+      "partial_units": {
+        "40": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 40 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1032",
+      "hunt_area": "41",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-24",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "See Note 1, Page 28",
+      "tag_quota": 75,
+      "source_page": 2,
+      "units": [
+        "41"
+      ],
+      "partial_units": {
+        "41": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 41 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1033",
+      "hunt_area": "42",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 50,
+      "source_page": 2,
+      "units": [
+        "42"
+      ],
+      "partial_units": {
+        "42": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 42 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1034",
+      "hunt_area": "44",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-09-15",
+      "end_date": "2026-10-31",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 225,
+      "source_page": 2,
+      "units": [
+        "44"
+      ],
+      "partial_units": {
+        "44": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 44 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1035",
+      "hunt_area": "45",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-15",
+      "end_date": "2026-10-31",
+      "restrictions": [
+        "motorized_rule",
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "See Note 1, Page 28, Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 75,
+      "source_page": 2,
+      "units": [
+        "45"
+      ],
+      "partial_units": {
+        "45": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 45 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1036",
+      "hunt_area": "47",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-31",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 50,
+      "source_page": 2,
+      "units": [
+        "47"
+      ],
+      "partial_units": {
+        "47": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 47 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1037",
+      "hunt_area": "47-1",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-15",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "See Notes 1 and 3, Page 28",
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "47"
+      ],
+      "partial_units": {
+        "47": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 47-1 — includes other units (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1038",
+      "hunt_area": "48",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-10",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "48"
+      ],
+      "partial_units": {
+        "48": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 48 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1039",
+      "hunt_area": "49",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-10",
+      "end_date": "2026-11-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "49"
+      ],
+      "partial_units": {
+        "49": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 49 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1040",
+      "hunt_area": "50-1",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "motorized_rule",
+        "portion_of_unit"
+      ],
+      "bag_limit": null,
+      "notes": "Portion of Unit only, Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "50"
+      ],
+      "partial_units": {
+        "50": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 50-1 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1041",
+      "hunt_area": "52",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-31",
+      "restrictions": [
+        "motorized_rule"
+      ],
+      "bag_limit": null,
+      "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 75,
+      "source_page": 2,
+      "units": [
+        "52"
+      ],
+      "partial_units": {
+        "52": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 52 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1042",
+      "hunt_area": "54",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-31",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 300,
+      "source_page": 2,
+      "units": [
+        "54"
+      ],
+      "partial_units": {
+        "54": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 54 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1043",
+      "hunt_area": "54",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-15",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 20,
+      "source_page": 2,
+      "units": [
+        "54"
+      ],
+      "partial_units": {
+        "54": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 54 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1044",
+      "hunt_area": "55",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-08-15",
+      "end_date": "2026-09-24",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 25,
+      "source_page": 2,
+      "units": [
+        "55"
+      ],
+      "partial_units": {
+        "55": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 55 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1045",
+      "hunt_area": "55",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-31",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 320,
+      "source_page": 2,
+      "units": [
+        "55"
+      ],
+      "partial_units": {
+        "55": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 55 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1046",
+      "hunt_area": "57",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-05",
+      "end_date": "2026-10-31",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 50,
+      "source_page": 2,
+      "units": [
+        "57"
+      ],
+      "partial_units": {
+        "57": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 57 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1047",
+      "hunt_area": "57",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-11-15",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "57"
+      ],
+      "partial_units": {
+        "57": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 57 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1048",
+      "hunt_area": "58-1",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "motorized_rule"
+      ],
+      "bag_limit": null,
+      "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "58"
+      ],
+      "partial_units": {
+        "58": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 58-1 — includes other units (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1049",
+      "hunt_area": "60-1",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "See Note 1, Page 28",
+      "tag_quota": 40,
+      "source_page": 2,
+      "units": [
+        "60"
+      ],
+      "partial_units": {
+        "60": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 60-1 — includes other units (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1050",
+      "hunt_area": "62",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 20,
+      "source_page": 2,
+      "units": [
+        "62"
+      ],
+      "partial_units": {
+        "62": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 62 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1051",
+      "hunt_area": "66",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "motorized_rule"
+      ],
+      "bag_limit": null,
+      "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "66"
+      ],
+      "partial_units": {
+        "66": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 66 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1052",
+      "hunt_area": "66A",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "motorized_rule"
+      ],
+      "bag_limit": null,
+      "notes": "Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 5,
+      "source_page": 2,
+      "units": [
+        "66A"
+      ],
+      "partial_units": {
+        "66A": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 66A (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1053",
+      "hunt_area": "67",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "See Note 4, Page 28",
+      "tag_quota": 40,
+      "source_page": 2,
+      "units": [
+        "67"
+      ],
+      "partial_units": {
+        "67": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 67 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1054",
+      "hunt_area": "69",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [
+        "cwd_testing",
+        "motorized_rule"
+      ],
+      "bag_limit": null,
+      "notes": "Chronic Wasting Disease Testing Required, See Page 96, Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": 10,
+      "source_page": 2,
+      "units": [
+        "69"
+      ],
+      "partial_units": {
+        "69": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 69 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1055",
+      "hunt_area": "70",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-30",
+      "restrictions": [],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 5,
+      "source_page": 2,
+      "units": [
+        "70"
+      ],
+      "partial_units": {
+        "70": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 70 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1056",
+      "hunt_area": "70",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-08-30",
+      "end_date": "2026-09-30",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only",
+      "tag_quota": 145,
+      "source_page": 2,
+      "units": [
+        "70"
+      ],
+      "partial_units": {
+        "70": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 70 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1056",
+      "hunt_area": "70",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-31",
+      "restrictions": [
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only",
+      "tag_quota": 145,
+      "source_page": 2,
+      "units": [
+        "70"
+      ],
+      "partial_units": {
+        "70": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 70 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1057",
+      "hunt_area": "73",
+      "hunt_class": "controlled",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-24",
+      "restrictions": [
+        "motorized_rule",
+        "see_notes"
+      ],
+      "bag_limit": null,
+      "notes": "1st choice only Unlimited Controlled Hunt, See Page 110 Nonresident tag limit is 240 tags, See Page 109, Motorized Hunting Rule Applies, See Pages 104 - 106",
+      "tag_quota": null,
+      "source_page": 2,
+      "units": [
+        "73"
+      ],
+      "partial_units": {
+        "73": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 73 (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1119",
+      "hunt_area": "18X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlered",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-20",
+      "restrictions": [
+        "cwd_testing",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "White-tailed deer only, Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "18"
+      ],
+      "partial_units": {
+        "18": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 18X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1120",
+      "hunt_area": "1-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-09-15",
+      "end_date": "2026-10-14",
+      "restrictions": [
+        "cwd_testing",
+        "portion_of_unit",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "White-tailed deer only, Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 300,
+      "source_page": 3,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1121",
+      "hunt_area": "1-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-15",
+      "end_date": "2026-11-14",
+      "restrictions": [
+        "cwd_testing",
+        "portion_of_unit",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "White-tailed deer only, Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 300,
+      "source_page": 3,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1122",
+      "hunt_area": "1-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-11-15",
+      "end_date": "2026-12-14",
+      "restrictions": [
+        "cwd_testing",
+        "portion_of_unit",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "White-tailed deer only, Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 400,
+      "source_page": 3,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1123",
+      "hunt_area": "1-2X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-08-30",
+      "end_date": "2026-09-30",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1123",
+      "hunt_area": "1-2X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-10",
+      "end_date": "2026-12-01",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1123",
+      "hunt_area": "1-2X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-10",
+      "end_date": "2026-12-24",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1123",
+      "hunt_area": "1-2X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-25",
+      "end_date": "2026-12-31",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "1"
+      ],
+      "partial_units": {
+        "1": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 1-2X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1124",
+      "hunt_area": "2-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-08-30",
+      "end_date": "2026-09-30",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 150,
+      "source_page": 3,
+      "units": [
+        "2"
+      ],
+      "partial_units": {
+        "2": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1124",
+      "hunt_area": "2-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-10",
+      "end_date": "2026-12-01",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 150,
+      "source_page": 3,
+      "units": [
+        "2"
+      ],
+      "partial_units": {
+        "2": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1124",
+      "hunt_area": "2-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-10",
+      "end_date": "2026-12-24",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 150,
+      "source_page": 3,
+      "units": [
+        "2"
+      ],
+      "partial_units": {
+        "2": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1124",
+      "hunt_area": "2-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-25",
+      "end_date": "2026-12-31",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 150,
+      "source_page": 3,
+      "units": [
+        "2"
+      ],
+      "partial_units": {
+        "2": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 2-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1125",
+      "hunt_area": "3-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-08-30",
+      "end_date": "2026-09-30",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 75,
+      "source_page": 3,
+      "units": [
+        "3"
+      ],
+      "partial_units": {
+        "3": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1125",
+      "hunt_area": "3-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-10",
+      "end_date": "2026-12-01",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 75,
+      "source_page": 3,
+      "units": [
+        "3"
+      ],
+      "partial_units": {
+        "3": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1125",
+      "hunt_area": "3-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-10",
+      "end_date": "2026-12-24",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 75,
+      "source_page": 3,
+      "units": [
+        "3"
+      ],
+      "partial_units": {
+        "3": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1125",
+      "hunt_area": "3-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-25",
+      "end_date": "2026-12-31",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 75,
+      "source_page": 3,
+      "units": [
+        "3"
+      ],
+      "partial_units": {
+        "3": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 3-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1126",
+      "hunt_area": "5-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-08-30",
+      "end_date": "2026-09-30",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "5"
+      ],
+      "partial_units": {
+        "5": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1126",
+      "hunt_area": "5-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-10",
+      "end_date": "2026-12-01",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "5"
+      ],
+      "partial_units": {
+        "5": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1126",
+      "hunt_area": "5-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-10",
+      "end_date": "2026-12-24",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "5"
+      ],
+      "partial_units": {
+        "5": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1126",
+      "hunt_area": "5-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-12-25",
+      "end_date": "2026-12-31",
+      "restrictions": [
+        "portion_of_unit",
+        "see_notes",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "Archery only, White-tailed deer only White-tailed deer only Archery only, White-tailed deer only Muzzleloader only, White-tailed deer only",
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "5"
+      ],
+      "partial_units": {
+        "5": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 5-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1127",
+      "hunt_area": "11-1X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-10",
+      "end_date": "2026-12-01",
+      "restrictions": [
+        "portion_of_unit"
+      ],
+      "bag_limit": null,
+      "notes": null,
+      "tag_quota": 50,
+      "source_page": 3,
+      "units": [
+        "11"
+      ],
+      "partial_units": {
+        "11": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 11-1X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1128",
+      "hunt_area": "14X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-20",
+      "restrictions": [
+        "cwd_testing",
+        "mule_deer_only"
+      ],
+      "bag_limit": null,
+      "notes": "Mule deer only, Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 180,
+      "source_page": 3,
+      "units": [
+        "14"
+      ],
+      "partial_units": {
+        "14": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 14X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    },
+    {
+      "species_id": "deer",
+      "sub_species": null,
+      "tag_type_id": "controlled",
+      "zone": null,
+      "hunt_number": "1129",
+      "hunt_area": "14X",
+      "hunt_class": "extra",
+      "weapon": "any",
+      "sex": "antlerless",
+      "start_date": "2026-10-10",
+      "end_date": "2026-11-20",
+      "restrictions": [
+        "cwd_testing",
+        "whitetail_only"
+      ],
+      "bag_limit": null,
+      "notes": "White-tailed deer only, Chronic Wasting Disease Transport Rules Apply and Testing Required, See Page 96",
+      "tag_quota": 250,
+      "source_page": 3,
+      "units": [
+        "14"
+      ],
+      "partial_units": {
+        "14": {
+          "coverage": "partial",
+          "note": "Controlled hunt area 14X (exact units resolved by T-17b)",
+          "frac": null
+        }
+      }
+    }
+  ]
+}

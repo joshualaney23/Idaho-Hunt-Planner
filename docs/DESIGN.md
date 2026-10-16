@@ -161,7 +161,8 @@ Idaho-Hunt-Planner/
 │   ├── build_hunt_area_coverage.py # GIS MapServer/4 polygons × GMUs → data/hunt_area_coverage/<year>.json
 │   ├── build_county_overlay.py # TIGER counties × GMUs → static/data/county_units.json
 │   ├── build_idfg_unit_links.py # IDFG Hunt Planner unit pages → static/data/idfg_units.json (T-08)
-│   └── verify_golden.py        # compare an import against tests/golden/<year>/*.json
+│   ├── make_golden.py          # dump a section to tests/golden/<year>/<section>.json; --check diffs it (T-22c)
+│   └── make_verification_checklist.py # render every cited page + the VERIFICATION.md skeleton (T-22c)
 ├── static/
 │   ├── index.html
 │   ├── css/theme.css           # tokens (§4)
@@ -621,10 +622,10 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | `unit_tokens_valid` | Every unit token is a real GMU from `units`. Every hunt area resolves to ≥ 1 unit. | — |
 | `gis_area_match` | Every controlled hunt area exists in the GIS Controlled Hunts layer for `license_year` (fall back to the latest year with a warning). Match **exactly**, including a full-size `*`. | Big Game 469/469 · MSG 145/145 (2025 GIS) |
 | `general_coverage` | Every GMU (except `YNP`) has ≥ 1 general Regular deer season **or** appears in a controlled-only list that is confirmed in the page text. | 5 controlled-only: 44, 45, 52, 54, 68A |
-| `golden_match` | For every section with a committed `tests/golden/<year>/<section>.json`, the import matches it **exactly**. | The check ships in T-22c; the 2026 golden files are built in T-22d–f |
+| `golden_match` | For every section with a committed `tests/golden/<year>/<section>.json`, the import matches it **exactly**. A section with no golden file is `skipped` (never `warn`: in the T-22b gate a `warn` blocks publishing until a human waives it, and a file that does not exist yet is not something to waive). | Shipped in T-22c, proven on `fixture_controlled_deer.json` (81 rows); the 2026 golden files are built in T-22d–f |
 | `yoy_diff` (warn) | Changes vs. last year's published data are listed for review. More than 25 % of rows changed in a section → warn. | — |
 
-**Golden dataset (T-22c–f).** For the first year (2026), every row of every MVP section (general deer, all controlled deer/elk/pronghorn/bear) is **verified by hand against the PDF**, one page at a time, and committed as JSON. The parser must reproduce it with zero diffs. In later years the previous year's golden file is not truth for the new PDF, but it serves as a regression fixture: re-parsing the 2026 PDF after any parser change must still match 2026 golden exactly. New years are protected by the invariants plus the review gate.
+**Golden dataset (T-22c–f).** The harness is `scripts/make_golden.py` (canonical dump, `--check` diff), `scripts/make_verification_checklist.py` (page images + the `VERIFICATION.md` log a human signs) and `planner/golden.py` (the canonical row form both read). For the first year (2026), every row of every MVP section (general deer, all controlled deer/elk/pronghorn/bear) is **verified by hand against the PDF**, one page at a time, and committed as JSON. The parser must reproduce it with zero diffs. In later years the previous year's golden file is not truth for the new PDF, but it serves as a regression fixture: re-parsing the 2026 PDF after any parser change must still match 2026 golden exactly. New years are protected by the invariants plus the review gate.
 
 **Review gate.** Publishing requires every check to pass or be explicitly waived with a written reason, and every disagreeing row to be individually reviewed (§8.4). There's no bulk approve for rows that fail any check.
 
@@ -933,7 +934,7 @@ Each ticket is self-contained for a coding agent. **Every agent reads `docs/AGEN
 **Description:** Everything needed to produce and enforce golden files, without hand-verifying 2026 (that is T-22d–f, one section group each, because it is human work).
 1. `scripts/make_golden.py <section> [--year] [--check]`: dumps a section's parsed rows to `tests/golden/<year>/<section>.json` in a canonical, stably sorted, diff-friendly form; `--check` prints the diff against the committed file and exits non-zero instead of writing.
 2. `scripts/make_verification_checklist.py <section>`: renders every source page the section's rows cite to `data/verify/<year>/<section>/pNNN.png` (never committed) and writes the `tests/golden/<year>/VERIFICATION.md` skeleton — a table of page, rows on page, verified-by, date, and corrections made — with every page **unverified**.
-3. `golden_match` in the check registry: for every section with a committed golden file for the document's year, the import must match it exactly; a missing golden file is `warn`, not `fail`.
+3. `golden_match` in the check registry: for every section with a committed golden file for the document's year, the import must match it exactly; a missing golden file is **`skipped`**, never `fail` — and not `warn` either, because T-22b's gate blocks publishing on a `warn` until it is waived, and a golden file that does not exist yet is not something a human can waive (§8.7).
 4. `tests/test_golden.py`: re-parses the real 2026 PDF (downloaded once into a cache dir keyed by URL hash; skipped with a clear message when offline or uncached) and asserts an exact match for every committed golden section. CI caches the PDF by URL hash.
 **Acceptance criteria:**
 - The dump → checklist → diff → test loop is proven end to end on one section derived from the committed fixtures (`tests/golden/2026/fixture_controlled_deer.json`), with the commands and output in the PR.

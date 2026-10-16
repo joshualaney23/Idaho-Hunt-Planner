@@ -50,6 +50,15 @@ jobs:
       - name: Install dependencies
         if: steps.scope.outputs.docs_only != 'true'
         run: pip install -r requirements.txt -r requirements-dev.txt
+      # The golden test (T-22c) re-parses the real brochure when it is cached here, and
+      # skips with a message when it is not. The cache is keyed by the committed source
+      # list, so a new or changed source URL starts a fresh cache.
+      - name: Cache source regulation PDFs
+        if: steps.scope.outputs.docs_only != 'true'
+        uses: actions/cache@v4
+        with:
+          path: data/pdf_cache
+          key: regs-pdf-${{ hashFiles('tests/golden/sources.json') }}
       - name: Ruff check
         if: steps.scope.outputs.docs_only != 'true'
         run: ruff check .

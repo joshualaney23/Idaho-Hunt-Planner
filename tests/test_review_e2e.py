@@ -105,11 +105,13 @@ def test_the_accuracy_panel_has_a_row_for_every_check(imported) -> None:
     assert sorted(deer) == [
         "date_token_accounting",
         "general_coverage",
+        # `skipped`: no 2026 golden file is committed for this section yet (T-22d–f).
+        "golden_match",
         "row_validation",
         "two_path_agreement",
         "unit_tokens_valid",
     ]
-    assert {c["status"] for c in detail["checks"]} == {"pass", "fail"}
+    assert {c["status"] for c in detail["checks"]} == {"pass", "fail", "skipped"}
     assert _coverage_check(detail)["status"] == "fail"
     # Every check belongs to a section the panel can group it under, and every section of
     # the panel is present — including the controlled ones that found nothing here.

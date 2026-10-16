@@ -1,0 +1,11 @@
+{
+  "documents": {
+    "big_game_2026": {
+      "url": "https://idfg.idaho.gov/sites/default/files/seasons-rules-big-game-2026.pdf",
+      "kind": "big_game",
+      "license_year": 2026,
+      "year_end": 2026,
+      "note": "125 pages. Cached by URL hash under data/pdf_cache/ (git-ignored); tests/test_golden.py skips when it is not there."
+    }
+  }
+}
