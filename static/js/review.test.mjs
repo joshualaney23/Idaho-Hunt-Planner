@@ -21,6 +21,7 @@ import {
   diffIndex,
   gateReasons,
   groupRows,
+  groupRowsForReview,
   pdfPageHref,
   publishCounts,
   restrictionLabel,
@@ -276,6 +277,17 @@ test("groupRows nests species -> table title -> page, keeping every row", () => 
   assert.deepEqual(deer.pages.map((p) => p.page), [12, 13]);
   assert.deepEqual(deer.pages[0].rows.map((r) => r.id), [1, 2]);
   assert.deepEqual(rowOrder(groups).map((r) => r.id), [1, 2, 3, 4]);
+});
+
+test("groupRowsForReview moves approved rows to the bottom, keeping the rest in order", () => {
+  const groups = groupRowsForReview([
+    season({ id: 1, source_page: 12, status: "approved" }),
+    season({ id: 2, source_page: 12 }),
+    season({ id: 3, source_page: 13, status: "rejected" }),
+    season({ id: 4, species_id: "elk", table_title: "Elk Zones", source_page: 20 }),
+    season({ id: 5, source_page: 13, status: "approved" }),
+  ]);
+  assert.deepEqual(rowOrder(groups).map((r) => r.id), [2, 3, 4, 1, 5]);
 });
 
 test("confidenceClass walks the §4.1 ramp", () => {
