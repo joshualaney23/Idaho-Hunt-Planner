@@ -87,6 +87,11 @@ class DateCell:
     #: This cell must yield at least one season (a controlled hunt always prints one);
     #: an empty deer cell (`No Season`) legitimately yields none.
     must_produce: bool = False
+    #: The window is printed once but **recurs every year** (the wolf table's
+    #: `Apr 1 - Nov 14` inside a `July 2026 - June 2027` table), so one printed token
+    #: legitimately produces more than one license-year season (§12 T-13). The
+    #: invariant then is that every token produced *at least* one.
+    recurring: bool = False
 
 
 @dataclass(frozen=True)

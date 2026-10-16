@@ -95,7 +95,10 @@ def date_token_accounting(c: CheckContext) -> CheckResult | None:
         found = sum(len(common.parse_date_ranges(t, c.license_year)) for t in cell.texts)
         tokens += found
         seasons += cell.seasons
-        if found != cell.seasons or cell.leftovers or (cell.must_produce and not cell.seasons):
+        # A recurring window is printed once and applies twice inside one license year
+        # (§12 T-13), so there the rule is "every token produced at least one season".
+        short = cell.seasons < found if cell.recurring else cell.seasons != found
+        if short or cell.leftovers or (cell.must_produce and not cell.seasons):
             unaccounted.append(
                 {
                     "page": cell.page,
@@ -109,7 +112,9 @@ def date_token_accounting(c: CheckContext) -> CheckResult | None:
             )
     return CheckResult(
         name="date_token_accounting",
-        status="pass" if tokens == seasons and not unaccounted else "fail",
+        # Per-cell accounting is the real invariant: a recurring window makes the
+        # document-wide totals differ legitimately (§12 T-13).
+        status="pass" if not unaccounted else "fail",
         expected=f"{tokens} date tokens consumed",
         actual=f"{seasons} seasons from {len(cells)} date cells, {len(unaccounted)} unaccounted",
         detail=unaccounted or None,

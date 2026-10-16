@@ -287,6 +287,7 @@ QUALIFIER_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"dogs\s+(?:and\s+bait\s+)?(?:are\s+)?prohibited", "dogs_prohibited"),
     (r"electronic\s+calls\s+may\s+be\s+used", "electronic_calls"),
     (r"caution:?\s+grizzly\s+bears?\s+may\s+be\s+encountered", "grizzly_caution"),
+    (r"expanded\s+hunting\s+methods\s+not\s+allowed", "general_methods"),
     (r"expanded\s+hunting\s+methods\s+allowed", "expanded_methods"),
     (r"general\s+hunting\s+rules\s+apply", "general_methods"),
 )

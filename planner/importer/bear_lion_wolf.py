@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from planner.dates import to_iso
 from planner.importer import ParseContext, ParsedSeason, UnitRef, common, parser
 from planner.importer.checks import DateCell, MethodWindow, SectionFacts, TwoPath
-from planner.importer.extract import Page, Table, Word
+from planner.importer.extract import Page, Word
 from planner.importer.textlayer import (
     TextLine,
     column_blocks,
@@ -77,8 +77,11 @@ SPECS: tuple[SectionSpec, ...] = (
         section="black_bear_general",
         species_re=re.compile(r"black\s+bear", re.IGNORECASE),
         season_words=frozenset({"take"}),
-        method_words={"dogs": "dogs_prohibited", "prohibited": "dogs_prohibited",
-                      "training": "dog_training"},  # fmt: skip
+        method_words={
+            "dogs": "dogs_prohibited",
+            "prohibited": "dogs_prohibited",
+            "training": "dog_training",
+        },  # fmt: skip
     ),
     SectionSpec(
         species_id="mountain_lion",
@@ -334,7 +337,8 @@ def tables_from_text(page: Page) -> list[SeasonTable]:
         labels = [
             band
             for band in labels
-            if common.parse_units(_band_text(band)).units or common.names_all_units(_band_text(band))
+            if common.parse_units(_band_text(band)).units
+            or common.names_all_units(_band_text(band))
         ]
         if not labels:
             continue
@@ -428,6 +432,8 @@ class CellSeasons:
     text: str
     seasons: tuple[RowSeason, ...] = ()
     bbox: tuple[float, float, float, float] | None = None
+    #: The table's windows recur yearly, so one token can yield two license-year parts.
+    recurring: bool = False
 
     @property
     def leftovers(self) -> tuple[str, ...]:
@@ -456,62 +462,95 @@ def table_cells(table: SeasonTable, ctx: ParseContext) -> list[CellSeasons]:
             continue
         ranges = common.parse_date_ranges(cell, ctx.license_year)
         leftovers = list(common.leftover_date_text(cell, ranges))
+        recurring = covers_license_year(table.title, ctx)
         seasons: list[RowSeason] = []
         for i, found in enumerate(ranges):
             window = _qualifier_window(cell, found, ranges[i + 1] if i + 1 < len(ranges) else None)
             quals = common.qualifiers(window)
-            codes = list(quals.codes)
-            clamped = clamp_to_license_year(found, ctx)
-            if clamped is None:  # printed entirely outside this license year (D3)
+            parts = windows_in_license_year(found, ctx, recurring=recurring)
+            if not parts:  # printed entirely outside this license year (D3)
                 leftovers.append(found.text)
                 continue
-            if (clamped.start, clamped.end) != (found.start, found.end) and (
-                "see_notes" not in codes
-            ):
-                codes.append("see_notes")
-            for name, text in methods:
-                if name == "dogs_prohibited" and _overlaps_window(found, text, ctx):
-                    if "dogs_prohibited" not in codes:
-                        codes.append("dogs_prohibited")
-            seasons.append(
-                RowSeason(
-                    section=table.spec.section,
-                    units=units,
-                    start=clamped.start,
-                    end=clamped.end,
-                    clipped_from="" if clamped is found else found.text,
-                    codes=tuple(codes),
-                    unknown_units=unknown,
-                    leftovers=tuple(leftovers + list(quals.unmatched)),
-                    private_land=table.private_land,
-                    units_text=units_text,
-                    cell_text=cell,
-                    notes_text=notes_text,
-                    methods=methods,
-                    bbox=row.bbox,
+            for start, end, clipped in parts:
+                codes = list(quals.codes)
+                if clipped and "see_notes" not in codes:
+                    codes.append("see_notes")
+                for name, text in methods:
+                    if name == "dogs_prohibited" and _overlaps_window(found, text, ctx):
+                        if "dogs_prohibited" not in codes:
+                            codes.append("dogs_prohibited")
+                seasons.append(
+                    RowSeason(
+                        section=table.spec.section,
+                        units=units,
+                        start=start,
+                        end=end,
+                        clipped_from=found.text if clipped else "",
+                        codes=tuple(codes),
+                        unknown_units=unknown,
+                        leftovers=tuple(leftovers + list(quals.unmatched)),
+                        private_land=table.private_land,
+                        units_text=units_text,
+                        cell_text=cell,
+                        notes_text=notes_text,
+                        methods=methods,
+                        bbox=row.bbox,
+                    )
                 )
-            )
-        out.append(CellSeasons(units_text, cell, tuple(seasons), row.bbox))
+        out.append(CellSeasons(units_text, cell, tuple(seasons), row.bbox, recurring))
     return out
 
 
-def clamp_to_license_year(found: common.DateRange, ctx: ParseContext) -> common.DateRange | None:
-    """A printed window cut down to the document's license year, or None when outside.
+#: A title that names the license year's own span (`July 2026 - June 2027`) belongs to a
+#: table whose windows **recur every year**, so each one applies to this licence year
+#: wherever it falls inside it (the wolf and lion tables are printed that way). A title
+#: naming explicit seasons instead ("Seasons for Fall 2026 and Spring 2027") states one
+#: occurrence each, and nothing may be read into the year before it.
+def covers_license_year(title: str, ctx: ParseContext) -> bool:
+    """Does this table's title say it covers the whole license year (July X – June X+1)?"""
+    text = re.sub(r"\s+", " ", title or "")
+    return bool(
+        re.search(
+            rf"july\s+{ctx.license_year}\s*[-–—]\s*june\s+{ctx.year_end + 1}", text, re.IGNORECASE
+        )
+    )
 
-    The bear table's spring season runs `Apr 15 - July 31` (2027) and the wolf table
-    prints recurring windows (`Apr 1 - Nov 14`); both reach past Jun 30 of the license
-    year, which `validate` rejects. The row is neither dropped nor stretched: it is
-    clipped to the part the document covers — always a **subset** of the printed
-    season, so the map can never show a unit open when it is not — and the row carries
-    `see_notes` plus the printed text, which keeps it yellow and sends it to review (D3).
+
+def windows_in_license_year(
+    found: common.DateRange, ctx: ParseContext, *, recurring: bool
+) -> list[tuple[dt.date, dt.date, bool]]:
+    """The parts of a printed window that fall inside the license year.
+
+    `(start, end, clipped)` per part. A window is anchored by `common.parse_date_ranges`
+    and clipped to Jul 1 … Jun 30: the result is always a **subset** of what is printed,
+    so the map can never show a unit open when it is not, and a clipped row carries
+    `see_notes` so it stays yellow and goes to review (D3).
+
+    In a `recurring` table (`July 2026 - June 2027`) the same window also applies in the
+    year before the anchored one — `Apr 1 - Nov 14` means Jul 1 – Nov 14 2026 *and*
+    Apr 1 – Jun 30 2027 — so both parts are kept rather than silently losing one.
     """
-    start = max(found.start, dt.date(ctx.license_year, 7, 1))
-    end = min(found.end, dt.date(ctx.year_end + 1, 6, 30))
-    if end < start:
-        return None
-    if (start, end) == (found.start, found.end):
-        return found
-    return common.DateRange(start=start, end=end, text=found.text, span=found.span)
+    first = dt.date(ctx.license_year, 7, 1)
+    last = dt.date(ctx.year_end + 1, 6, 30)
+    candidates = [(found.start, found.end)]
+    if recurring:
+        candidates.append(
+            (_shift_year(found.start, -1), _shift_year(found.end, -1)),
+        )
+    out: list[tuple[dt.date, dt.date, bool]] = []
+    for start, end in candidates:
+        cut_start, cut_end = max(start, first), min(end, last)
+        if cut_end < cut_start:
+            continue
+        out.append((cut_start, cut_end, (cut_start, cut_end) != (start, end)))
+    return sorted(out)
+
+
+def _shift_year(day: dt.date, years: int) -> dt.date:
+    try:
+        return day.replace(year=day.year + years)
+    except ValueError:  # Feb 29
+        return day.replace(year=day.year + years, day=day.day - 1)
 
 
 def _overlaps_window(season: common.DateRange, text: str, ctx: ParseContext) -> bool:
@@ -528,7 +567,9 @@ def table_seasons(table: SeasonTable, ctx: ParseContext) -> list[RowSeason]:
 
 
 #: `See Note 1, Page 76` / `See Pages 104 - 106` — a pointer, not a condition itself.
-_POINTER_RE = re.compile(r"\b(?:see\s+)?(?:notes?|pages?|pg)\.?\s*(?:\d+|and|[,\s-])*", re.IGNORECASE)
+_POINTER_RE = re.compile(
+    r"\b(?:see\s+)?(?:notes?|pages?|pg)\.?\s*(?:\d+|and|[,\s-])*", re.IGNORECASE
+)
 #: `… in Units 29 and 37A` — the units a matched qualifier names.
 _UNIT_PHRASE_RE = re.compile(
     r"\bin (?:the )?units?\b(?:\s*(?:\d{1,2}[A-Z]?|and)[,\s]*)*", re.IGNORECASE
@@ -675,6 +716,7 @@ def parse_page_for(spec: SectionSpec, page: Page, ctx: ParseContext) -> Iterator
             label=cell.units_text,
             leftovers=cell.leftovers,
             bbox=cell.bbox,
+            recurring=cell.recurring,
         )
         for cell in cells_a
     ]
