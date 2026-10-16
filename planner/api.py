@@ -129,8 +129,8 @@ def meta():
             "version": __version__,
             "species": species,
             "tag_types": tag_types,
-            # The Season Table filter speaks the `seasons.weapon` vocabulary ('any', not 'all').
-            "weapons": list(WEAPONS),
+            # The Season Table filter: stored `seasons.weapon` values, plus 'rifle' (see below).
+            "weapons": list(FILTER_WEAPONS),
             "restrictions": engine.RESTRICTIONS,
             "reasons": {
                 code: {"label": label, "severity": "narrowing"}
@@ -1003,6 +1003,9 @@ REVIEWABLE_STATUSES = ("staged", "approved", "rejected")
 #: The `seasons` CHECK vocabularies, mirrored so an edit is rejected with a field name
 #: instead of an opaque IntegrityError. Keep in step with `planner/schema.sql`.
 WEAPONS = ("any", "archery", "muzzleloader", "short_range", "shotgun", "falconry")
+#: Season Table Weapon filter choices. 'rifle' is a filter-only value: it shows the seasons
+#: stored as 'any' (open to rifle hunters, not exclusively bow or muzzleloader).
+FILTER_WEAPONS = ("rifle", "archery", "muzzleloader", "short_range", "falconry")
 SEXES = ("antlered", "antlerless", "either", "any", "male", "na")
 #: Free-text columns the review screen lets a human correct. `None` clears them.
 EDITABLE_TEXT_FIELDS = ("zone", "hunt_number", "hunt_area", "sub_species", "bag_limit", "notes")
@@ -1575,10 +1578,13 @@ def _season_filters() -> tuple[str, list[Any], dict[str, Any]]:
         ("hunt_class", "s.hunt_class"),
     ):
         value = args.get(param)
+        if value == "rifle":
+            # 'rifle' has no rows of its own: it means the seasons open to any weapon.
+            value = "any"
         if value:
             clauses.append(f"{column} = ?")
             params.append(value)
-            applied[param] = value
+            applied[param] = args.get(param)
     if args.get("document"):
         clauses.append("s.document_id = ?")
         params.append(int(args["document"]))
