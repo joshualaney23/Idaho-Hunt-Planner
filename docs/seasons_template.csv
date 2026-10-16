@@ -1,0 +1,4 @@
+license_year,species,tag_type,zone,hunt_number,hunt_class,weapon,sex,start_date,end_date,units,restrictions,notes,source_page
+2026,deer,deer_regular,,,general,any,either,2026-10-10,2026-10-24,32;32A,,"General deer season, any weapon",12
+2026,deer,deer_regular,,,general,archery,antlered,2026-08-30,2026-09-30,39;43,antlered_only,Archery-only season,16
+2026,elk,controlled,,1001,controlled,muzzleloader,antlerless,2026-11-01,2026-11-14,4A,antlerless_only;portion_of_unit,"Controlled hunt 1001, portion of unit only",40
