@@ -847,6 +847,10 @@ export function createReviewScreen(docId, options = {}) {
         button("btn small", "Reject (r)", () => decide(row.id, "rejected")),
         button("btn small", "Edit (e)", () => startEdit(row.id)),
       );
+      // The row's own click handler selects the row and scrolls it into view. A button
+      // click must not reach it: on Approve it would re-select the approved row, which
+      // has just moved to the bottom, and scroll the page down to it.
+      actions.addEventListener("click", (event) => event.stopPropagation());
       item.appendChild(actions);
     }
     item.addEventListener("click", () => select(row.id, { focus: false }));
