@@ -416,8 +416,9 @@ def test_every_staged_controlled_season_resolves_to_at_least_one_unit(app, impor
 
 def test_acceptance_deer_1_1_covers_its_nine_units(app, imported) -> None:
     with app.app_context():
-        assert units_of("1001") == [(u, "full", 1.0) for u in
-                                    ("1", "2", "3", "4", "4A", "5", "6", "7", "9")]
+        assert units_of("1001") == [
+            (u, "full", 1.0) for u in ("1", "2", "3", "4", "4A", "5", "6", "7", "9")
+        ]
 
 
 def test_acceptance_deer_11_is_exactly_unit_11_full(app, imported) -> None:
@@ -454,8 +455,12 @@ def test_the_checks_are_recorded_for_every_species_section(app, imported) -> Non
         statuses = {(r["section"], r["check_name"]): r["status"] for r in rows}
         for species in ("deer", "elk", "pronghorn", "black_bear"):
             section = f"hunt_areas_{species}"
-            for name in ("gis_area_match", "unit_coverage", "footnote_consistency",
-                         "geometry_year"):
+            for name in (
+                "gis_area_match",
+                "unit_coverage",
+                "footnote_consistency",
+                "geometry_year",
+            ):
                 assert (section, name) in statuses
         assert statuses[("hunt_areas_deer", "gis_area_match")] == "pass"
         assert statuses[("hunt_areas_deer", "unit_coverage")] == "pass"
@@ -470,6 +475,7 @@ def test_reimporting_the_document_resolves_the_same_units(app, imported, tmp_pat
         before = units_of("1001")
         importer.run_import(imported, data_dir=tmp_path)
         assert units_of("1001") == before
-        assert db.q1("SELECT COUNT(*) n FROM hunt_areas WHERE description IS NULL")["n"] < (
-            db.q1("SELECT COUNT(*) n FROM hunt_areas")["n"]
+        assert (
+            db.q1("SELECT COUNT(*) n FROM hunt_areas WHERE description IS NULL")["n"]
+            < (db.q1("SELECT COUNT(*) n FROM hunt_areas")["n"])
         )
