@@ -162,8 +162,41 @@ def test_publish_is_blocked_while_staged_rows_and_a_failing_check_remain(client,
     err = res.get_json()["error"]
     assert err["code"] == "publish_blocked"
     assert [c["check_name"] for c in err["detail"]["checks"]] == EXCERPT_BLOCKERS
-    assert err["detail"]["rows"] == sorted(_ids(detail))  # every staged row is named
-    assert len(err["detail"]["unreviewed_rows"]) == EXPECTED_ROWS
+    # T-22g: the checks block, the rows do not. Every one of the 235 parsed rows scored
+    # 1.0 and both extraction paths agreed, so none of them needs a human (the old rule
+    # named all 235 here and made publishing a 235-click chore).
+    assert err["detail"]["rows"] == []
+    assert err["detail"]["unreviewed_rows"] == []
+    assert err["detail"]["override_available"] is True
+    assert detail["publish"]["rows"] == {"approved": 0, "auto": EXPECTED_ROWS, "unreviewed": 0}
+
+
+def test_the_deer_section_routes_to_review_only_because_of_its_checks(imported) -> None:
+    """T-22g AC5 on real brochure pages: routing, and why."""
+    _doc_id, detail = imported
+    deer = _section(detail)
+    assert deer["routing"] == "review"
+    assert deer["reasons"] == ["check_blocking"]  # not one uncertain row
+    assert deer["rows"] == EXPECTED_ROWS
+    assert deer["needs_review_rows"] == []
+    # The controlled sections of this deer-only excerpt staged nothing and every check
+    # on them passed, so they auto-accept.
+    assert detail["routing"]["review"] == ["deer_general"]
+    assert "controlled_deer" in detail["routing"]["auto_accepted"]
+    assert detail["routing"]["rows_needing_review"] == 0
+
+
+def test_waiving_the_blocking_checks_publishes_235_rows_with_no_approval(client, imported) -> None:
+    """T-22g AC1 against the real pages: a clean section needs no per-row approval."""
+    doc_id, detail = imported
+    _waive_excerpt_checks(client, doc_id, detail, "nine-page excerpt (T-22g e2e)")
+    res = client.post(f"/api/documents/{doc_id}/publish")
+    assert res.status_code == 200, res.get_json()
+    body = res.get_json()
+    assert len(body["published"]) == EXPECTED_ROWS
+    assert len(body["auto_published"]) == EXPECTED_ROWS
+    assert body["published_unreviewed"] == []
+    assert body["document"]["publish_override"] is None
 
 
 def test_approving_every_row_is_not_enough_while_the_check_fails(client, imported) -> None:
