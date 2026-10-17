@@ -171,18 +171,77 @@ export function sectionViews(checks, sections) {
     const summary = summaries.get(section) || {};
     const counts = {};
     for (const c of list) counts[c.status] = (counts[c.status] || 0) + 1;
+    const waived = Boolean(summary.waived) || list.some((c) => c.waived);
+    const blocking = list.filter((c) => c.blocks).map((c) => c.name);
+    // The server routes; an older payload without routing is read the same way the
+    // server reads it, from the checks it does carry.
+    const reasons = summary.reasons || [
+      ...(blocking.length ? ["check_blocking"] : []),
+      ...(waived ? ["check_waived"] : []),
+    ];
     return {
       section,
       label: sectionLabel(section),
-      waived: Boolean(summary.waived) || list.some((c) => c.waived),
+      waived,
       clean: summary.clean !== undefined ? Boolean(summary.clean) : list.every((c) => !c.blocks),
-      blocking: list.filter((c) => c.blocks).map((c) => c.name),
+      blocking,
       counts,
+      routing: summary.routing || (reasons.length ? "review" : "auto_accepted"),
+      reasons,
+      rows: Number(summary.rows || 0),
+      needsReview: (summary.needs_review_rows || []).map(Number),
+      unreviewed: (summary.unreviewed_rows || []).map(Number),
       checks: list.slice().sort((a, b) => a.name.localeCompare(b.name)),
     };
   });
   const rank = (s) => (s.blocking.length ? 0 : s.waived ? 1 : 2);
   return out.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label));
+}
+
+/** Why a section was sent to review, as a sentence (§8.4 routing, T-22g). */
+export const ROUTING_REASONS = {
+  check_blocking: "a check fails and has not been waived",
+  check_waived: "a check was waived by hand",
+  low_confidence: "a row scored below 1.0",
+  two_path_disagreement: "the two extraction paths disagree on a row",
+  edited: "a row was edited and not decided on",
+};
+
+export function routingReasonText(reason) {
+  return ROUTING_REASONS[reason] || String(reason);
+}
+
+/**
+ * Is this one row a human must decide on? The twin of the server's
+ * `ROW_NEEDS_REVIEW_SQL`: a row the parser scored 1.0, both extraction paths agreed on
+ * and nobody has edited rides along with its document, even inside a section that was
+ * sent to review (T-22g — a single uncertain row never drags its whole section in).
+ */
+export function rowNeedsReview(row) {
+  if (!row) return false;
+  const confidence = Number(row.confidence ?? 1);
+  if (Number.isFinite(confidence) && confidence < 1) return true;
+  if (!row.extract_agree) return true;
+  return Boolean(row.edited_at && !row.reviewed_by_user);
+}
+
+/** The one-line summary above the rows: how many sections went each way. */
+export function routingSummaryText(views) {
+  const auto = views.filter((s) => s.routing === "auto_accepted");
+  const review = views.filter((s) => s.routing === "review");
+  const rows = review.reduce((n, s) => n + s.needsReview.length, 0);
+  const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  if (!views.length) return "This import recorded no sections.";
+  return (
+    `${plural(auto.length, "section")} accepted automatically · ` +
+    `${plural(review.length, "section")} sent to review · ` +
+    `${plural(rows, "row")} need${rows === 1 ? "s" : ""} a decision`
+  );
+}
+
+/** The sections whose rows the review list shows; the rest are collapsed (T-22g). */
+export function reviewSections(views) {
+  return new Set(views.filter((s) => s.routing === "review").map((s) => s.section));
 }
 
 // ---- the row list's view model ---------------------------------------------
@@ -305,7 +364,12 @@ export function gateReasons(publish) {
   const blockers = publish?.blockers || {};
   const reasons = [];
   const staged = (blockers.unreviewed_rows || []).length;
-  if (staged) reasons.push(`${staged} row${staged === 1 ? "" : "s"} still staged`);
+  // T-22g: only the uncertain rows are counted — a clean staged row never blocks.
+  if (staged) {
+    reasons.push(
+      `${staged} row${staged === 1 ? "" : "s"} still need${staged === 1 ? "s" : ""} a decision`,
+    );
+  }
   const checks = blockers.checks || [];
   if (checks.length) {
     const names = checks.map((c) => `${c.check_name} (${c.status})`).join(", ");
@@ -442,6 +506,66 @@ export function createWaiveDialog(onWaive) {
   };
 }
 
+/**
+ * The override dialog: publishing past the review gate (T-22g). Same contract as the
+ * waive dialog — nothing leaves without a typed reason, because the reason is what the
+ * document carries forever in place of the review nobody did.
+ */
+export function createOverrideDialog(onPublish) {
+  const dlg = el("dialog", "override-dialog");
+  dlg.id = "override-dialog";
+  const title = el("h3", null, "Publish without confirming everything?");
+  const what = el("p", "muted", "");
+  const warn = el("p", "muted");
+  warn.textContent =
+    "These rows go live without a human confirming them. The reason, your name and the" +
+    " exact blockers are kept on the document forever, and each row is flagged as" +
+    " published unreviewed — always verify against the official regulations.";
+  const label = el("label", null, "Why publish now?");
+  const input = el("textarea", "override-reason");
+  input.id = "override-reason";
+  input.setAttribute("rows", "3");
+  input.setAttribute("placeholder", "e.g. season opens tomorrow; I read pp. 12-21 myself.");
+  label.setAttribute("for", "override-reason");
+  const err = el("p", "err");
+  err.hidden = true;
+  const bar = el("p", "row-actions");
+
+  const go = button("btn primary", "Publish anyway", async () => {
+    const reason = String(input.value || "").trim();
+    if (!reason) {
+      err.textContent = "An override needs a written reason — it is kept on the document forever.";
+      err.hidden = false;
+      input.focus();
+      return;
+    }
+    try {
+      go.disabled = true;
+      await onPublish(reason);
+      dlg.close();
+    } catch (e) {
+      go.disabled = false;
+      err.textContent = e && e.message ? e.message : String(e);
+      err.hidden = false;
+    }
+  });
+  bar.append(button("btn", "Cancel", () => dlg.close()), go);
+  dlg.append(title, what, warn, label, input, err, bar);
+
+  return {
+    dlg,
+    open(lines) {
+      what.textContent = (lines || []).join(" · ") || "The §8.4 gate is not satisfied.";
+      input.value = "";
+      err.hidden = true;
+      go.disabled = false;
+      if (dlg.showModal) dlg.showModal();
+      else dlg.setAttribute("open", "true");
+      input.focus();
+    },
+  };
+}
+
 /** One check's line in the Accuracy panel. */
 function checkLine(view, { onWaive, onJump } = {}) {
   const line = el("li", `check check-${view.status}`);
@@ -493,12 +617,25 @@ export function renderAccuracyPanel(host, views, handlers = {}) {
     const block = el("section", "accuracy-section");
     block.dataset.section = section.section;
     const h = el("h3", null, section.label);
+    block.dataset.routing = section.routing;
     if (section.waived) h.append(" ", badge("warn", "⚠ manually verified"));
     if (section.blocking.length) h.append(" ", badge("neutral", "✗ blocks publish"));
+    h.append(
+      " ",
+      badge(
+        section.routing === "auto_accepted" ? "ok" : "warn",
+        section.routing === "auto_accepted" ? "✓ accepted automatically" : "→ sent to review",
+      ),
+    );
     const counts = Object.entries(section.counts)
       .map(([status, n]) => `${CHECK_ICONS[status] || "?"} ${n} ${status}`)
       .join(" · ");
     block.append(h, textEl("p", counts || "no checks", "muted"));
+    if (section.reasons.length) {
+      block.appendChild(
+        textEl("p", `Sent to review: ${section.reasons.map(routingReasonText).join("; ")}.`, "muted"),
+      );
+    }
     const list = el("ul", "check-list");
     for (const view of section.checks) list.appendChild(checkLine(view, handlers));
     block.appendChild(list);
@@ -761,7 +898,7 @@ export function createReviewScreen(docId, options = {}) {
     review = (sid, body) => putJSON(`/api/documents/${docId}/seasons/${sid}`, body),
     waive = (cid, reason) => postJSON(`/api/documents/${docId}/checks/${cid}/waive`, { reason }),
     approveAll = () => postJSON(`/api/documents/${docId}/approve-all`, {}),
-    publish = () => postJSON(`/api/documents/${docId}/publish`, {}),
+    publish = (body = {}) => postJSON(`/api/documents/${docId}/publish`, body),
     notify = toast,
   } = options;
 
@@ -801,7 +938,9 @@ export function createReviewScreen(docId, options = {}) {
     accuracyHost.hidden = view.bodyHidden;
   }
   paintAccuracyToggle();
-  const rowsCard = card("Staged rows", rowsHost, removedHost);
+  const routingHost = el("div", "routing");
+  routingHost.id = "routing-summary";
+  const rowsCard = card("Staged rows", routingHost, rowsHost, removedHost);
   rowsCard.id = "review-rows-card";
   const split = el("div", "review-split");
   split.append(rowsCard, viewer);
@@ -816,6 +955,8 @@ export function createReviewScreen(docId, options = {}) {
   let order = [];
   let selectedId = null;
   let editing = null;
+  //: Auto-accepted sections the user opened to look at anyway (T-22g).
+  const expanded = new Set();
 
   const waiver = createWaiveDialog(async (check, reason) => {
     await waive(check.id, reason);
@@ -827,6 +968,17 @@ export function createReviewScreen(docId, options = {}) {
   const confirm = el("dialog", "publish-dialog");
   confirm.id = "publish-dialog";
   root.appendChild(confirm);
+
+  const override = createOverrideDialog(async (reason) => {
+    const result = await publish({ override: { reason } });
+    await refresh();
+    const n = (result.published_unreviewed || []).length;
+    notify(
+      `Published ${(result.published || []).length} row(s); ${n} unreviewed.`,
+      n ? "warn" : "success",
+    );
+  });
+  root.appendChild(override.dlg);
 
   // ---- painting -------------------------------------------------------------
 
@@ -895,11 +1047,19 @@ export function createReviewScreen(docId, options = {}) {
     } else {
       item.appendChild(rowSummary(row, { diff: diffs.get(Number(row.id)), waivedSection: waived }));
       const actions = el("p", "row-actions");
-      actions.append(
-        button("btn small", "Approve (a)", () => decide(row.id, "approved")),
-        button("btn small", "Reject (r)", () => decide(row.id, "rejected")),
-        button("btn small", "Edit (e)", () => startEdit(row.id)),
-      );
+      // T-22g: only an uncertain row carries approve/reject. A clean row publishes with
+      // its document; Edit stays, and editing sends the row (and its section) to review.
+      const needs = rowNeedsReview(row) || row.status !== "staged";
+      item.dataset.needsReview = rowNeedsReview(row) ? "1" : "";
+      if (needs) {
+        actions.append(
+          button("btn small", "Approve (a)", () => decide(row.id, "approved")),
+          button("btn small", "Reject (r)", () => decide(row.id, "rejected")),
+        );
+      } else {
+        actions.append(textEl("span", "publishes with the document", "muted"), " ");
+      }
+      actions.append(button("btn small", "Edit (e)", () => startEdit(row.id)));
       // The row's own click handler selects the row and scrolls it into view. A button
       // click must not reach it: on Approve it would re-select the approved row, which
       // has just moved to the bottom, and scroll the page down to it.
@@ -911,8 +1071,51 @@ export function createReviewScreen(docId, options = {}) {
     return item;
   }
 
+  /** The collapsed card an auto-accepted section gets instead of its rows (T-22g). */
+  function acceptedCard(view) {
+    const block = el("section", "accepted-section");
+    block.dataset.section = view.section;
+    const h = el("h3", null, view.label);
+    h.append(" ", badge("ok", "✓ accepted automatically"));
+    block.appendChild(h);
+    const counts = Object.entries(view.counts)
+      .map(([status, n]) => `${CHECK_ICONS[status] || "?"} ${n} ${status}`)
+      .join(" · ");
+    block.appendChild(
+      textEl(
+        "p",
+        `${view.rows} row${view.rows === 1 ? "" : "s"} · ${counts || "no checks"} · no row needs a decision`,
+        "muted",
+      ),
+    );
+    const open = expanded.has(view.section);
+    const toggle = button("link", open ? "Hide rows" : "Show rows", () => {
+      if (open) expanded.delete(view.section);
+      else expanded.add(view.section);
+      paintRows();
+    });
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    block.appendChild(toggle);
+    return block;
+  }
+
   function paintRows() {
-    const groups = groupRowsForReview(state.seasons);
+    const views = sectionViews(state.checks, state.sections);
+    const review = reviewSections(views);
+    const known = new Set(views.map((v) => v.section));
+    // Only a section under review opens into the row list; an auto-accepted one shows a
+    // collapsed card until the user asks for its rows. A row whose section the payload
+    // never mentioned is always shown — never hide data we cannot classify (D3).
+    const visible = state.seasons.filter((r) => {
+      const sec = r.section || "";
+      return !known.has(sec) || review.has(sec) || expanded.has(sec);
+    });
+    routingHost.replaceChildren();
+    routingHost.appendChild(textEl("p", routingSummaryText(views), "routing-line"));
+    for (const view of views) {
+      if (view.routing === "auto_accepted") routingHost.appendChild(acceptedCard(view));
+    }
+    const groups = groupRowsForReview(visible);
     order = rowOrder(groups);
     const waived = waivedSections();
     const body = el("div", "row-groups");
@@ -990,6 +1193,18 @@ export function createReviewScreen(docId, options = {}) {
     publishBtn.disabled = blocked;
     if (blocked) publishBtn.title = reasons.join(" · ");
     bar.append(approve, publishBtn);
+    // T-22g: the gate can be overridden by a human who types why. The button only
+    // exists while something is actually blocking.
+    if (blocked) {
+      const anyway = button(
+        "btn",
+        "Publish anyway…",
+        () => override.open(reasons),
+        "Publish past the review gate, with a reason kept on the document forever",
+      );
+      anyway.id = "publish-override-button";
+      bar.appendChild(anyway);
+    }
     gateHost.appendChild(bar);
     const why = el("ul", "gate-reasons");
     why.id = "gate-reasons";
@@ -1002,6 +1217,7 @@ export function createReviewScreen(docId, options = {}) {
 
   function openConfirm() {
     const counts = publishCounts(state.seasons);
+    const rows = (state.publish && state.publish.rows) || {};
     confirm.replaceChildren();
     const err = el("div", "err");
     err.hidden = true;
@@ -1010,6 +1226,11 @@ export function createReviewScreen(docId, options = {}) {
       textEl(
         "p",
         `${counts.approved} approved row(s) become live; ${counts.rejected} rejected and ${counts.staged} staged row(s) do not.`,
+        "muted",
+      ),
+      textEl(
+        "p",
+        `${Number(rows.auto || 0)} row(s) of auto-accepted sections publish with the document (T-22g).`,
         "muted",
       ),
       textEl("p", "Matching rows of an older document for the same year are superseded (§8.5).", "muted"),

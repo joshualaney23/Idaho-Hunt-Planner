@@ -1058,6 +1058,31 @@ dialog.drawer[open] {
   position: sticky;
   top: 12px;
 }
+/* T-22g: the §8.4 routing summary and the collapsed auto-accepted sections. */
+.routing {
+  margin-bottom: 10px;
+}
+.routing-line {
+  font-family: var(--font-display);
+  letter-spacing: 0.4px;
+  margin: 0 0 6px;
+}
+.accepted-section {
+  border: 1px solid var(--bg5);
+  border-left: 3px solid var(--sc5);
+  border-radius: 6px;
+  background: var(--bg2);
+  padding: 6px 10px;
+  margin-bottom: 6px;
+}
+.accepted-section h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.5px;
+  margin: 2px 0;
+}
+.accepted-section p {
+  margin: 2px 0;
+}
 .accuracy-section {
   border-top: 1px solid var(--bg4);
   padding-top: 8px;
@@ -1286,6 +1311,7 @@ button.link {
   color: var(--sc5);
 }
 .waive-dialog,
+.override-dialog,
 .publish-dialog {
   border: 1px solid var(--bg5);
   border-radius: 8px;
@@ -1295,6 +1321,7 @@ button.link {
   padding: 14px 16px;
   box-shadow: var(--shadow);
 }
+.override-reason,
 .waive-reason {
   width: 100%;
   background: var(--bg3);

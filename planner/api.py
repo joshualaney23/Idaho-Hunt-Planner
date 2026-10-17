@@ -1051,6 +1051,17 @@ def _document_dict(row) -> dict[str, Any]:
         "pdf_url": f"/api/documents/{row['id']}/pdf",
         "seasons": {r["status"]: r["n"] for r in counts},
         "checks": {r["status"]: r["n"] for r in checks},
+        # Kept forever when a human published past the gate (T-22g); `None` otherwise.
+        "publish_override": (
+            {
+                "reason": row["publish_override_reason"],
+                "by": row["publish_override_by"],
+                "at": row["publish_override_at"],
+                "bypassed": json.loads(row["publish_override_detail"] or "null"),
+            }
+            if row["publish_override_reason"]
+            else None
+        ),
     }
 
 
@@ -1074,6 +1085,7 @@ def get_document(doc_id: int):
         s["restrictions"] = json.loads(s["restrictions"] or "[]")
         s["units"] = sorted((s["units"] or "").split(","), key=_unit_sort) if s["units"] else []
     checks = _checks_for(doc_id)
+    sections = _sections_for(checks, _routing_rows(doc_id))
     return jsonify(
         {
             "document": _document_dict(row),
@@ -1081,7 +1093,9 @@ def get_document(doc_id: int):
             "checks": checks,
             # §8.7 display safety: a section with a waived check shows the ⚠ badge, and
             # every season carries its `section` so the UI can join the two (T-22b).
-            "sections": _sections_for(checks),
+            # Each section also carries its §8.4 routing and reasons (T-22g).
+            "sections": sections,
+            "routing": _routing_summary(sections),
             "publish": _publish_state(doc_id),
         }
     )
@@ -1314,49 +1328,169 @@ def _checks_for(doc_id: int) -> list[dict[str, Any]]:
     return [_check_dict(r) for r in rows]
 
 
-def _sections_for(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Per-section check summary.
-
-    `waived` is §8.7 display safety: every season of a section with a waived check shows the
-    ⚠ "manually verified" badge. `clean` is the bulk-approve rule — a section whose checks
-    all pass (a waiver is a human override, not a pass, so it never makes a section clean).
-    """
-    sections: dict[str, dict[str, Any]] = {}
-    for c in checks:
-        s = sections.setdefault(
-            c["section"] or "",
-            {
-                "section": c["section"] or "",
-                "checks": {},
-                "waived": False,
-                "waived_checks": [],
-                "blocking_checks": [],
-                "clean": True,
-            },
-        )
-        s["checks"][c["status"]] = s["checks"].get(c["status"], 0) + 1
-        if c["waived"]:
-            s["waived"] = True
-            s["waived_checks"].append(c["check_name"])
-        if c["blocks_publish"]:
-            s["blocking_checks"].append(c["check_name"])
-        if c["status"] != "pass":
-            s["clean"] = False
-    return [sections[k] for k in sorted(sections)]
+#: Row states the routing looks at; a published or superseded row is history (§8.4).
+ROUTABLE_STATUSES = ("staged", "approved", "rejected")
+#: The SQL that says "this row is uncertain" — the only rows a human must approve by
+#: hand (T-22g). A row the parser scored 1.0 and both extraction paths agreed on carries
+#: no red flag of its own, so it rides along with its document even when its section was
+#: sent to review. Section-wide problems are checks, and a check has its own gate: it
+#: blocks publishing until a human waives it with a written reason.
+#: A hand-edited row is uncertain again until someone decides on it: the edit means a
+#: human disagreed with the parser, which is exactly §12 T-22g's "editing a row of an
+#: auto-accepted section routes that section to review".
+ROW_NEEDS_REVIEW_SQL = (
+    "(confidence < 1.0 OR extract_agree = 0 OR (edited_at IS NOT NULL AND reviewed_by_user = 0))"
+)
+#: Why a section was sent to review, in the order the UI lists them (§8.4).
+ROUTING_REASONS = (
+    "check_blocking",
+    "check_waived",
+    "low_confidence",
+    "two_path_disagreement",
+    "edited",
+)
+#: The columns `_row_needs_review` reads; every query that feeds it selects them.
+ROW_FLAG_COLUMNS = "id, section, status, confidence, extract_agree, reviewed_by_user, edited_at"
 
 
-def _row_refs(sql: str, doc_id: int) -> list[dict[str, Any]]:
+def _confidence(row: Any) -> float:
+    value = row["confidence"]
+    return float(1.0 if value is None else value)
+
+
+def _row_needs_review(row: Any) -> bool:
+    """The Python twin of `ROW_NEEDS_REVIEW_SQL`."""
+    return (
+        _confidence(row) < 1.0
+        or not row["extract_agree"]
+        or bool(row["edited_at"] and not row["reviewed_by_user"])
+    )
+
+
+def _routing_rows(doc_id: int) -> list[dict[str, Any]]:
     return _dicts(
-        "SELECT id, section, status, source_page, extract_agree, reviewed_by_user"
-        f" FROM seasons WHERE document_id = ? AND {sql} ORDER BY id",
+        f"SELECT {ROW_FLAG_COLUMNS} FROM seasons"
+        f" WHERE document_id = ? AND status IN {ROUTABLE_STATUSES} ORDER BY id",
         doc_id,
     )
 
 
+def _blank_section(name: str) -> dict[str, Any]:
+    return {
+        "section": name,
+        "checks": {},
+        "waived": False,
+        "waived_checks": [],
+        "blocking_checks": [],
+        "clean": True,
+        "routing": "auto_accepted",
+        "reasons": [],
+        "rows": 0,
+        "needs_review_rows": [],
+        "unreviewed_rows": [],
+    }
+
+
+def _sections_for(
+    checks: list[dict[str, Any]], rows: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
+    """Per-section check summary and the §8.4 review routing (T-22g).
+
+    `waived` is §8.7 display safety: every season of a section with a waived check shows the
+    ⚠ "manually verified" badge. `clean` is the bulk-approve rule — a section whose checks
+    all pass (a waiver is a human override, not a pass, so it never makes a section clean).
+
+    `routing` is `auto_accepted` when every row of the section has confidence 1.0, no row
+    disagrees between the two extraction paths, and every check on it is `pass` or
+    `skipped`; any other section is sent to `review`, with its `reasons`. Routing is
+    derived, never stored. Being sent to review does **not** mean every row must be
+    approved: only the rows in `needs_review_rows` do (`unreviewed_rows` are the ones
+    still `staged`). A failing check keeps its own gate — a waiver — instead of turning
+    each of a section's clean rows into a click.
+    """
+    sections: dict[str, dict[str, Any]] = {}
+    for c in checks:
+        s = sections.setdefault(c["section"] or "", _blank_section(c["section"] or ""))
+        s["checks"][c["status"]] = s["checks"].get(c["status"], 0) + 1
+        if c["waived"]:
+            s["waived"] = True
+            s["waived_checks"].append(c["check_name"])
+            s["reasons"].append("check_waived")
+        if c["blocks_publish"]:
+            s["blocking_checks"].append(c["check_name"])
+            s["reasons"].append("check_blocking")
+        if c["status"] != "pass":
+            s["clean"] = False
+    for r in rows or []:
+        s = sections.setdefault(r["section"] or "", _blank_section(r["section"] or ""))
+        s["rows"] += 1
+        if _confidence(r) < 1.0:
+            s["reasons"].append("low_confidence")
+        if not r["extract_agree"]:
+            s["reasons"].append("two_path_disagreement")
+        if r["edited_at"] and not r["reviewed_by_user"]:
+            s["reasons"].append("edited")
+        if _row_needs_review(r):
+            s["needs_review_rows"].append(r["id"])
+            if r["status"] == "staged":
+                s["unreviewed_rows"].append(r["id"])
+    for s in sections.values():
+        s["reasons"] = [reason for reason in ROUTING_REASONS if reason in s["reasons"]]
+        s["routing"] = "review" if s["reasons"] else "auto_accepted"
+    return [sections[k] for k in sorted(sections)]
+
+
+def _routing_summary(sections: list[dict[str, Any]]) -> dict[str, Any]:
+    """The review screen's one-line summary: how many sections went each way (§8.4)."""
+    auto = [s["section"] for s in sections if s["routing"] == "auto_accepted"]
+    review = [s["section"] for s in sections if s["routing"] == "review"]
+    return {
+        "auto_accepted": auto,
+        "review": review,
+        "rows_needing_review": sum(len(s["needs_review_rows"]) for s in sections),
+    }
+
+
+def _row_refs(sql: str, doc_id: int) -> list[dict[str, Any]]:
+    return _dicts(
+        f"SELECT {ROW_FLAG_COLUMNS}, source_page FROM seasons"
+        f" WHERE document_id = ? AND {sql} ORDER BY id",
+        doc_id,
+    )
+
+
+def _publishable_rows(doc_id: int) -> dict[str, list[int]]:
+    """What a publish would do with this document's rows (T-22g).
+
+    `approved` were approved by hand, `auto` are staged rows no red flag touched — they
+    publish with the document — and `unreviewed` are staged rows that still need a human
+    and only publish through an override.
+    """
+    rows = _dicts(
+        f"SELECT {ROW_FLAG_COLUMNS} FROM seasons"
+        " WHERE document_id = ? AND status IN ('staged', 'approved') ORDER BY id",
+        doc_id,
+    )
+    out: dict[str, list[int]] = {"approved": [], "auto": [], "unreviewed": []}
+    for r in rows:
+        if r["status"] == "approved":
+            out["approved"].append(int(r["id"]))
+        elif _row_needs_review(r):
+            out["unreviewed"].append(int(r["id"]))
+        else:
+            out["auto"].append(int(r["id"]))
+    return out
+
+
 def _publish_blockers(doc_id: int) -> dict[str, Any]:
-    """Everything that keeps document `doc_id` from publishing (§8.4's three conditions)."""
+    """Everything that keeps document `doc_id` from publishing (§8.4's conditions).
+
+    Condition (1) is T-22g's: no *uncertain* row may still be `staged`. Rows in an
+    auto-accepted section — and the clean rows of a section sent to review — publish with
+    the document without an individual approval.
+    """
     checks = [c for c in _checks_for(doc_id) if c["blocks_publish"]]
-    unreviewed = _row_refs("status = 'staged'", doc_id)
+    unreviewed = _row_refs(f"status = 'staged' AND {ROW_NEEDS_REVIEW_SQL}", doc_id)
     disagreeing = _row_refs(
         "extract_agree = 0 AND reviewed_by_user = 0 AND status NOT IN ('superseded', 'published')",
         doc_id,
@@ -1377,12 +1511,19 @@ def _publish_blockers(doc_id: int) -> dict[str, Any]:
         "rows": rows,
         "unreviewed_rows": unreviewed,
         "disagreeing_rows": disagreeing,
+        # Every blocker here can be pushed through with a written reason (T-22g).
+        "override_available": True,
     }
 
 
 def _publish_state(doc_id: int) -> dict[str, Any]:
     blockers = _publish_blockers(doc_id)
-    return {"blocked": bool(blockers["checks"] or blockers["rows"]), "blockers": blockers}
+    return {
+        "blocked": bool(blockers["checks"] or blockers["rows"]),
+        "blockers": blockers,
+        # What Publish would do right now, so the confirmation modal can say it (T-22g).
+        "rows": {k: len(v) for k, v in _publishable_rows(doc_id).items()},
+    }
 
 
 def _season_row(doc_id: int, season_id: int):
@@ -1416,8 +1557,14 @@ def document_checks(doc_id: int):
     """Accuracy results for the review screen's Accuracy panel (§8.4)."""
     _document_row(doc_id)
     checks = _checks_for(doc_id)
+    sections = _sections_for(checks, _routing_rows(doc_id))
     return jsonify(
-        {"checks": checks, "sections": _sections_for(checks), "publish": _publish_state(doc_id)}
+        {
+            "checks": checks,
+            "sections": sections,
+            "routing": _routing_summary(sections),
+            "publish": _publish_state(doc_id),
+        }
     )
 
 
@@ -1576,6 +1723,10 @@ def review_season(doc_id: int, season_id: int):
             status=409,
         )
     cols, units = _season_edits(row, body)
+    if cols or units is not None:
+        # A hand edit sends the row (and its section) back to review until someone
+        # decides on it — §12 T-22g. `status` in the same request clears it again.
+        cols["edited_at"] = _now()
     if status is not None:
         cols.update({"status": status, "reviewed_by_user": 1, "reviewed_at": _now()})
     with db.tx():
@@ -1601,14 +1752,19 @@ def review_season(doc_id: int, season_id: int):
 def approve_all(doc_id: int):
     """Bulk approve, §8.4's one allowed form: rows the checks agree on.
 
-    A row qualifies only when both extraction paths agreed (`extract_agree = 1`) **and**
-    every check of its section passed. There is no confidence-only bulk approve, and a
-    waived check never makes its section eligible — those rows are approved one by one.
+    A row qualifies only when both extraction paths agreed (`extract_agree = 1`), the
+    parser scored it 1.0 **and** every check of its section passed — the same definition
+    of "clean" the T-22g routing uses, so the two can never disagree. There is no
+    confidence-only bulk approve, and a waived check never makes its section eligible:
+    those rows are approved one by one.
+
+    Since T-22g a clean row no longer *needs* approving to publish, so this is now a
+    convenience (it records who looked), not the way out of the gate.
     """
     _document_row(doc_id)
     clean = {s["section"] for s in _sections_for(_checks_for(doc_id)) if s["clean"]}
     staged = _row_refs("status = 'staged'", doc_id)
-    approved = [r for r in staged if r["extract_agree"] and (r["section"] or "") in clean]
+    approved = [r for r in staged if not _row_needs_review(r) and (r["section"] or "") in clean]
     skipped = [r for r in staged if r not in approved]
     if approved:
         now = _now()
@@ -1617,18 +1773,21 @@ def approve_all(doc_id: int):
             " WHERE id = ?",
             [(now, r["id"]) for r in approved],
         )
+
+    def _why(r: dict[str, Any]) -> str:
+        if not r["extract_agree"]:
+            return "extract_disagreement"
+        if _confidence(r) < 1.0:
+            return "low_confidence"
+        if r["edited_at"] and not r["reviewed_by_user"]:
+            return "edited_not_reviewed"
+        return "section_has_failing_check"
+
     return jsonify(
         {
             "approved": [r["id"] for r in approved],
             "skipped": [
-                {
-                    "id": r["id"],
-                    "section": r["section"],
-                    "reason": "extract_disagreement"
-                    if not r["extract_agree"]
-                    else "section_has_failing_check",
-                }
-                for r in skipped
+                {"id": r["id"], "section": r["section"], "reason": _why(r)} for r in skipped
             ],
             "clean_sections": sorted(clean),
             "publish": _publish_state(doc_id),
@@ -1672,11 +1831,20 @@ def _supersede(doc_row, season_ids: list[int]) -> list[int]:
 
 @api.post("/documents/<int:doc_id>/publish")
 def publish_document(doc_id: int):
-    """Publish a document's approved rows — only when the §8.4 gate is satisfied.
+    """Publish a document's rows — when the §8.4 gate is satisfied, or by override.
 
-    The gate: (1) no row is still `staged`, (2) every check is `pass`, `skipped` or waived
-    with a reason, and (3) every `extract_agree = 0` row was reviewed individually.
-    Otherwise 409 `publish_blocked`, naming every blocking check and row.
+    The gate: (1) no **uncertain** row is still `staged` (confidence < 1.0 or the two
+    extraction paths disagreed — a clean row publishes with the document, T-22g),
+    (2) every check is `pass`, `skipped` or waived with a reason, and (3) every
+    `extract_agree = 0` row was reviewed individually. Otherwise 409 `publish_blocked`,
+    naming every blocking check and row.
+
+    **Override (T-22g, Josh's call).** `{"override": {"reason": "…", "by": "…"}}`
+    publishes anyway: the blockers it bypassed are stored on the document forever
+    (`publish_override_*`) and every row it pushed through unreviewed is flagged
+    `published_unreviewed = 1`, so the app can say which seasons no human confirmed. An
+    override without a written reason is a 400 `missing_reason` — the same rule as a
+    waiver, for the same reason (D3).
     """
     row = _document_row(doc_id)
     if row["status"] == "published":
@@ -1686,27 +1854,47 @@ def publish_document(doc_id: int):
             {"document_id": doc_id, "published_at": row["published_at"]},
             status=409,
         )
+    # Publish takes no body in the normal case, so an empty POST stays valid.
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}
+    override = body.get("override")
+    reason = None
+    by = "user"
+    if override:
+        source = override if isinstance(override, dict) else body
+        raw = source.get("reason")
+        if not isinstance(raw, str) or not raw.strip():
+            raise ApiError(
+                "missing_reason",
+                "publishing past the review gate needs a written reason",
+                {"field": "reason"},
+                status=400,
+            )
+        reason = raw.strip()
+        by = _text(source.get("by"), "by") or "user"
+
     blockers = _publish_blockers(doc_id)
-    if blockers["checks"] or blockers["rows"]:
+    blocked = bool(blockers["checks"] or blockers["rows"])
+    if blocked and reason is None:
         raise ApiError(
             "publish_blocked",
             "the §8.7 review gate is not satisfied",
             blockers,
             status=409,
         )
+    overridden = blocked and reason is not None
+    groups = _publishable_rows(doc_id)
+    ids = sorted(groups["approved"] + groups["auto"] + (groups["unreviewed"] if overridden else []))
+    unreviewed = sorted(groups["unreviewed"]) if overridden else []
     with db.tx():
-        ids = [
-            int(r["id"])
-            for r in db.q(
-                "SELECT id FROM seasons WHERE document_id = ? AND status = 'approved' ORDER BY id",
-                doc_id,
-            )
-        ]
         if ids:
-            db.exec(
-                "UPDATE seasons SET status = 'published' WHERE document_id = ? AND"
-                " status = 'approved'",
-                doc_id,
+            db.exec_many(
+                "UPDATE seasons SET status = 'published' WHERE id = ?", [(i,) for i in ids]
+            )
+        if unreviewed:
+            db.exec_many(
+                "UPDATE seasons SET published_unreviewed = 1 WHERE id = ?",
+                [(i,) for i in unreviewed],
             )
         superseded = _supersede(row, ids)
         db.exec(
@@ -1714,10 +1902,28 @@ def publish_document(doc_id: int):
             _now(),
             doc_id,
         )
+        if overridden:
+            db.exec(
+                "UPDATE source_documents SET publish_override_reason = ?, publish_override_by = ?,"
+                " publish_override_at = ?, publish_override_detail = ? WHERE id = ?",
+                reason,
+                by,
+                _now(),
+                json.dumps(
+                    {
+                        "checks": blockers["checks"],
+                        "rows": blockers["rows"],
+                        "published_unreviewed": unreviewed,
+                    }
+                ),
+                doc_id,
+            )
     return jsonify(
         {
             "document": _document_dict(_document_row(doc_id)),
             "published": ids,
+            "auto_published": sorted(groups["auto"]),
+            "published_unreviewed": unreviewed,
             "superseded": superseded,
         }
     )

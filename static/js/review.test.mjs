@@ -30,6 +30,11 @@ import {
   rowOrder,
   sectionLabel,
   sectionViews,
+  createOverrideDialog,
+  reviewSections,
+  routingReasonText,
+  routingSummaryText,
+  rowNeedsReview,
 } from "./review.js";
 
 beforeEach(() => installFakeDom());
@@ -595,7 +600,7 @@ test("gateReasons names §8.4's three conditions", () => {
       },
     }),
     [
-      "2 rows still staged",
+      "2 rows still need a decision",
       "1 unwaived check: general_coverage (fail)",
       "1 row(s) where the two paths disagree, unreviewed",
     ],
@@ -607,7 +612,7 @@ test("Publish is disabled while the gate blocks, and enabled when it clears", as
   const { screen } = mount();
   await screen.ready;
   assert.equal(screen.el.querySelector("#publish-button").disabled, true);
-  assert.match(screen.el.querySelector("#gate-reasons").textContent, /1 row still staged/);
+  assert.match(screen.el.querySelector("#gate-reasons").textContent, /1 row still needs a decision/);
 
   const { screen: clear } = mount({
     body: body({
@@ -710,4 +715,156 @@ test("a failed load says so instead of rendering an empty screen", async () => {
   await screen.ready;
   assert.equal(document.body.dataset.reviewReady, "error");
   assert.match(screen.el.textContent, /no such document 4/);
+});
+
+
+// ---- T-22g: per-section routing, per-row approval, the publish override ------
+
+const sectionSummary = (over = {}) => ({
+  section: "deer_general",
+  checks: { pass: 1 },
+  waived: false,
+  waived_checks: [],
+  blocking_checks: [],
+  clean: true,
+  routing: "auto_accepted",
+  reasons: [],
+  rows: 2,
+  needs_review_rows: [],
+  unreviewed_rows: [],
+  ...over,
+});
+
+test("rowNeedsReview flags only the uncertain rows", () => {
+  assert.equal(rowNeedsReview(season()), false);
+  assert.equal(rowNeedsReview(season({ confidence: 0.8 })), true);
+  assert.equal(rowNeedsReview(season({ extract_agree: 0 })), true);
+  assert.equal(rowNeedsReview(season({ edited_at: "2026-10-16T09:00:00" })), true);
+  // …until someone decides on the edit.
+  assert.equal(
+    rowNeedsReview(season({ edited_at: "2026-10-16T09:00:00", reviewed_by_user: 1 })),
+    false,
+  );
+});
+
+test("sectionViews carries the routing the server sent, and its reasons", () => {
+  const views = sectionViews(
+    [check({ status: "pass", blocks_publish: false })],
+    [sectionSummary({ routing: "review", reasons: ["low_confidence"], needs_review_rows: [3] })],
+  );
+  assert.equal(views[0].routing, "review");
+  assert.deepEqual(views[0].needsReview, [3]);
+  assert.match(routingReasonText("low_confidence"), /below 1\.0/);
+  assert.deepEqual([...reviewSections(views)], ["deer_general"]);
+});
+
+test("routingSummaryText counts the sections and the rows that need a human", () => {
+  const views = sectionViews(
+    [],
+    [
+      sectionSummary(),
+      sectionSummary({
+        section: "controlled_elk",
+        routing: "review",
+        reasons: ["two_path_disagreement"],
+        needs_review_rows: [9],
+      }),
+    ],
+  );
+  assert.equal(
+    routingSummaryText(views),
+    "1 section accepted automatically · 1 section sent to review · 1 row needs a decision",
+  );
+});
+
+test("an auto-accepted section collapses to a card, and Show rows opens it", async () => {
+  const { screen } = mount({
+    body: body({
+      seasons: [season({ id: 1 }), season({ id: 2 })],
+      checks: [check({ status: "pass", blocks_publish: false })],
+      sections: [sectionSummary()],
+      publish: { blocked: false, blockers: { checks: [], rows: [], unreviewed_rows: [] } },
+    }),
+  });
+  await screen.ready;
+  const summary = screen.el.querySelector("#routing-summary");
+  assert.match(summary.textContent, /1 section accepted automatically/);
+  assert.match(summary.textContent, /accepted automatically/);
+  // No rows are listed while the section is collapsed.
+  assert.equal(screen.el.querySelectorAll("article").length, 0);
+
+  const toggle = [...summary.querySelectorAll("button")].find((b) => b.textContent === "Show rows");
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  toggle.dispatch("click");
+  assert.equal(screen.el.querySelectorAll("article").length, 2);
+});
+
+test("in a review section only the uncertain row carries Approve / Reject", async () => {
+  const { screen } = mount({
+    body: body({
+      seasons: [season({ id: 1 }), season({ id: 2, confidence: 0.5 })],
+      sections: [
+        sectionSummary({
+          routing: "review",
+          reasons: ["low_confidence"],
+          clean: false,
+          needs_review_rows: [2],
+          unreviewed_rows: [2],
+        }),
+      ],
+    }),
+  });
+  await screen.ready;
+  const rows = [...screen.el.querySelectorAll("article")];
+  assert.equal(rows.length, 2);
+  const labels = (node) => [...node.querySelectorAll("button")].map((b) => b.textContent);
+  assert.deepEqual(labels(rows[0]), ["Edit (e)"]);
+  assert.match(rows[0].textContent, /publishes with the document/);
+  assert.deepEqual(labels(rows[1]), ["Approve (a)", "Reject (r)", "Edit (e)"]);
+});
+
+test("Publish anyway appears only while the gate blocks, and sends the typed reason", async () => {
+  const calls = [];
+  const { screen } = mount({
+    options: {
+      publish: async (payload) => {
+        calls.push(payload);
+        return { published: [1], published_unreviewed: [1], superseded: [] };
+      },
+    },
+  });
+  await screen.ready;
+  const anyway = screen.el.querySelector("#publish-override-button");
+  assert.ok(anyway, "the override button is offered while the gate blocks");
+  anyway.dispatch("click");
+
+  const dlg = screen.el.querySelector("#override-dialog");
+  const go = [...dlg.querySelectorAll("button")].find((b) => b.textContent === "Publish anyway");
+  go.dispatch("click");
+  await Promise.resolve();
+  assert.deepEqual(calls, []); // an empty reason never reaches the server
+  assert.match(dlg.textContent, /needs a written reason/);
+
+  dlg.querySelector("#override-reason").value = "Opener is tomorrow; I read pp. 12-21 myself.";
+  go.dispatch("click");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls, [
+    { override: { reason: "Opener is tomorrow; I read pp. 12-21 myself." } },
+  ]);
+});
+
+test("the override dialog refuses an empty reason on its own", async () => {
+  const sent = [];
+  const dialog = createOverrideDialog(async (reason) => sent.push(reason));
+  dialog.open(["1 row still needs a decision"]);
+  const go = [...dialog.dlg.querySelectorAll("button")].find(
+    (b) => b.textContent === "Publish anyway",
+  );
+  go.dispatch("click");
+  await Promise.resolve();
+  assert.deepEqual(sent, []);
+  dialog.dlg.querySelector("#override-reason").value = "  verified by hand  ";
+  go.dispatch("click");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(sent, ["verified by hand"]);
 });
