@@ -341,6 +341,170 @@ def availability():
     return Response(body, mimetype="application/json")
 
 
+# ───────── controlled hunts (T-17c, §6 `GET /api/hunts/<year>/<hunt_number>`) ─────────
+#: Season statuses a hunt lookup reports, best first. `rejected` rows are never a hunt you
+#: can hold a tag for, so a number whose rows were all rejected in review reads as unknown
+#: (§12 T-17c: "Save is disabled for unknown numbers or numbers whose seasons are only
+#: rejected"). Staged/approved rows are shown, flagged by `status`, because the user may
+#: hold the tag before the import is published.
+HUNT_STATUSES: tuple[str, ...] = ("published", "approved", "staged", "superseded")
+
+
+def _hunt_seasons(year: int, hunt_number: str) -> list[dict[str, Any]]:
+    """Every non-rejected season printed under one hunt number in one license year.
+
+    One hunt number can print several date windows (T-17a), so this is a list. The year is
+    the *document's* `license_year`, which is what a controlled tag matches on (§7.2).
+    """
+    marks = ", ".join("?" * len(HUNT_STATUSES))
+    return _dicts(
+        "SELECT s.id, s.status, s.species_id, sp.label AS species_label, sp.icon,"
+        " s.tag_type_id, s.hunt_number, s.hunt_area, s.hunt_class, s.weapon, s.sex,"
+        " s.start_date AS start, s.end_date AS end, s.restrictions, s.bag_limit, s.notes,"
+        " s.source_page, s.document_id, d.license_year"
+        " FROM seasons s"
+        " JOIN source_documents d ON d.id = s.document_id"
+        " JOIN species sp ON sp.id = s.species_id"
+        f" WHERE s.hunt_number = ? AND d.license_year = ? AND s.status IN ({marks})"
+        " ORDER BY s.start_date, s.end_date, s.id",
+        hunt_number,
+        year,
+        *HUNT_STATUSES,
+    )
+
+
+def _hunt_units(season_ids: list[int]) -> list[dict[str, Any]]:
+    """The hunt's units with their §5 coverage, worst coverage per unit, in map order."""
+    if not season_ids:
+        return []
+    marks = ", ".join("?" * len(season_ids))
+    rows = _dicts(
+        "SELECT su.unit_id AS unit, su.coverage, su.coverage_note, su.coverage_frac"
+        " FROM season_units su JOIN units u ON u.id = su.unit_id"
+        f" WHERE su.season_id IN ({marks})"
+        " ORDER BY u.sort_key, u.id",
+        *season_ids,
+    )
+    out: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        cur = out.get(r["unit"])
+        # Several windows of one hunt share a unit: keep the narrowest coverage of them.
+        if cur is None or (cur["coverage"] == "full" and r["coverage"] == "partial"):
+            out[r["unit"]] = r
+        elif (
+            cur["coverage_frac"] is not None and (r["coverage_frac"] or 1.0) < cur["coverage_frac"]
+        ):
+            out[r["unit"]] = r
+    return list(out.values())
+
+
+def _hunt_dict(year: int, hunt_number: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """The §6 hunt shape: what the Add-tag preview and the tag card show."""
+    first = rows[0]
+    for r in rows:
+        r["restrictions"] = json.loads(r["restrictions"] or "[]")
+    area = None
+    if first["hunt_area"]:
+        # `hunt_areas` is keyed per document too (§5): prefer the hunt's own document,
+        # so a re-import of the same year can't hand back the superseded description.
+        area = db.q1(
+            "SELECT description, description_page FROM hunt_areas"
+            " WHERE license_year = ? AND species_id = ? AND area_id = ?"
+            " ORDER BY document_id = ? DESC, document_id DESC",
+            year,
+            first["species_id"],
+            first["hunt_area"],
+            first["document_id"],
+        )
+    status = next((s for s in HUNT_STATUSES if any(r["status"] == s for r in rows)), "staged")
+    return {
+        "year": year,
+        "hunt_number": hunt_number,
+        "tag_type_id": first["tag_type_id"],
+        "species_id": first["species_id"],
+        "species_label": first["species_label"],
+        "icon": first["icon"] or "🎟️",
+        # Hunt numbers are unique per species in the brochures we parse; if one ever isn't,
+        # say so instead of guessing which hunt the user drew (D3).
+        "species_ids": sorted({r["species_id"] for r in rows}),
+        "hunt_class": first["hunt_class"],
+        "weapon": first["weapon"],
+        "sex": first["sex"],
+        "hunt_area": first["hunt_area"],
+        "description": area["description"] if area else None,
+        "description_page": area["description_page"] if area else None,
+        "status": status,
+        "published": status == "published",
+        "start": min(r["start"] for r in rows),
+        "end": max(r["end"] for r in rows),
+        "windows": [
+            {
+                "id": r["id"],
+                "status": r["status"],
+                "start": r["start"],
+                "end": r["end"],
+                "weapon": r["weapon"],
+                "sex": r["sex"],
+                "restrictions": r["restrictions"],
+                "bag_limit": r["bag_limit"],
+                "notes": r["notes"],
+                "source_page": r["source_page"],
+                "document_id": r["document_id"],
+            }
+            for r in rows
+        ],
+        "units": _hunt_units([r["id"] for r in rows]),
+        "source_page": first["source_page"],
+        "document_id": first["document_id"],
+    }
+
+
+def hunt_brief(year: int, hunt_number: str | None) -> dict[str, Any] | None:
+    """The hunt behind a controlled tag, or None when that year prints no such hunt."""
+    if not hunt_number:
+        return None
+    rows = _hunt_seasons(year, hunt_number)
+    return _hunt_dict(year, hunt_number, rows) if rows else None
+
+
+@api.get("/hunts/<int:year>/<hunt_number>")
+def hunt_lookup(year: int, hunt_number: str):
+    """Controlled-hunt lookup for the Add-tag dialog (§6, §12 T-17c).
+
+    404 `unknown_hunt` covers both "no such number this year" and "its rows were rejected
+    in review"; `detail.reason` says which, and the dialog keeps Save disabled either way.
+    """
+    year = _year(year)
+    number = str(hunt_number).strip()
+    if not number.isalnum():
+        raise ApiError(
+            "bad_hunt_number",
+            "hunt numbers are digits (e.g. 1002)",
+            {"hunt_number": hunt_number},
+        )
+    rows = _hunt_seasons(year, number)
+    if not rows:
+        rejected = db.q1(
+            "SELECT 1 FROM seasons s JOIN source_documents d ON d.id = s.document_id"
+            " WHERE s.hunt_number = ? AND d.license_year = ? AND s.status = 'rejected'",
+            number,
+            year,
+        )
+        raise ApiError(
+            "unknown_hunt",
+            f"hunt #{number} was rejected in review for {year}"
+            if rejected
+            else f"no hunt #{number} in the {year} regulations",
+            {
+                "year": year,
+                "hunt_number": number,
+                "reason": "rejected" if rejected else "not_found",
+            },
+            status=404,
+        )
+    return jsonify({"hunt": _hunt_dict(year, number, rows)})
+
+
 # ───────── request helpers ─────────
 def _body() -> dict[str, Any]:
     data = request.get_json(silent=True)
@@ -463,7 +627,10 @@ def _validate_tag(
         if hunt_number is None:
             errors["hunt_number"] = "required for this tag type"
         elif not hunt_number.isalnum():
-            # T-17c adds the real lookup against that year's published hunts.
+            # Deliberately not "must be a hunt in this year's regulations": the dialog
+            # looks the hunt up (`GET /api/hunts/<year>/<no>`, T-17c) and keeps Save
+            # disabled when it isn't one, but a tag may be recorded before the brochure
+            # is imported, so the server only checks the shape.
             errors["hunt_number"] = "hunt numbers are digits (e.g. 1002)"
     else:
         hunt_number = None
@@ -474,7 +641,7 @@ def _validate_tag(
 
 
 def _tag_dict(row) -> dict[str, Any]:
-    return {
+    tag = {
         "id": row["id"],
         "license_year": row["license_year"],
         "tag_type_id": row["tag_type_id"],
@@ -491,6 +658,16 @@ def _tag_dict(row) -> dict[str, Any]:
         "requires_zone": bool(row["requires_zone"]),
         "requires_hunt_no": bool(row["requires_hunt_no"]),
     }
+    # A controlled tag carries no species of its own: it comes from the hunt (§7.2), and
+    # with it the species, units and dates the tag card shows (T-17c). None = that year's
+    # regulations aren't imported yet, or the number isn't in them.
+    if tag["requires_hunt_no"]:
+        tag["hunt"] = hunt_brief(int(row["license_year"]), row["hunt_number"])
+        if tag["hunt"]:
+            tag["species_id"] = tag["hunt"]["species_id"]
+            tag["species_label"] = tag["hunt"]["species_label"]
+            tag["icon"] = tag["hunt"]["icon"]
+    return tag
 
 
 _TAG_SELECT = """

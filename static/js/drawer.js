@@ -207,11 +207,14 @@ function seasonItem(s, labels) {
   const narrowing = (s.restrictions || []).filter(
     (c) => labels.restrictions?.[c]?.severity === "narrowing",
   );
-  li.appendChild(seasonLine({ ...s, reasons: narrowing }, labels, { link: true }));
+  // The hunt number rides on the season line itself (T-17c) and the coverage note has
+  // its own row below, so neither is repeated in the meta line.
+  li.appendChild(
+    seasonLine({ ...s, reasons: narrowing }, labels, { link: true, coverage: false }),
+  );
   const meta = [
     s.tag_type_label,
     s.zone ? `${s.zone} zone` : null,
-    s.hunt_number ? `hunt ${s.hunt_number}` : null,
     s.hunt_area && s.hunt_area !== s.hunt_number ? `area ${s.hunt_area}` : null,
     s.hunt_class && s.hunt_class !== "general" ? s.hunt_class : null,
     s.sub_species,

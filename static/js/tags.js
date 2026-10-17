@@ -9,8 +9,18 @@
 // from the tags filter and invalidates the availability query (T-07 subscribes here).
 
 import { ApiError, deleteJSON, getJSON, postJSON, putJSON } from "./api.js";
-import { button, card, field, fieldError as showError, select, textEl, toast } from "./ui.js";
+import {
+  badge,
+  button,
+  card,
+  field,
+  fieldError as showError,
+  select,
+  textEl,
+  toast,
+} from "./ui.js";
 import { WEEKEND_DEFS, createProfileCard } from "./settings.js";
+import { fmtShort, parseISO } from "./dates.js";
 
 export const TAGS_CHANGED = "ihp:tags-changed";
 // Permits saved from either side (this tab or the map's permit chips, T-07):
@@ -30,16 +40,45 @@ export function fieldsFor(tagType) {
   };
 }
 
-/** Short label for a tag: "🦌 Regular deer tag". */
-export function tagTitle(tag) {
-  return `${tag.icon || "🎟️"} ${tag.label || tag.tag_type_label}`;
+/** A hunt's units: "Unit 11", "Part of Unit 38", "Units 11, 12 +2" (T-17c). */
+export function huntUnits(hunt, max = 3) {
+  const units = hunt?.units || [];
+  if (!units.length) return "no units yet";
+  const shown = units.slice(0, max).map((u) => u.unit);
+  const rest = units.length - shown.length;
+  const noun = units.length === 1 ? "Unit" : "Units";
+  const partial = units.every((u) => u.coverage === "partial");
+  return `${partial ? "Part of " : ""}${noun} ${shown.join(", ")}${rest ? ` +${rest}` : ""}`;
 }
 
-/** The identifying detail under the title: zone, hunt number and/or note. */
+/** A hunt's date span: "Oct 10 – Nov 3". */
+export function huntDates(hunt) {
+  if (!hunt?.start || !hunt?.end) return "";
+  return `${fmtShort(parseISO(hunt.start))} – ${fmtShort(parseISO(hunt.end))}`;
+}
+
+/** The one-line hunt summary a controlled tag card shows: "Deer · Unit 11 · Oct 10 – Nov 3". */
+export function huntSummary(hunt) {
+  if (!hunt) return "";
+  return [hunt.species_label, huntUnits(hunt), huntDates(hunt)].filter(Boolean).join(" · ");
+}
+
+/** Short label for a tag: "🦌 Regular deer tag", or "🦌 Controlled no. 1002" (T-17c). */
+export function tagTitle(tag) {
+  const icon = tag.icon || "🎟️";
+  if (tag.hunt) return `${icon} Controlled #${tag.hunt_number}`;
+  return `${icon} ${tag.label || tag.tag_type_label}`;
+}
+
+/** The identifying detail under the title: zone, hunt, and/or note. */
 export function tagDetail(tag) {
   const parts = [];
   if (tag.zone) parts.push(`Zone ${tag.zone}`);
-  if (tag.hunt_number) parts.push(`Hunt #${tag.hunt_number}`);
+  if (tag.hunt) parts.push(huntSummary(tag.hunt));
+  else if (tag.hunt_number) parts.push(`Hunt #${tag.hunt_number}`);
+  // `hunt: null` (not a missing key) means the lookup ran and found nothing: either the
+  // year's regulations aren't imported yet, or the number isn't one of its hunts.
+  if (tag.hunt === null) parts.push(`not a hunt in the ${tag.license_year} regulations yet`);
   if (tag.label && tag.label !== tag.tag_type_label) parts.push(tag.tag_type_label);
   if (tag.notes) parts.push(tag.notes);
   if (tag.filled) parts.push("filled — excluded from the map");
@@ -48,7 +87,10 @@ export function tagDetail(tag) {
 
 /** One tag as a filter chip: "🫎 Elk A tag (Sawtooth)", or the controlled tag plus its hunt number. */
 export function tagChipLabel(tag) {
-  const bits = [`${tag.icon || "🎟️"} ${tag.tag_type_label}`];
+  const icon = tag.icon || "🎟️";
+  // A controlled tag reads as its hunt once the lookup knows it: "🦌 Controlled no. 1002".
+  if (tag.hunt) return `${icon} Controlled #${tag.hunt_number}`;
+  const bits = [`${icon} ${tag.tag_type_label}`];
   if (tag.zone) bits.push(`(${tag.zone})`);
   if (tag.hunt_number) bits.push(`#${tag.hunt_number}`);
   return bits.join(" ");
@@ -163,6 +205,102 @@ function tagsCard(rerender, openDialog) {
   return card(`My tags (${state.year})`, list, foot);
 }
 
+// ---- controlled-hunt lookup (T-17c) -----------------------------------------
+const PROMPT = "Type the hunt number printed in the regulations (e.g. 1002).";
+const LOOKUP_DELAY = 250; // ms of quiet before the dialog asks the server
+
+/** The PDF page a hunt-area description is printed on (`GET /api/documents/<id>/pdf`). */
+function pdfLink(hunt) {
+  if (!hunt.description_page) return null;
+  const a = textEl("a", `p.${hunt.description_page}`, "pg");
+  a.href = `/api/documents/${encodeURIComponent(hunt.document_id)}/pdf?page=${hunt.description_page}#page=${hunt.description_page}`;
+  a.target = "_blank";
+  a.rel = "noopener";
+  return a;
+}
+
+/** The preview card: what `GET /api/hunts/<year>/<no>` found, verbatim (§12 T-17c). */
+export function huntCard(hunt) {
+  const rows = [
+    textEl("b", `${hunt.icon || "🎟️"} ${hunt.species_label} · Controlled #${hunt.hunt_number}`),
+    textEl("div", `${huntUnits(hunt, 6)} · ${huntDates(hunt)}`),
+    textEl(
+      "div",
+      [
+        `${hunt.weapon.replace(/_/g, " ")} weapon`,
+        hunt.sex && hunt.sex !== "either" ? hunt.sex : null,
+        hunt.hunt_area ? `area ${hunt.hunt_area}` : null,
+        hunt.windows.length > 1 ? `${hunt.windows.length} season windows` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      "muted",
+    ),
+  ];
+  if (hunt.description) {
+    const p = textEl("p", `${hunt.description} `, "note");
+    const link = pdfLink(hunt);
+    if (link) p.appendChild(link);
+    rows.push(p);
+  }
+  if (!hunt.published) {
+    const line = document.createElement("div");
+    line.append(
+      badge("warn", hunt.status),
+      textEl("span", " this hunt isn't published yet — the map won't use it until it is.", "muted"),
+    );
+    rows.push(line);
+  }
+  return rows;
+}
+
+/**
+ * The live hunt lookup behind the Add-tag dialog's Hunt number field.
+ *
+ * `fetchHunt(year, number)` is injected so the node twin can drive it without a network;
+ * `onState({hunt, error, pending})` is what disables Save. Out-of-order replies are
+ * dropped (a slow lookup for "100" must never overwrite the card for "1002").
+ */
+export function createHuntPreview({ fetchHunt, onState = () => {}, prompt = PROMPT } = {}) {
+  const box = document.createElement("div");
+  box.className = "huntcard";
+  box.id = "hunt-preview";
+  let seq = 0;
+  const paint = (...kids) => box.replaceChildren(...kids);
+  const idle = () => {
+    box.dataset.state = "idle";
+    paint(textEl("p", prompt, "muted"));
+  };
+  idle();
+
+  async function lookup(year, number) {
+    const n = String(number || "").trim();
+    const mine = ++seq;
+    if (!n) {
+      idle();
+      onState({ hunt: null, error: null, pending: false });
+      return null;
+    }
+    box.dataset.state = "loading";
+    paint(textEl("p", `Looking up hunt #${n}…`, "muted"));
+    onState({ hunt: null, error: null, pending: true });
+    let hunt = null;
+    let error = null;
+    try {
+      hunt = (await fetchHunt(year, n)).hunt;
+    } catch (e) {
+      error = e instanceof ApiError ? e.message : String(e);
+    }
+    if (mine !== seq) return null; // a later keystroke already won
+    box.dataset.state = hunt ? "found" : "missing";
+    paint(...(hunt ? huntCard(hunt) : [textEl("p", error, "note")]));
+    onState({ hunt, error, pending: false });
+    return hunt;
+  }
+
+  return { el: box, lookup, reset: idle };
+}
+
 // ---- add-tag dialog ---------------------------------------------------------
 function addDialog(onSaved) {
   const dlg = document.createElement("dialog");
@@ -189,12 +327,17 @@ function addDialog(onSaved) {
   huntInput.inputMode = "numeric";
   huntInput.placeholder = "1002";
   const huntField = field("Hunt number", huntInput, "tag-hunt");
-  const huntHint = textEl(
-    "p",
-    "The full hunt lookup (species, area, dates) arrives in T-17c.",
-    "muted",
-  );
-  huntField.appendChild(huntHint);
+  const preview = createHuntPreview({
+    fetchHunt: (year, number) =>
+      getJSON(`/api/hunts/${year}/${encodeURIComponent(number)}`),
+    onState: ({ hunt, pending }) => {
+      lookedUp = hunt;
+      // §12 T-17c: Save stays disabled for a number this year's regulations don't print
+      // (and for one whose rows were all rejected in review — the API 404s both).
+      save.disabled = pending || (!huntField.hidden && !hunt);
+    },
+  });
+  huntField.appendChild(preview.el);
   const notesInput = document.createElement("input");
   notesInput.type = "text";
   notesInput.placeholder = "optional";
@@ -202,6 +345,8 @@ function addDialog(onSaved) {
 
   const actions = document.createElement("div");
   actions.className = "cardfoot";
+  let lookedUp = null; // the hunt the preview found, or null
+  let timer = null;
   const save = button("Save tag", "chip", null, { type: "submit" });
   save.id = "tag-save";
   const cancel = button("Cancel", "chip", () => dlg.close());
@@ -216,9 +361,19 @@ function addDialog(onSaved) {
     zoneField.hidden = !need.zone;
     huntField.hidden = !need.huntNo;
     for (const f of [typeField, zoneField, huntField, notesField]) showError(f, "");
+    // A controlled tag can't be saved before its hunt is known; every other type can.
+    save.disabled = need.huntNo && !lookedUp;
   }
   typeField.control.addEventListener("change", syncFields);
   syncFields();
+
+  huntInput.addEventListener("input", () => {
+    showError(huntField, "");
+    save.disabled = true;
+    clearTimeout(timer);
+    const number = huntInput.value;
+    timer = setTimeout(() => preview.lookup(state.year, number), LOOKUP_DELAY);
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();

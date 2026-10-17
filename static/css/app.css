@@ -622,6 +622,23 @@ input[type="text"] {
   gap: 10px;
   margin-top: 10px;
 }
+.huntcard {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--bg5);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.huntcard[data-state="missing"] {
+  border-style: dashed;
+}
+.huntcard .note {
+  margin: 0;
+  color: var(--text2);
+}
 .checklist {
   display: flex;
   flex-direction: column;

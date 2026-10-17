@@ -249,6 +249,48 @@ test("seasonLine links p.N to the stored PDF page only when asked", () => {
   assert.match(seasonLine(s).textContent, /p\.13/);
 });
 
+// ---- T-17c: controlled hunts on a season line ------------------------------------
+
+const CONTROLLED = {
+  weapon: "any",
+  sex: "antlered",
+  start: "2026-10-10",
+  end: "2026-11-03",
+  hunt_number: "1028",
+  source_page: 23,
+  document_id: 7,
+  tag_ids: [4],
+  status: "restricted",
+  reasons: ["portion_of_unit"],
+  coverage: "partial",
+  coverage_note: "That portion of Unit 38 south of Interstate 84… — see p.33",
+};
+
+test("a controlled season names its hunt, its tag and its hunt area", () => {
+  const labels = { tags: { 4: "🦌 Controlled #1028" }, restrictions: {} };
+  const line = seasonLine(CONTROLLED, labels);
+  assert.match(line.textContent, /Controlled #1028/);
+  assert.match(line.textContent, /Oct 10 – Nov 3/);
+  // §7.2: the tooltip says which tag unlocks the season…
+  assert.match(line.textContent, /via 🦌 Controlled #1028/);
+  // …and a partial hunt area carries the brochure's own words plus the page.
+  assert.match(line.textContent, /That portion of Unit 38/);
+  assert.match(line.textContent, /p\.33/);
+});
+
+test("an unheld tag id, a full-coverage unit and {coverage:false} add nothing", () => {
+  assert.doesNotMatch(seasonLine(CONTROLLED, {}).textContent, /via/);
+  const full = { ...CONTROLLED, coverage: "full" };
+  assert.doesNotMatch(seasonLine(full, {}).textContent, /That portion/);
+  const brief = seasonLine(CONTROLLED, {}, { coverage: false });
+  assert.doesNotMatch(brief.textContent, /That portion/);
+});
+
+test("a general season line is unchanged by the controlled-hunt additions", () => {
+  const s = { weapon: "any", sex: "either", start: "2026-10-10", end: "2026-10-31" };
+  assert.equal(seasonLine(s, {}).textContent.trim(), "anyOct 10 – Oct 31"); // fakedom joins nodes without spacing
+});
+
 const BASE = { x: 0, y: 0, w: 430, h: 690 };
 
 test("zoomBox keeps the focal point fixed and clamps to 1×–8× and the map bounds", () => {
