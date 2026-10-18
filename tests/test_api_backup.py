@@ -202,11 +202,15 @@ def test_restore_migrates_an_older_backup_forward(client, app, tmp_path):
 
     seed.seed(conn)
     conn.execute("UPDATE schema_version SET version = 1")
-    # Undo everything migration 002 added, so the file really is a v1 database.
+    # Undo everything migrations 002 and 004 added, so the file really is a v1 database.
     conn.execute("ALTER TABLE seasons DROP COLUMN section")
     conn.execute("ALTER TABLE seasons DROP COLUMN reviewed_at")
     conn.execute("ALTER TABLE import_checks DROP COLUMN waived_by")
     conn.execute("ALTER TABLE import_checks DROP COLUMN waived_at")
+    conn.execute("ALTER TABLE seasons DROP COLUMN published_unreviewed")
+    conn.execute("ALTER TABLE seasons DROP COLUMN edited_at")
+    for column in ("reason", "by", "at", "detail"):
+        conn.execute(f"ALTER TABLE source_documents DROP COLUMN publish_override_{column}")
     conn.commit()
     conn.close()
     assert backup.inspect(old) == 1

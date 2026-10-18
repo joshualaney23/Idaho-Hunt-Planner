@@ -75,9 +75,10 @@ def test_publish_blocked_by_failing_check_names_every_check_and_row(client, conn
     assert {c["check_name"] for c in blocking} == {"two_path_agreement", "yoy_diff"}
     assert {c["id"] for c in blocking} == {fail_id, warn_id}
     assert [c for c in blocking if c["id"] == fail_id][0]["expected"] == "235"
-    # Every blocking row is named: both are still staged, and `bad` also disagrees.
-    assert error["detail"]["rows"] == sorted([ok, bad])
-    assert [r["id"] for r in error["detail"]["unreviewed_rows"]] == sorted([ok, bad])
+    # Only an *uncertain* row blocks (T-22g): `bad` disagrees between the two extraction
+    # paths, while `ok` is clean and publishes with the document without an approval.
+    assert error["detail"]["rows"] == [bad]
+    assert [r["id"] for r in error["detail"]["unreviewed_rows"]] == [bad]
     assert [r["id"] for r in error["detail"]["disagreeing_rows"]] == [bad]
     # A `pass` and a `skipped` check never block.
     assert all(c["check_name"] not in ("tag_checksum", "golden_match") for c in blocking)
@@ -168,10 +169,11 @@ def test_waiver_requires_a_reason_and_unblocks_publish(client, conn):
     assert section["clean"] is False
     assert doc_body["seasons"][0]["section"] == SECTION
 
-    # Only the rows still block now; approve them and publishing goes through.
-    assert _publish(client, doc)[1]["error"]["detail"]["checks"] == []
-    _review(client, doc, row, "approved")
+    # The waiver was the last blocker: the row is clean, so it publishes with the
+    # document without an individual approval (T-22g).
+    assert row  # staged, never approved
     assert _publish(client, doc)[0] == 200
+    assert db.q1("SELECT status FROM seasons WHERE id = ?", row, conn=conn)[0] == "published"
     after = client.get(f"/api/documents/{doc}").get_json()
     assert [c for c in after["checks"] if c["id"] == check_id][0]["waive_reason"] == reason
     assert after["publish"]["blocked"] is False
