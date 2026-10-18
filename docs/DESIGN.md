@@ -673,9 +673,9 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
-| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, White-tailed & Mule deer filters, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30, T-31 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; {T-06, T-07, T-08, T-09, T-17c} → T-31 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
 
 ---
 
@@ -1158,6 +1158,44 @@ Two decisions were added while building it (Josh, 2026-10-16), and §8.4/§8.7 c
 
 ---
 
+### T-31 · Deer sub-species filters: White-tailed & Mule deer (tag-aware)
+**Depends on:** T-06, T-07, T-08, T-09, T-17c · **Size:** M
+**Description:** Add two species filters, **White-tailed deer** and **Mule deer**, next to the existing 🦌 Deer chip. Each one shows only the seasons the user's deer tags are actually valid for that animal. The existing **Deer** chip keeps its current meaning (the union of both) and is unchanged for every user.
+
+Today the Deer chip treats every deer season the same, so the \"White-tailed deer only\" and \"Mule deer only\" hunts (`whitetail_only`, `mule_deer_only`, §5.1) are only shown as a yellow *restricted* reason. A hunter who holds a Regular deer tag can't tell at a glance which units they can hunt for mule deer.
+
+**Tag validity matrix (the rule the filters apply):**
+
+| User holds | Season qualifier | Valid for White-tailed filter? | Valid for Mule filter? |
+|---|---|---|---|
+| Regular Deer tag | none (any deer) | yes | yes |
+| Regular Deer tag | `whitetail_only` | **yes** | **no** |
+| Regular Deer tag | `mule_deer_only` | **no** | **yes** |
+| White-tailed Deer tag | none | yes | **no** |
+| White-tailed Deer tag | `whitetail_only` | yes | no |
+| White-tailed Deer tag | `mule_deer_only` | no | no |
+| Controlled deer hunt tag (T-17c) | the hunt's own text | yes, if the hunt is white-tailed | yes, if the hunt is mule deer |
+
+Before building, confirm the matrix against the Big Game brochure's tag-definition text (Regular vs. White-tailed tag wording, and whether a White-tailed tag covers mule deer). If the brochure says otherwise, change the matrix here and in §7 in the same PR and flag it. Never guess (D3).
+
+**Design:**
+- **Virtual species ids.** `deer_whitetail` and `deer_mule` are *filter* ids, not new rows in `species`. They resolve to `species = deer` plus a sub-species test. This keeps the schema unchanged (no migration) and lets T-27's list syntax work unchanged (`species=deer_mule,elk`). `/api/meta` lists them with their labels and the 🦌 icon.
+- **Engine (§7).** Add a sub-species step before the tag check. For `deer_whitetail`, keep a season only if it has no `mule_deer_only` restriction. For `deer_mule`, keep a season only if it has no `whitetail_only` restriction. A held tag is then valid only where the matrix above says. A season the filter removes is a hard exclusion, like the weapon filter, so the unit shows `closed` (not `untagged`) under that filter.
+- **Narrowing under the matching filter.** Choosing White-tailed deer already satisfies `whitetail_only`, so it no longer narrows a unit under that filter. The same holds for `mule_deer_only` under Mule deer. The tooltip still names the restriction, and the Deer chip (no sub-filter) keeps today's behavior.
+- **UI (§4.2).** Add the two chips after Deer, in the same single-select group as today (T-27 makes the group multi-select; this ticket must not block it). When a deer sub-filter is active, the Viewing line reads e.g. `🦌 White-tailed deer · open tags only`.
+- **URL state.** `?species=deer_mule` round-trips through `state.js` and back/forward.
+
+**Acceptance criteria:**
+- On a seeded DB holding a published 2026 deer general season with `whitetail_only` (unit 1, antlered, Oct 10–31, as in the T-11 spot checks) and another with `mule_deer_only` (any unit with that code in the seed): with only a **Regular Deer** tag held, `species=deer_whitetail` shows the `whitetail_only` unit as `open`, and `species=deer_mule` shows that unit as `closed` and the `mule_deer_only` unit as `open`.
+- With only a **White-tailed Deer** tag held, `species=deer_mule` returns no `open` or `restricted` units (`closed` everywhere, `tags=mine`), and `species=deer_whitetail` returns the same units as the Regular-tag case on the `whitetail_only` seasons.
+- `species=deer` returns the same per-unit status as before this ticket on the same DB (regression test). A unit that is open under `deer_whitetail` or `deer_mule` is never worse under `deer`.
+- Under `deer_whitetail`, `whitetail_only` does not appear in a unit's `reasons` (it is satisfied), while `partial_dates` and other narrowing codes still do.
+- `include_untagged=1` under a sub-filter shows only seasons valid for that sub-species; the other sub-species' seasons are not listed as `untagged`.
+- An unknown virtual id still returns 400 `{error:{code:\"unknown_species\"}}`. `/api/meta` lists `deer_whitetail` and `deer_mule` with labels.
+- Node twin tests cover the chip group (both chips render, one is selected at a time, selecting one updates `?species=`), and the URL round-trips through back/forward.
+- Chrome check (real browser, per AGENT_CONTEXT.md): with a Regular tag and a seeded DB, clicking White-tailed deer then Mule deer changes the map, and Back restores the previous chip. Lighthouse accessibility for `#/` is unchanged.
+- The §7 matrix is confirmed against the brochure text, and the PR quotes the wording it relied on. Any deviation from the table above is listed in the PR.
+
 ---
 
 ## 13. Annual workflow (what using it looks like)
@@ -1234,6 +1272,7 @@ Two decisions were added while building it (Josh, 2026-10-16), and §8.4/§8.7 c
 | T-28 | [#54](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/54) | "Get latest regs" button (check IDFG for new regulations) |
 | T-29 | [#69](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/69) | Highlight the focused row on the source PDF page (explore) |
 | T-30 | [#72](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/72) | One-step install and launch (setup script + macOS double-click) |
+| T-31 | [#94](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/94) | Deer sub-species filters: White-tailed & Mule deer (tag-aware) |
 
 **Kickoff prompt template:**
 ```
