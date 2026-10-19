@@ -11,10 +11,32 @@ Requires Python 3.12. On macOS the system `python3` may be older, so install one
 ```bash
 git clone https://github.com/joshualaney23/Idaho-Hunt-Planner.git
 cd Idaho-Hunt-Planner
+./scripts/setup.sh
+```
+
+That one command does everything: it finds Python 3.12 (and tells you to `brew install python@3.12` if it's missing, without changing anything), creates `.venv`, installs `requirements.txt`, starts the server, waits for `/api/health`, **downloads the current IDFG regulation brochures and imports them**, and opens the browser. In Finder you can double-click **`Install Idaho Hunt Planner.command`** instead — same flow, in a Terminal window.
+
+Run it again any time: the install step is a no-op when `requirements.txt` hasn't changed, an already-running server on the port is reused, and nothing under `data/` is touched.
+
+The regulation download runs automatically only on a first install (an empty database). Afterwards use **Get latest regs** on the Regulations tab, or `./scripts/setup.sh --fetch-regs`. Downloaded seasons land *staged* — nothing is published until you review it.
+
+```bash
+./scripts/setup.sh --no-browser      # install + serve, don't open a browser
+./scripts/setup.sh --fetch-regs      # always check IDFG, not just on a first run
+./scripts/setup.sh --no-fetch-regs   # skip the IDFG check entirely
+PLANNER_PORT=6060 ./scripts/setup.sh # any port
+```
+
+<details>
+<summary>Manual setup (fallback)</summary>
+
+```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt            # add -r requirements-dev.txt for tests/linting
 ```
+
+</details>
 
 ## Run
 
