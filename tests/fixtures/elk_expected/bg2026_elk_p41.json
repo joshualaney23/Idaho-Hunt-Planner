@@ -1,0 +1,164 @@
+[
+ {
+  "zone": "Middle Fork",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-01",
+  "end": "2026-10-31",
+  "units": [
+   "20A",
+   "26"
+  ],
+  "restrictions": [
+   "antlered_only",
+   "brow_tined"
+  ],
+  "tag_quota": 1551
+ },
+ {
+  "zone": "Middle Fork",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-01",
+  "end": "2026-10-31",
+  "units": [
+   "27"
+  ],
+  "restrictions": [
+   "brow_tined",
+   "antlered_only"
+  ],
+  "tag_quota": 1551
+ },
+ {
+  "zone": "Middle Fork",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-09-15",
+  "end": "2026-09-30",
+  "units": [
+   "20A",
+   "26"
+  ],
+  "restrictions": [
+   "antlered_only",
+   "brow_tined"
+  ],
+  "tag_quota": 1636
+ },
+ {
+  "zone": "Middle Fork",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-09-15",
+  "end": "2026-09-30",
+  "units": [
+   "27"
+  ],
+  "restrictions": [
+   "brow_tined",
+   "antlered_only"
+  ],
+  "tag_quota": 1636
+ },
+ {
+  "zone": "Middle Fork",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-11-01",
+  "end": "2026-11-18",
+  "units": [
+   "20A",
+   "26"
+  ],
+  "restrictions": [
+   "antlered_only",
+   "brow_tined"
+  ],
+  "tag_quota": 1636
+ },
+ {
+  "zone": "Middle Fork",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-11-01",
+  "end": "2026-11-18",
+  "units": [
+   "27"
+  ],
+  "restrictions": [
+   "brow_tined",
+   "antlered_only"
+  ],
+  "tag_quota": 1636
+ },
+ {
+  "zone": "Salmon",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "21",
+   "21A",
+   "36B"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Salmon",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-12-01",
+  "end": "2026-12-31",
+  "units": [
+   "28"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Salmon",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-08-01",
+  "end": "2026-10-31",
+  "units": [
+   "21A"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Salmon",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-15",
+  "end": "2026-11-08",
+  "units": [
+   "21",
+   "21A",
+   "28",
+   "36B"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": 2507
+ }
+]

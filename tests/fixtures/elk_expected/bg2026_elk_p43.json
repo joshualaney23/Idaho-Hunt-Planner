@@ -1,0 +1,144 @@
+[
+ {
+  "zone": "Lemhi",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-08-01",
+  "end": "2026-08-29",
+  "units": [
+   "51"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Lemhi",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-08-01",
+  "end": "2026-10-31",
+  "units": [
+   "29",
+   "37",
+   "37A"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Lemhi",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "29",
+   "37",
+   "37A",
+   "51"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Lemhi",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlerless",
+  "start": "2026-11-25",
+  "end": "2026-12-09",
+  "units": [
+   "29",
+   "37",
+   "37A",
+   "51"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Beaverhead",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-08-01",
+  "end": "2026-08-29",
+  "units": [
+   "58",
+   "59",
+   "59A"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Beaverhead",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "30",
+   "30A",
+   "58",
+   "59",
+   "59A"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Beaverhead",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlerless",
+  "start": "2026-10-15",
+  "end": "2026-10-31",
+  "units": [
+   "30",
+   "30A",
+   "58",
+   "59",
+   "59A"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Beaverhead",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-08-01",
+  "end": "2026-10-31",
+  "units": [
+   "30"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ }
+]

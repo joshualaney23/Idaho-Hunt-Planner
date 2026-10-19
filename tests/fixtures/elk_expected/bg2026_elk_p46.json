@@ -1,0 +1,97 @@
+[
+ {
+  "zone": "Boise River",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-11-10",
+  "end": "2026-11-30",
+  "units": [
+   "39"
+  ],
+  "restrictions": [
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Boise River",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-27",
+  "end": "2026-11-09",
+  "units": [
+   "39"
+  ],
+  "restrictions": [
+   "antlered_only",
+   "portion_of_unit",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Boise River",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "either",
+  "start": "2026-08-01",
+  "end": "2026-09-30",
+  "units": [
+   "38"
+  ],
+  "restrictions": [
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Boise River",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "either",
+  "start": "2026-10-01",
+  "end": "2026-12-31",
+  "units": [
+   "38"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "spike_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Smoky-Bennett",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "43",
+   "48"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Smoky-Bennett",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-11-10",
+  "end": "2026-11-24",
+  "units": [
+   "44",
+   "45",
+   "52"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": 600
+ }
+]

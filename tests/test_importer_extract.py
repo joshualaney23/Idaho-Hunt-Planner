@@ -153,3 +153,38 @@ def test_unclassifiable_never_guesses() -> None:
         classify_mod.classify(["Big Game Seasons & Rules"])  # no year anywhere
     with pytest.raises(classify_mod.ClassifyError):
         classify_mod.classify(["whatever"], kind="not_a_kind")
+
+
+# ───────── rotated pages: the calendar frame (T-12) ─────────
+
+ELK_PAGE = FIXTURES / "bg2026_elk_p38.pdf"
+
+
+def test_a_rotated_page_carries_its_reading_frame_and_its_drawn_grid() -> None:
+    """A sideways calendar page has no ruled table, so geometry is the only way in."""
+    page = next(iter(extract.iter_pages(ELK_PAGE)))
+    assert page.rotated and not page.tables
+    # `x` runs along the printed line, `top`/`bottom` down the printed page, so the
+    # first printed line is the zone title — and it is read uncropped, which the fixed
+    # 40 pt side crop (the first and last printed lines of a rotated page) would cut.
+    top = min(w.top for w in page.rot_words)
+    title = " ".join(w.text for w in sorted(page.rot_words, key=lambda w: w.x0) if w.top - top < 2)
+    assert title.startswith("Panhandle Zone (Units 1, 2, 3, 4, 4A, 5, 6, 7, 9)")
+    fills = {s.fill for s in page.rot_rects}
+    assert (0.706, 0.727, 0.661) in fills  # the zone title band
+    assert (0.815, 0.782, 0.66) in fills  # the month header strip
+    assert any(r.bottom - r.top < 2 for r in page.rot_rules)  # row hairlines
+
+
+def test_an_upright_page_pays_nothing_for_the_rotated_frame() -> None:
+    page = next(iter(extract.iter_pages(FIXTURES / "bg2026_deer_p12.pdf")))
+    assert not page.rotated
+    assert (page.rot_words, page.rot_rects, page.rot_rules) == ([], [], [])
+
+
+def test_the_rotated_frame_survives_the_page_cache(tmp_path) -> None:
+    cached = extract.cache_dir_for("elk", tmp_path)
+    first = next(iter(extract.iter_pages(ELK_PAGE, cache_dir=cached)))
+    again = next(iter(extract.iter_pages(ELK_PAGE, cache_dir=cached)))
+    assert again.rot_words == first.rot_words
+    assert again.rot_rects == first.rot_rects and again.rot_rules == first.rot_rules
