@@ -1,0 +1,297 @@
+[
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "antlered",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "4A",
+   "5",
+   "6",
+   "7",
+   "9"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-25",
+  "end": "2026-10-29",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "4A",
+   "5",
+   "6",
+   "7",
+   "9"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlered",
+  "start": "2026-11-15",
+  "end": "2026-12-01",
+  "units": [
+   "4",
+   "7",
+   "9"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlerless",
+  "start": "2026-12-02",
+  "end": "2026-12-08",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4A",
+   "5"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-09-15",
+  "end": "2026-09-21",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4A",
+   "5",
+   "6"
+  ],
+  "restrictions": [
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "antlered",
+  "start": "2026-12-10",
+  "end": "2026-12-16",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "4A",
+   "5",
+   "6",
+   "7",
+   "9"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_b",
+  "weapon": "archery",
+  "sex": "antlered",
+  "start": "2026-09-06",
+  "end": "2026-09-12",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "4A",
+   "5",
+   "6",
+   "7",
+   "9"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-10",
+  "end": "2026-10-24",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4",
+   "4A",
+   "5",
+   "6",
+   "7",
+   "9"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Panhandle",
+  "tag": "elk_zone_b",
+  "weapon": "muzzleloader",
+  "sex": "antlerless",
+  "start": "2026-12-02",
+  "end": "2026-12-08",
+  "units": [
+   "1",
+   "2",
+   "3",
+   "4A",
+   "5"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Palouse",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-08-01",
+  "end": "2026-09-15",
+  "units": [
+   "8",
+   "8A",
+   "11A"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Palouse",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "8",
+   "8A",
+   "11A"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Palouse",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlerless",
+  "start": "2026-12-02",
+  "end": "2026-12-14",
+  "units": [
+   "8",
+   "11A"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Palouse",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "either",
+  "start": "2026-12-02",
+  "end": "2026-12-05",
+  "units": [
+   "8A"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "spike_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Palouse",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlered",
+  "start": "2026-12-06",
+  "end": "2026-12-14",
+  "units": [
+   "8A"
+  ],
+  "restrictions": [
+   "spike_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Palouse",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-10",
+  "end": "2026-10-24",
+  "units": [
+   "8",
+   "8A",
+   "11A"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ }
+]

@@ -333,4 +333,5 @@ from planner.importer.checks import (  # noqa: E402,F401  (side effect)
     hunt_areas,
     method_windows,
     shared,
+    zones,
 )

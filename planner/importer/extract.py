@@ -47,7 +47,7 @@ SUPERSCRIPT_SHARE = 0.75
 #: number there, in the margin the side crop removes (T-17a printed → physical map).
 FOOTER_BAND_PT = 40.0
 #: Bumped whenever the cached shape changes, which invalidates older cache files.
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 
 Table = list[list[str | None]]
 
@@ -108,6 +108,33 @@ class Cell:
         return cls(None if text is None else str(text), *(float(v) for v in (x0, top, x1, bottom)))
 
 
+@dataclass(frozen=True)
+class Shape:
+    """A filled rect or a drawn rule — the printed skeleton of a page (T-12).
+
+    The elk zone pages carry no ruled *table*: their grid is artwork, a tan title band
+    and month strip plus 0.5 pt hairlines, so the rows can only be read from these.
+    `fill` is the rect's non-stroking colour, rounded, which is what identifies a band.
+    """
+
+    x0: float
+    top: float
+    x1: float
+    bottom: float
+    fill: tuple[float, ...] | None = None
+
+    def to_json(self) -> list[Any]:
+        return [self.x0, self.top, self.x1, self.bottom, list(self.fill) if self.fill else None]
+
+    @classmethod
+    def from_json(cls, data: Sequence[Any]) -> Shape:
+        x0, top, x1, bottom, fill = data
+        return cls(
+            *(float(v) for v in (x0, top, x1, bottom)),
+            fill=tuple(float(v) for v in fill) if fill else None,
+        )
+
+
 #: One ruled table as rows of cells (`None` where the table has no cell at all).
 CellTable = list[list[Cell | None]]
 
@@ -137,6 +164,15 @@ class Page:
     wide_tables: list[Table] = field(default_factory=list)
     wide_words: list[Word] = field(default_factory=list)
     wide_text: str = ""
+    #: A **rotated** page read in its own reading frame (T-12): `x` runs along a printed
+    #: line and `top`/`bottom` march down the printed page, so `textlayer`'s line, band
+    #: and column helpers apply unchanged. Uncropped — the fixed side crop cuts the
+    #: rotated page's first and last printed lines, which is where a zone title sits.
+    #: Filled only when `rotated`; `rot_rects`/`rot_rules` carry the drawn skeleton
+    #: (filled bands and hairlines) in the same frame.
+    rot_words: list[Word] = field(default_factory=list)
+    rot_rects: list[Shape] = field(default_factory=list)
+    rot_rules: list[Shape] = field(default_factory=list)
 
     @property
     def lines(self) -> list[str]:
@@ -177,6 +213,9 @@ class Page:
             "wide_tables": self.wide_tables,
             "wide_words": [w.to_json() for w in self.wide_words],
             "wide_text": self.wide_text,
+            "rot_words": [w.to_json() for w in self.rot_words],
+            "rot_rects": [s.to_json() for s in self.rot_rects],
+            "rot_rules": [s.to_json() for s in self.rot_rules],
         }
 
     @classmethod
@@ -199,6 +238,9 @@ class Page:
             wide_tables=[[list(row) for row in t] for t in data.get("wide_tables") or ()],
             wide_words=[Word.from_json(w) for w in data.get("wide_words") or ()],
             wide_text=str(data.get("wide_text") or ""),
+            rot_words=[Word.from_json(w) for w in data.get("rot_words") or ()],
+            rot_rects=[Shape.from_json(s) for s in data.get("rot_rects") or ()],
+            rot_rules=[Shape.from_json(s) for s in data.get("rot_rules") or ()],
         )
 
 
@@ -323,6 +365,45 @@ def small_chars(page: Any, body_size: float | None = None) -> list[Word]:
     ]
 
 
+def _rot_word(page: Any, obj: dict[str, Any], text: str) -> Word:
+    """One object of a rotated page in its reading frame (T-12).
+
+    A printed line of a sideways page runs *up* the sheet, so the frame is turned a
+    quarter turn: `x` becomes the position along the line (`height - bottom`) and
+    `top`/`bottom` become the line's own place on the page (`x0`/`x1`).
+    """
+    height = float(page.height)
+    return Word(
+        text=text,
+        x0=round(height - float(obj["bottom"]), 2),
+        top=round(float(obj["x0"]), 2),
+        x1=round(height - float(obj["top"]), 2),
+        bottom=round(float(obj["x1"]), 2),
+    )
+
+
+def _rot_shape(page: Any, obj: dict[str, Any]) -> Shape:
+    """One rect or line of a rotated page in the same frame, keeping its fill colour."""
+    word = _rot_word(page, obj, "")
+    colour = obj.get("non_stroking_color")
+    fill = tuple(round(float(v), 3) for v in colour) if isinstance(colour, list | tuple) else None
+    return Shape(word.x0, word.top, word.x1, word.bottom, fill)
+
+
+def rotated_geometry(page: Any) -> tuple[list[Word], list[Shape], list[Shape]]:
+    """A rotated page's words, filled rects and drawn rules, all in the reading frame.
+
+    Read from the **uncropped** page on purpose: the side crop takes 40 pt off each
+    side, which on a sideways page is the first and last *printed line* — exactly where
+    a zone title and its unit list sit (§8.2, T-12).
+    """
+    opts = {"line_dir_rotated": "ltr", "char_dir_rotated": "btt"}
+    words = [_rot_word(page, w, w["text"]) for w in page.extract_words(**opts)]
+    rects = [_rot_shape(page, r) for r in page.rects]
+    rules = [_rot_shape(page, ln) for ln in page.lines]
+    return words, rects, rules
+
+
 def footer_text(page: Any, band: float = FOOTER_BAND_PT) -> str:
     """The page's bottom band, **uncropped**: the printed page number lives in the margin."""
     if page.height <= band:
@@ -374,6 +455,14 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
         wide_tables = [list(t.extract()) for t in wide.find_tables()]
         wide_words = [_word(w) for w in wide.extract_words(**opts)]
         wide_text = wide.extract_text(**opts) or ""
+    # A rotated page has no ruled tables at all (its grid is artwork), so its geometry
+    # is the only way to read it — words, filled bands and hairlines, in the rotated
+    # reading frame and uncropped (T-12).
+    rot_words: list[Word] = []
+    rot_rects: list[Shape] = []
+    rot_rules: list[Shape] = []
+    if rotated:
+        rot_words, rot_rects, rot_rules = rotated_geometry(body)
     return Page(
         number=number,
         text=text,
@@ -389,6 +478,9 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
         wide_tables=wide_tables,
         wide_words=wide_words,
         wide_text=wide_text,
+        rot_words=rot_words,
+        rot_rects=rot_rects,
+        rot_rules=rot_rules,
     )
 
 
