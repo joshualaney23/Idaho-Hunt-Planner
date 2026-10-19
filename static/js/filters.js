@@ -8,7 +8,7 @@
 import { chipGroup, textEl } from "./ui.js";
 import { fmtShort, parseISO, presets, toISO } from "./dates.js";
 import { activeTags, tagChipLabel } from "./tags.js";
-import { withDate } from "./state.js";
+import { MAX_SPECIES, toggleSpecies, withDate } from "./state.js";
 
 // §4.2 shows these twelve first; everything else sits behind "More ▾".
 export const FEATURED = [
@@ -57,9 +57,23 @@ export function speciesChipLabel(sp) {
   return SHORT[sp.id] || sp.label;
 }
 
-/** The user's unfilled tags that can apply to `species` (species-less tags apply to all). */
+/**
+ * The user's unfilled tags that can apply to `species` (species-less tags apply to all).
+ * `species` is one id or, since T-27, a list: then it's the union over the selection.
+ */
 export function tagsForSpecies(tags, species) {
-  return activeTags(tags).filter((t) => t.species_id === species || t.species_id == null);
+  const want = new Set(Array.isArray(species) ? species : [species]);
+  return activeTags(tags).filter((t) => want.has(t.species_id) || t.species_id == null);
+}
+
+/** The Match control's labels (§4.2): what `species_mode` means in words. */
+export const MATCH_LABELS = { any: "Any", all: "All" };
+
+/** The breadcrumb's match phrase for a selection: "both open", "all 3 open", "any open". */
+export function matchPhrase(state) {
+  if (state.species.length < 2) return null;
+  if (state.speciesMode !== "all") return "any open";
+  return state.species.length === 2 ? "both open" : `all ${state.species.length} open`;
 }
 
 /** The tag filter from the chips that are on: all of them collapses to `null` ("mine"). */
@@ -81,11 +95,12 @@ export function selectedTagIds(filter, heldIds) {
  * ["🦌 Deer", "🦌 Regular deer tag", "All legal weapons", "Oct 16 – Oct 18"].
  */
 export function breadcrumbParts(state, speciesList, tags) {
-  const sp = speciesList.find((s) => s.id === state.species) || {
-    id: state.species,
-    label: state.species,
-    icon: "",
-  };
+  const spText = state.species
+    .map((id) => {
+      const sp = speciesList.find((s) => s.id === id) || { label: id, icon: "" };
+      return `${sp.icon} ${sp.label}`.trim();
+    })
+    .join(" + ");
   const held = tagsForSpecies(tags, state.species);
   const on = selectedTagIds(
     state.tags,
@@ -99,7 +114,9 @@ export function breadcrumbParts(state, speciesList, tags) {
     state.start === state.end
       ? fmtShort(parseISO(state.start))
       : `${fmtShort(parseISO(state.start))} – ${fmtShort(parseISO(state.end))}`;
-  return [`${sp.icon} ${sp.label}`.trim(), tagText, WEAPON_LABELS[state.weapon], range];
+  return [spText, matchPhrase(state), tagText, WEAPON_LABELS[state.weapon], range].filter(
+    Boolean,
+  );
 }
 
 /** Render the "Viewing …" breadcrumb into `el`. */
@@ -157,14 +174,51 @@ export function createFilters(container, opts) {
   const byId = Object.fromEntries(species.map((s) => [s.id, s]));
   const featured = FEATURED.filter((id) => byId[id]);
   const more = species.map((s) => s.id).filter((id) => !featured.includes(id));
-  let expanded = more.includes(state.species);
-  const unpublished = (id) => !(byId[id]?.published_seasons > 0) && id !== state.species;
+  let expanded = more.some((id) => state.species.includes(id));
+  const unpublished = (id) => !(byId[id]?.published_seasons > 0) && !state.species.includes(id);
 
   const speciesBox = document.createElement("div");
   speciesBox.className = "species-box";
   const speciesHint = textEl("p", "", "muted hint");
   speciesHint.id = "f-species-hint";
   let speciesChips = null;
+  // Set when the user pressed a 5th species chip; cleared by the next accepted edit.
+  let atLimit = false;
+
+  // ---- Match any|all (§4.2): shown only while 2+ species are selected --------
+  const matchBox = document.createElement("div");
+  matchBox.className = "match-box";
+  matchBox.id = "f-match-box";
+  const matchLabel = textEl("span", "Match", "l");
+  matchLabel.id = "f-match-label";
+  const matchChips = chipGroup({
+    id: "f-match",
+    items: Object.entries(MATCH_LABELS),
+    value: state.speciesMode,
+    labelledBy: "f-match-label",
+    onChange: (v) => onChange({ speciesMode: v }),
+  });
+  matchBox.append(matchLabel, matchChips);
+  function paintMatch() {
+    matchBox.hidden = state.species.length < 2;
+    matchChips.setValue(state.speciesMode);
+  }
+
+  /** Apply one species chip press under the T-27 limits (max 4, never zero). */
+  function onSpeciesChip(sel) {
+    const cur = state.species;
+    const changed = sel.find((id) => !cur.includes(id)) ?? cur.find((id) => !sel.includes(id));
+    const next = changed === undefined ? cur : toggleSpecies(cur, changed);
+    if (next === cur) {
+      atLimit = sel.length > cur.length; // a 5th was pressed, not the last one dropped
+      speciesChips.setValue(cur);
+      renderSpecies();
+      return;
+    }
+    atLimit = false;
+    // The Match control only exists for 2+; dropping back to one returns to `any`.
+    onChange({ species: next, tags: null, ...(next.length < 2 ? { speciesMode: "any" } : {}) });
+  }
 
   function renderSpecies() {
     const ids = expanded ? [...featured, ...more] : featured;
@@ -177,10 +231,11 @@ export function createFilters(container, opts) {
           ? `${byId[id].label}: ${byId[id].published_seasons} published seasons`
           : `${byId[id].label}: no published seasons yet`,
       })),
+      multi: true,
       value: state.species,
       labelledBy: "f-species-label",
       disabled: unpublished,
-      onChange: (v) => onChange({ species: v, tags: null }),
+      onChange: onSpeciesChip,
     });
     const sep = document.createElement("span");
     sep.className = "chip-sep";
@@ -193,21 +248,25 @@ export function createFilters(container, opts) {
       toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
       toggle.addEventListener("click", () => {
         expanded = !expanded;
-        speciesKey = `${state.species}|${expanded}`;
+        speciesKey = `${state.species.join(",")}|${expanded}|${atLimit}`;
         renderSpecies();
         document.getElementById("f-species-more")?.focus();
       });
       speciesChips.appendChild(toggle);
     }
-    const n = byId[state.species]?.published_seasons || 0;
-    speciesHint.hidden = n > 0;
+    const empty = state.species.filter((id) => !(byId[id]?.published_seasons > 0));
+    speciesHint.hidden = !atLimit && !empty.length;
     speciesHint.replaceChildren();
-    if (!n) {
+    if (atLimit) {
+      speciesHint.append(`Up to ${MAX_SPECIES} species at a time — unselect one first.`);
+    } else if (empty.length) {
       const link = textEl("a", "upload the regulations", "");
       link.href = "#/regs";
-      speciesHint.append(`No published ${byId[state.species]?.label || state.species} seasons yet: `, link, ".");
+      const names = empty.map((id) => byId[id]?.label || id).join(", ");
+      speciesHint.append(`No published ${names} seasons yet: `, link, ".");
     }
-    speciesBox.replaceChildren(speciesChips, speciesHint);
+    paintMatch();
+    speciesBox.replaceChildren(speciesChips, matchBox, speciesHint);
   }
 
   // ---- my tags ------------------------------------------------------------
@@ -329,16 +388,18 @@ export function createFilters(container, opts) {
   let speciesKey = null;
   let tagsKey = null;
   function update(next, nextCtx) {
-    const speciesChanged = next.species !== state.species;
+    const speciesChanged = String(next.species) !== String(state.species);
     state = next;
     if (nextCtx) ctx = { ...ctx, ...nextCtx };
-    if (speciesChanged && more.includes(state.species)) expanded = true;
+    if (speciesChanged && state.species.some((id) => more.includes(id))) expanded = true;
     // Rebuild chip rows only when their content changes; otherwise just repaint the
     // pressed state, so a keyboard user's focus stays on the chip they toggled.
-    const sk = `${state.species}|${expanded}`;
+    const sk = `${state.species.join(",")}|${expanded}|${atLimit}`;
     if (sk !== speciesKey) {
       speciesKey = sk;
       keepFocus(speciesBox, renderSpecies);
+    } else {
+      paintMatch();
     }
     const held = tagsForSpecies(ctx.tags, state.species);
     const tk = JSON.stringify([ctx.year, held.map((t) => [t.id, tagChipLabel(t)])]);

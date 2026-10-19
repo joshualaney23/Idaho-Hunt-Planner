@@ -150,7 +150,9 @@ export function renderTimeline(model, seasons) {
  * viewing. Returns `{primary, other}` (both keep the API's order).
  */
 export function splitSeasons(seasons, { heldSpecies = [], viewing = null } = {}) {
-  const want = new Set([...heldSpecies, viewing].filter(Boolean));
+  // `viewing` is one id or, since T-27, the whole species selection.
+  const seen = Array.isArray(viewing) ? viewing : [viewing];
+  const want = new Set([...heldSpecies, ...seen].filter(Boolean));
   const primary = [];
   const other = [];
   for (const s of seasons) (want.has(s.species_id) ? primary : other).push(s);

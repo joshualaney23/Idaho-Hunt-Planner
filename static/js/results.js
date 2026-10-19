@@ -76,6 +76,8 @@ export function resultRows(availability) {
       weapons,
       earliest,
       seasons,
+      // T-27: `{deer: {status, reasons, days_open}, …}` whenever 2+ species were asked for.
+      perSpecies: u.per_species || null,
     });
   }
   return rows.sort((a, b) => naturalCompare(a.unit, b.unit));
@@ -124,6 +126,17 @@ export const COLUMNS = [
   { key: "earliest", label: "Earliest start" },
   { key: null, label: "Seasons overlapping your dates" },
 ];
+
+/**
+ * The columns for one availability payload (§4.3, T-27): in `all` mode with 2+ species
+ * the table gains one status-pill column per selected species beside the combined status.
+ * `labels` maps a species id to its chip text ({deer: "🦌 Deer"}).
+ */
+export function columnsFor(species = [], mode = "any", labels = {}) {
+  if (mode !== "all" || species.length < 2) return COLUMNS;
+  const extra = species.map((id) => ({ key: null, species: id, label: labels[id] || id }));
+  return [...COLUMNS.slice(0, 2), ...extra, ...COLUMNS.slice(2)];
+}
 
 // ---- CSV -------------------------------------------------------------------------
 /** RFC 4180 cell: quoted when it holds a comma, quote or line break. */
@@ -178,10 +191,12 @@ export function toCSV(rows, labels = {}) {
   return `${lines.join("\r\n")}\r\n`;
 }
 
-/** `ihp-deer-2026-10-16_2026-10-18.csv` */
+/** `ihp-deer-2026-10-16_2026-10-18.csv`; `ihp-deer-elk-all-…` for a T-27 selection. */
 export function csvFilename(state) {
   const safe = (s) => String(s).replace(/[^\w.-]+/g, "-");
-  return `ihp-${safe(state.species)}-${state.start}_${state.end}.csv`;
+  const sp = state.species.map(safe).join("-");
+  const mode = state.species.length > 1 ? `-${state.speciesMode || "any"}` : "";
+  return `ihp-${sp}${mode}-${state.start}_${state.end}.csv`;
 }
 
 /** Save `text` as a file through a temporary object URL. */
@@ -202,7 +217,7 @@ export function downloadText(text, filename, type = "text/csv;charset=utf-8") {
  * `onHover(unit|null)`, `onOpen(unit, button)`. Returns
  * `{update(availability), rows(), sort(key, dir?), sortState()}`.
  */
-export function createResults(container, { labels = {}, onHover = () => {}, onOpen = () => {} } = {}) {
+export function createResults(container, { labels = {}, onHover = () => {}, onOpen = () => {}, speciesLabels = {} } = {}) {
   const table = document.createElement("table");
   table.className = "results";
   table.id = "results-table";
@@ -218,28 +233,44 @@ export function createResults(container, { labels = {}, onHover = () => {}, onOp
   let sortKey = "unit";
   let sortDir = "asc";
   let hovered = null;
+  // The selected species and how they're combined, read off the payload (§6 echoes them).
+  let species = [];
+  let mode = "any";
+  let columns = COLUMNS;
+  let userSorted = false;
 
-  const ths = {};
-  for (const col of COLUMNS) {
-    const th = document.createElement("th");
-    th.setAttribute("scope", "col");
-    if (col.num) th.className = "num";
-    if (!col.key) {
-      th.textContent = col.label;
-      th.className = "seasons-col";
-    } else {
-      const btn = textEl("button", col.label, "sort");
-      btn.type = "button";
-      btn.dataset.sort = col.key;
-      btn.addEventListener("click", () => {
-        const dir = sortKey === col.key && sortDir === "asc" ? "desc" : "asc";
-        sort(col.key, dir);
-      });
-      th.appendChild(btn);
-      ths[col.key] = th;
+  let ths = {};
+  function buildHead() {
+    ths = {};
+    const cells = [];
+    for (const col of columns) {
+      const th = document.createElement("th");
+      th.setAttribute("scope", "col");
+      if (col.num) th.className = "num";
+      if (col.species) {
+        th.className = "sp-col";
+        th.dataset.species = col.species;
+        th.textContent = col.label;
+      } else if (!col.key) {
+        th.textContent = col.label;
+        th.className = "seasons-col";
+      } else {
+        const btn = textEl("button", col.label, "sort");
+        btn.type = "button";
+        btn.dataset.sort = col.key;
+        btn.addEventListener("click", () => {
+          const dir = sortKey === col.key && sortDir === "asc" ? "desc" : "asc";
+          userSorted = true;
+          sort(col.key, dir);
+        });
+        th.appendChild(btn);
+        ths[col.key] = th;
+      }
+      cells.push(th);
     }
-    headRow.appendChild(th);
+    headRow.replaceChildren(...cells);
   }
+  buildHead();
 
   function paintHeads() {
     for (const [key, th] of Object.entries(ths)) {
@@ -266,6 +297,21 @@ export function createResults(container, { labels = {}, onHover = () => {}, onOp
     unitTd.appendChild(btn);
     const stTd = document.createElement("td");
     stTd.appendChild(textEl("span", STATUS_TEXT[r.status] || r.status, `st ${r.status}`));
+    // One pill per selected species beside the combined status (T-27, `all` mode only).
+    const spTds = columns
+      .filter((c) => c.species)
+      .map((c) => {
+        const td = document.createElement("td");
+        td.className = "sp-col";
+        td.dataset.species = c.species;
+        const st = r.perSpecies?.[c.species]?.status || "closed";
+        const pill = textEl("span", STATUS_TEXT[st] || st, `st ${st}`);
+        pill.title = `${c.label}: ${STATUS_TEXT[st] || st}, ${
+          r.perSpecies?.[c.species]?.days_open ?? 0
+        } day(s) open`;
+        td.appendChild(pill);
+        return td;
+      });
     const daysTd = textEl("td", String(r.daysOpen), "num");
     const wTd = document.createElement("td");
     wTd.className = "weapons";
@@ -280,7 +326,7 @@ export function createResults(container, { labels = {}, onHover = () => {}, onOp
     const sTd = document.createElement("td");
     sTd.className = "seasons-col";
     for (const s of r.seasons) sTd.appendChild(seasonLine(s, labels, { link: true }));
-    tr.append(unitTd, stTd, daysTd, wTd, eTd, sTd);
+    tr.append(unitTd, stTd, ...spTds, daysTd, wTd, eTd, sTd);
     tr.addEventListener("mouseenter", () => setHover(r.unit));
     tr.addEventListener("mouseleave", () => setHover(null));
     tr.addEventListener("focusin", () => setHover(r.unit));
@@ -292,8 +338,8 @@ export function createResults(container, { labels = {}, onHover = () => {}, onOp
     if (!shown.length) {
       const tr = document.createElement("tr");
       const td = textEl("td", "Nothing open for these filters.", "muted");
-      td.colSpan = COLUMNS.length;
-      td.setAttribute("colspan", String(COLUMNS.length));
+      td.colSpan = columns.length;
+      td.setAttribute("colspan", String(columns.length));
       tr.appendChild(td);
       tbody.replaceChildren(tr);
     } else {
@@ -312,7 +358,28 @@ export function createResults(container, { labels = {}, onHover = () => {}, onOp
   }
 
   function update(availability) {
+    const nextSpecies = availability?.species || [];
+    const nextMode = availability?.species_mode || "any";
+    const sig = `${nextSpecies.join(",")}|${nextMode}`;
+    if (sig !== `${species.join(",")}|${mode}`) {
+      species = nextSpecies;
+      mode = nextMode;
+      columns = columnsFor(species, mode, speciesLabels);
+      buildHead();
+    }
     base = resultRows(availability);
+    // §12 T-27: `all` mode sorts by combined status, then days open, until the user
+    // picks a column themselves.
+    if (!userSorted) {
+      if (mode === "all" && species.length > 1) {
+        base = sortRows(base, "days", "desc");
+        sortKey = "status";
+        sortDir = "asc";
+      } else {
+        sortKey = "unit";
+        sortDir = "asc";
+      }
+    }
     shown = sortRows(base, sortKey, sortDir);
     if (hovered && !base.some((r) => r.unit === hovered)) setHover(null);
     paintHeads();
@@ -325,6 +392,7 @@ export function createResults(container, { labels = {}, onHover = () => {}, onOp
     update,
     sort,
     rows: () => shown.slice(),
+    columns: () => columns.slice(),
     sortState: () => ({ key: sortKey, dir: sortDir }),
     table,
   };

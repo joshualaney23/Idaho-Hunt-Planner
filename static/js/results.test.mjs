@@ -125,7 +125,58 @@ test("CSV: RFC 4180 quoting, labels from /api/meta, CRLF", () => {
     lines[2],
     "4A,restricted,2,archery,2026-08-30,White-tailed deer only,archery antlered 2026-08-30..2026-10-31 White-tailed deer only p.13,13",
   );
-  assert.equal(csvFilename({ species: "deer", start: "2026-10-16", end: "2026-10-18" }), "ihp-deer-2026-10-16_2026-10-18.csv");
+  assert.equal(
+    csvFilename({ species: ["deer"], start: "2026-10-16", end: "2026-10-18" }),
+    "ihp-deer-2026-10-16_2026-10-18.csv",
+  );
+  assert.equal(
+    csvFilename({ species: ["deer", "elk"], speciesMode: "all", start: "2026-10-16", end: "2026-10-18" }),
+    "ihp-deer-elk-all-2026-10-16_2026-10-18.csv",
+  );
+});
+
+test("T-27: `all` mode adds a status column per species and sorts by status then days", () => {
+  const box = doc.createElement("div");
+  doc.body.appendChild(box);
+  const r = createResults(box, { speciesLabels: { deer: "🦌 Deer", elk: "🫎 Elk" } });
+  const unit = (status, days, per) => ({
+    status,
+    reasons: [],
+    days_open: days,
+    seasons: [season()],
+    per_species: per,
+  });
+  r.update({
+    species: ["deer", "elk"],
+    species_mode: "all",
+    units: {
+      // 39 open both days; 40 restricted (elk only one day); 12 restricted but fewer days.
+      39: unit("open", 2, { deer: { status: "open", days_open: 2 }, elk: { status: "open", days_open: 2 } }),
+      40: unit("restricted", 1, { deer: { status: "open", days_open: 2 }, elk: { status: "restricted", days_open: 1 } }),
+      12: unit("restricted", 0, { deer: { status: "restricted", days_open: 1 }, elk: { status: "closed", days_open: 0 } }),
+    },
+  });
+  const ths = r.table.querySelectorAll("th");
+  assert.deepEqual(
+    ths.map((th) => th.textContent),
+    ["Unit", "Status", "🦌 Deer", "🫎 Elk", "Days open", "Weapons", "Earliest start", "Seasons overlapping your dates"],
+  );
+  // Combined status first (open before restricted), then days open descending.
+  const bodyRows = () => r.table.querySelectorAll("tr").filter((tr) => tr.dataset.unit);
+  assert.deepEqual(bodyRows().map((tr) => tr.dataset.unit), ["39", "40", "12"]);
+  assert.deepEqual(r.sortState(), { key: "status", dir: "asc" });
+  const pills = bodyRows()[1].querySelectorAll("td").filter((td) => td.dataset.species);
+  assert.deepEqual(pills.map((td) => [td.dataset.species, td.textContent]), [
+    ["deer", "open"],
+    ["elk", "restricted"],
+  ]);
+  // Back to one species: the extra columns go away and the default sort is Unit again.
+  r.update({ species: ["deer"], species_mode: "any", units: { 39: unit("open", 2) } });
+  assert.equal(r.columns().length, 6);
+  assert.deepEqual(r.sortState(), { key: "unit", dir: "asc" });
+  // `any` mode with two species keeps T-08's six columns (no per-species pills).
+  r.update({ species: ["deer", "elk"], species_mode: "any", units: { 39: unit("open", 2, {}) } });
+  assert.equal(r.columns().length, 6);
 });
 
 test("table: sortable headers with aria-sort, hover highlights, unit button opens the brief", () => {

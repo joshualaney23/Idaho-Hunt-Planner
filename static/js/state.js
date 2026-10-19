@@ -11,9 +11,12 @@ import { defaultRange, localToday, parseISO, toISO } from "./dates.js";
 
 export const WEAPONS = ["all", "rifle", "archery", "muzzleloader", "short_range"];
 export const DEBOUNCE_MS = 150;
+// T-27: the species filter is a list of up to 4 ids combined by `speciesMode`.
+export const MAX_SPECIES = 4;
+export const SPECIES_MODES = ["any", "all"];
 
 // URL query keys, in the order they're written.
-const KEYS = ["species", "start", "end", "weapon", "tags", "untagged"];
+const KEYS = ["species", "mode", "start", "end", "weapon", "tags", "untagged"];
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** A valid YYYY-MM-DD string, or null. */
@@ -33,7 +36,10 @@ export function validISO(s) {
 export function defaultState({ profile = {}, today = localToday() } = {}) {
   const [d1, d2] = defaultRange(today, profile.weekend_def || "fri_sun");
   return {
-    species: profile.default_species || "deer",
+    // A list since T-27; `default_species` stays a single value, so a fresh load is
+    // still one species in `any` mode.
+    species: [profile.default_species || "deer"],
+    speciesMode: "any",
     start: toISO(d1),
     end: toISO(d2),
     weapon: "all",
@@ -41,6 +47,31 @@ export function defaultState({ profile = {}, today = localToday() } = {}) {
     includeUntagged: false,
   };
 }
+
+/**
+ * Parse a species list ("deer,elk") into at most `MAX_SPECIES` unique known ids, in the
+ * order written. Returns null when nothing usable is left, so the caller keeps its default.
+ */
+export function parseSpecies(raw, speciesIds) {
+  if (typeof raw !== "string") return null;
+  const ids = [...new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))]
+    .filter((id) => !speciesIds || speciesIds.includes(id))
+    .slice(0, MAX_SPECIES);
+  return ids.length ? ids : null;
+}
+
+/**
+ * Toggle `id` in a species selection: never past `MAX_SPECIES`, never down to none.
+ * Returns the same array (identity) when the edit isn't allowed, so callers can revert
+ * the chip that was just pressed.
+ */
+export function toggleSpecies(list, id) {
+  if (list.includes(id)) return list.length === 1 ? list : list.filter((x) => x !== id);
+  return list.length >= MAX_SPECIES ? list : [...list, id];
+}
+
+/** The species a single-species view (tags, the Unit Brief, the CSV name) speaks for. */
+export const primarySpecies = (s) => s.species[0];
 
 /** Parse a tag-id list ("3,7") into sorted unique ints; anything malformed → null (= mine). */
 function parseTags(raw) {
@@ -58,8 +89,10 @@ function parseTags(raw) {
 export function stateFromQuery(query, defaults, { speciesIds } = {}) {
   const q = typeof query === "string" ? new URLSearchParams(query) : query;
   const s = { ...defaults };
-  const sp = q.get("species");
-  if (sp && (!speciesIds || speciesIds.includes(sp))) s.species = sp;
+  const sp = parseSpecies(q.get("species"), speciesIds);
+  if (sp) s.species = sp;
+  const mode = q.get("mode");
+  if (mode && SPECIES_MODES.includes(mode)) s.speciesMode = mode;
 
   const start = validISO(q.get("start"));
   const end = validISO(q.get("end"));
@@ -78,7 +111,9 @@ export function stateFromQuery(query, defaults, { speciesIds } = {}) {
 /** The URL query for a state: always the core keys, plus tags/untagged only when set. */
 export function toQuery(s) {
   const q = new URLSearchParams();
-  q.set("species", s.species);
+  q.set("species", s.species.join(","));
+  // Only when it bites: a one-species view is always `any`, so its URL stays T-07's.
+  if (s.speciesMode === "all") q.set("mode", "all");
   q.set("start", s.start);
   q.set("end", s.end);
   q.set("weapon", s.weapon);
@@ -96,7 +131,8 @@ export function hasFilterKeys(query) {
 /** `GET /api/availability` path for a state (§6). */
 export function availabilityPath(s) {
   const q = new URLSearchParams();
-  q.set("species", s.species);
+  q.set("species", s.species.join(","));
+  q.set("species_mode", s.speciesMode || "any");
   q.set("start", s.start);
   q.set("end", s.end);
   q.set("weapon", s.weapon);

@@ -34,7 +34,7 @@ import {
   stateFromQuery,
   toQuery,
 } from "./state.js";
-import { MAP_PERMITS, createFilters, renderViewing } from "./filters.js";
+import { MAP_PERMITS, createFilters, renderViewing, speciesChipLabel } from "./filters.js";
 import { createMap, enableZoom, placeTip, renderLegend, tooltipContent } from "./map.js";
 import { createResults, csvFilename, downloadText, toCSV } from "./results.js";
 import { createDrawer } from "./drawer.js";
@@ -131,7 +131,15 @@ async function initMapTab() {
   const initial =
     route0.tab === "map" ? stateFromQuery(route0.query, defaults, { speciesIds }) : defaults;
   const store = createStore(initial);
-  const labels = { restrictions: meta.restrictions, reasons: meta.reasons };
+  const labels = {
+    restrictions: meta.restrictions,
+    reasons: meta.reasons,
+    // T-27: the tooltip groups seasons under a species-icon header.
+    species: Object.fromEntries(meta.species.map((s) => [s.id, { label: s.label, icon: s.icon }])),
+  };
+  const speciesLabels = Object.fromEntries(
+    meta.species.map((s) => [s.id, `${s.icon || ""} ${speciesChipLabel(s)}`.trim()]),
+  );
 
   const tagsByYear = {}; // license year → tags (filled included; filters drop them)
   const permitsByYear = {}; // license year → permit codes held
@@ -206,6 +214,7 @@ async function initMapTab() {
 
   const results = createResults(tableWrap, {
     labels,
+    speciesLabels,
     onHover: (id) => map.highlight(id ? [id] : []),
     onOpen: (id, btn) => openUnit(id, btn),
   });
@@ -357,7 +366,10 @@ async function initMapTab() {
         (data.units[id].reasons || []).includes("see_notes"),
       );
       map.setStatuses(statuses, notes);
-      renderLegend(legend, data.summary, data.include_untagged);
+      renderLegend(legend, data.summary, data.include_untagged, {
+        mode: data.species_mode,
+        speciesCount: (data.species || []).length,
+      });
       renderSide();
       // Test hooks: the query the map shows, and a counter that ticks on every repaint.
       document.body.dataset.availability = availabilityPath(store.get());
