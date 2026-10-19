@@ -77,6 +77,7 @@ One line per path: what it owns, and the ticket that brought it. Open the file f
 | `docs/seasons_template.csv` | The 3-row example CSV the Season Table links to, served by `GET /api/seasons/template.csv` (T-16) |
 | `docs/mockup.html` · `spike_*_parser.py` | UI mockup with real 2026 deer data (also the seed source for map demos) · proven parser spikes that parser tickets productionize (`spike_elk_parser.py` + `elk_parser_notes.md`: the rotated elk A/B zone pages, T-12a) |
 | `docs/tools/` | `section.py` prints a §/ticket · `make_issues.py` syncs issues from §12 (`--dry-run`/`--create`/`--link`) · `issue_map.json` ticket → issue number |
+| `scripts/setup.sh` · `Install Idaho Hunt Planner.command` | One-step install + launch: Python 3.12 check, `.venv`, requirements, server, `/api/health` wait, the first-run IDFG regs fetch (T-28's check-updates) and the browser · the Finder double-click wrapper (T-30) |
 | `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + node tests (TZ=America/Boise) on 3.12. The `main: require CI` ruleset requires `test (3.12)` and a branch up to date with `main` |
 
 ## Commands
@@ -94,6 +95,7 @@ pytest -q && ruff check . && ruff format --check .   # the gates; CI runs all th
 ruff format .                                        # formatter
 TZ=America/Boise node --test static/js/*.test.mjs    # JS tests (node 22+; pytest runs them too)
 
+./scripts/setup.sh               # one-step install+launch (venv, deps, server, first-run regs fetch)
 python -m planner --no-browser   # http://127.0.0.1:5050; first run creates + seeds data/planner.db
 sqlite3 data/planner.db '.tables'
 curl -s '127.0.0.1:5050/api/availability?species=deer&start=2026-10-17&end=2026-10-18&include_untagged=1' | jq .summary
