@@ -44,23 +44,23 @@ Source: `data/pdf_cache/da4260b617b679db.pdf` · **235 rows** on 9 pages · imag
 <!-- section: elk_zones -->
 ## `elk_zones`
 
-Source: `data/regs/2026/feb85a9c8741a72a1aeb40462cceaa391e8d1849df3604fdaa156a07d5494520.pdf` · **98 rows** on 13 pages · images: `data/verify/2026/elk_zones/`
+Source: `data/regs/2026/feb85a9c8741a72a1aeb40462cceaa391e8d1849df3604fdaa156a07d5494520.pdf` · **99 rows** on 13 pages · images: `data/verify/2026/elk_zones/`
 
 | PDF page | Rows | Verified by | Date | Corrections made |
 |---|---:|---|---|---|
-| p038 | 15 | | | |
-| p039 | 5 | | | |
-| p040 | 6 | | | |
-| p041 | 10 | | | |
-| p042 | 11 | | | |
-| p043 | 8 | | | |
-| p044 | 5 | | | |
-| p045 | 5 | | | |
-| p046 | 6 | | | |
-| p047 | 7 | | | |
-| p048 | 6 | | | |
-| p049 | 11 | | | |
-| p050 | 3 | | | |
-| **total** | **98** | | | |
+| p038 | 15 | josh | 2026-10-19 | none |
+| p039 | 5 | josh | 2026-10-19 | none |
+| p040 | 6 | josh | 2026-10-19 | none |
+| p041 | 10 | josh | 2026-10-19 | none |
+| p042 | 11 | josh | 2026-10-19 | none |
+| p043 | 8 | josh | 2026-10-19 | none |
+| p044 | 5 | josh | 2026-10-19 | none |
+| p045 | 5 | josh | 2026-10-19 | none |
+| p046 | 6 | josh | 2026-10-19 | none |
+| p047 | 7 | josh | 2026-10-19 | none |
+| p048 | 6 | josh | 2026-10-19 | none |
+| p049 | 12 | josh | 2026-10-19 | 1 row restored: Bear River B-tag archery window (Aug 30 – Sep 14), see PR #106 |
+| p050 | 3 | josh | 2026-10-19 | none |
+| **total** | **99** | josh | 2026-10-19 | 1 row restored (p049) |
 
 <!-- /section: elk_zones -->
