@@ -1,0 +1,207 @@
+[
+ {
+  "zone": "Tex Creek",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "66",
+   "69"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Tex Creek",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-10-22",
+  "end": "2026-10-31",
+  "units": [
+   "66",
+   "69"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Tex Creek",
+  "tag": "elk_zone_b",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-14",
+  "units": [
+   "66",
+   "69"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "spike_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Tex Creek",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-15",
+  "end": "2026-10-21",
+  "units": [
+   "66",
+   "69"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Bannock",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "70",
+   "71",
+   "72",
+   "73",
+   "73A",
+   "74"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Bannock",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-10-25",
+  "end": "2026-11-15",
+  "units": [
+   "70",
+   "71",
+   "72",
+   "73",
+   "73A",
+   "74"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Bannock",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlerless",
+  "start": "2026-12-01",
+  "end": "2026-12-31",
+  "units": [
+   "70",
+   "71",
+   "72",
+   "73",
+   "73A",
+   "74"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Bear River",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "75",
+   "77",
+   "78"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Bear River",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-10-25",
+  "end": "2026-11-15",
+  "units": [
+   "75",
+   "77",
+   "78"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Bear River",
+  "tag": "elk_zone_a",
+  "weapon": "muzzleloader",
+  "sex": "antlerless",
+  "start": "2026-12-01",
+  "end": "2026-12-31",
+  "units": [
+   "75",
+   "77",
+   "78"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Bear River",
+  "tag": "elk_zone_b",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-14",
+  "units": [
+   "75",
+   "77",
+   "78"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "spike_only"
+  ],
+  "tag_quota": 550
+ },
+ {
+  "zone": "Bear River",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-15",
+  "end": "2026-10-24",
+  "units": [
+   "75",
+   "77",
+   "78"
+  ],
+  "restrictions": [
+   "antlered_only"
+  ],
+  "tag_quota": 550
+ }
+]

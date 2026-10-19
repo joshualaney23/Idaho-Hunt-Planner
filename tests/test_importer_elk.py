@@ -19,6 +19,9 @@ brochure. The fixtures are one-page excerpts of it
 * **p. 46** — Boise River + Smoky-Bennett: `antlerless or spike only` (the phrase a
   shortest-match sex regex reads as plain `antlerless`) and an `Oct 1 - Dec 31` window
   centred on the November column;
+* **p. 49** — Tex Creek + Bannock + Bear River: Bear River's B-tag archery window is
+  typeset `Aug 30 - Sep14` (no space in the PDF's character stream) where Tex Creek
+  prints `Aug 30 - Sep 14` two blocks above;
 * **p. 50** — Diamond Creek and the document-level `ELK Notes:` legend page.
 
 `tests/fixtures/elk_expected/*.json` is hand-verified against the rendered pages (the
@@ -50,6 +53,7 @@ PAGES: dict[str, tuple[tuple[str, ...], int]] = {
     "bg2026_elk_p42": (("Weiser River", "McCall"), 11),
     "bg2026_elk_p43": (("Lemhi", "Beaverhead"), 8),
     "bg2026_elk_p46": (("Boise River", "Smoky-Bennett"), 6),
+    "bg2026_elk_p49": (("Tex Creek", "Bannock", "Bear River"), 12),
     "bg2026_elk_p50": (("Diamond Creek",), 3),
 }
 
@@ -183,6 +187,39 @@ def test_a_weapon_note_under_a_window_is_not_the_next_hunts_label(ctx: ParseCont
         following = next(s for s in rows if to_iso(s.start) == start)
         assert following.weapon == "any"
         assert "see_notes" in following.restrictions
+
+
+def test_a_window_whose_month_is_glued_to_its_day_is_still_a_season(ctx: ParseContext) -> None:
+    """Bear River's B-tag archery window is typeset `Aug 30 - Sep14` (2026 p. 49).
+
+    The space between `Sep` and `14` is missing from the PDF's own characters — Tex
+    Creek, two blocks above the same page, prints the identical window with it. A date
+    parser that insists on whitespace reads no range at all, and the season then
+    disappears from *both* paths at once: path A keeps the entry but stages nothing from
+    it, and path B drops any entry whose text holds no date. The two paths therefore
+    agreed, `date_token_accounting` saw no leftover month (`\\bSep\\b` cannot match
+    `Sep14`), and the zone published three A-tag hunts and one B-tag hunt instead of
+    two. Reported on the 2026 verification sheet, page 49, units 75/77/78.
+    """
+    rows = [s for s in parse("bg2026_elk_p49", ctx) if s.zone == "Bear River"]
+    b_tag = [s for s in rows if s.tag_type_id == "elk_zone_b"]
+    assert [(to_iso(s.start), to_iso(s.end), s.weapon) for s in b_tag] == [
+        ("2026-08-30", "2026-09-14", "archery"),
+        ("2026-10-15", "2026-10-24", "any"),
+    ]
+    archery = b_tag[0]
+    assert archery.sex == "either"
+    assert sorted(archery.restrictions) == ["antlerless_only", "spike_only"]
+    assert [u.unit_id for u in archery.unit_refs()] == ["75", "77", "78"]
+    assert archery.tag_quota == 550  # the block's `550 B Tag Quota Available` sub-row
+    # The window is read as confidently as the spaced one Tex Creek prints on this page.
+    assert archery.extract_agree and archery.confidence == 1.0
+    tex_creek = next(
+        s
+        for s in parse("bg2026_elk_p49", ctx)
+        if s.zone == "Tex Creek" and s.tag_type_id == "elk_zone_b" and s.weapon == "archery"
+    )
+    assert (to_iso(tex_creek.start), to_iso(tex_creek.end)) == ("2026-08-30", "2026-09-14")
 
 
 def test_the_sex_vocabulary_matches_the_longest_phrase(ctx: ParseContext) -> None:

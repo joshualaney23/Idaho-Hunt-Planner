@@ -30,14 +30,24 @@ _MONTH = (
     r"|Aug(?:ust)?|Sept?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
 )
 _SEP = r"(?:\s*[-–—]\s*|\s+(?:through|thru|to)\s+)"
+#: The space between a month and its day is **optional**. The brochure sets these cells
+#: by hand and sometimes drops the space character outright: the 2026 elk zone page for
+#: Bear River (units 75, 77, 78) prints `Aug 30 - Sep14` where Tex Creek, two blocks
+#: above, prints the same window with the space. Requiring `\s+` cost that zone its
+#: whole B-tag archery season — in *both* extraction paths, since path B keeps only
+#: entries whose text parses to a date — so the two paths agreed and nothing complained.
+_DAY_GAP = r"\s*"
 _DATE_RANGE_RE = re.compile(
-    rf"(?P<m1>{_MONTH})\.?\s+(?P<d1>\d{{1,2}})(?:\s*,\s*(?P<y1>\d{{4}}))?"
+    rf"(?P<m1>{_MONTH})\.?{_DAY_GAP}(?P<d1>\d{{1,2}})(?:\s*,\s*(?P<y1>\d{{4}}))?"
     rf"{_SEP}"
-    rf"(?:(?P<m2>{_MONTH})\.?\s+)?(?P<d2>\d{{1,2}})(?:\s*,\s*(?P<y2>\d{{4}}))?",
+    rf"(?:(?P<m2>{_MONTH})\.?{_DAY_GAP})?(?P<d2>\d{{1,2}})(?:\s*,\s*(?P<y2>\d{{4}}))?",
     re.IGNORECASE,
 )
 #: A month name anywhere in a cell — used to spot date text the range parser left behind.
-_MONTH_TOKEN_RE = re.compile(rf"\b{_MONTH}\b\.?", re.IGNORECASE)
+#: The trailing boundary is "not a letter" rather than `\b`, so a month glued to its day
+#: (`Sep14`) still reads as a month token: a `\b` there cannot see one, which is why
+#: `date_token_accounting` could not report the dropped Bear River window.
+_MONTH_TOKEN_RE = re.compile(rf"\b{_MONTH}(?![A-Za-z])\.?", re.IGNORECASE)
 
 #: Cell values that mean "no season in this column" (§8.3): no row is created.
 NO_SEASON_VALUES = {"", "none", "no season", "closed", "n/a", "-", "--", "–"}
