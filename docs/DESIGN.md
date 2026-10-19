@@ -678,9 +678,9 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
-| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, White-tailed & Mule deer filters, Bull & Cow elk filters, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30, T-31, T-32, T-33 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, White-tailed & Mule deer filters, Bull & Cow elk filters, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30, T-31, T-32, T-33, T-34 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; {T-06, T-07, T-08, T-09, T-17c} → T-31 ; {T-06, T-07, T-08, T-12, T-17c, T-31} → T-33 ; {T-08, T-21, T-27} → T-32 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; {T-06, T-07, T-08, T-09, T-17c} → T-31 ; {T-06, T-07, T-08, T-12, T-17c, T-31} → T-33 ; {T-08, T-21, T-27} → T-32 ; T-08 → T-34 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
 
 ---
 
@@ -1258,6 +1258,24 @@ Before building, confirm the matrix against the Big Game brochure's elk tag and 
 - Chrome check (real browser, per AGENT_CONTEXT.md): with an Elk A tag and a seeded DB, clicking Bull elk then Cow elk changes the map, and Back restores the previous chip. Lighthouse accessibility for `#/` is unchanged.
 - The §7 matrix is confirmed against the brochure text, and the PR quotes the wording it relied on. Any deviation from the table above is listed in the PR.
 
+### T-34 · Unit Brief timeline: label each row with its animal
+**Depends on:** T-08 · **Size:** S
+**Description:** The Unit Brief timeline (§4.3, `drawer.js` `renderTimeline`) draws one bar per season but never says which animal the bar is for. A hunter looking at a unit with deer, elk and bear seasons sees bars in the same colors with no name beside them, and has to match each bar to the season list below it by hand. Put the animal name at the start of each timeline row so the bars read without the list.
+- **Label text:** the season's `species_label` from `GET /api/units/<unit>/seasons`, the same string the brief's season list and group headings already show (e.g. `Elk`, `Black bear`, and `White-tailed deer` / `Mule deer` once T-31 lands). Do not invent new names, and do not use the emoji icon alone.
+- **Layout:** a left label gutter inside the inline SVG, sized to the longest label in the current row set, with each row's text vertically centred on its bar. Bars keep their x-positions (Aug 1 → Jan 31) and the gutter moves the axis right, not the dates. Labels longer than the gutter's cap are truncated with an ellipsis; the full text stays in the bar's existing `<title>` tooltip.
+- **Rows:** one label per bar. Two seasons of the same species get the same label on two rows, so the row and its bar can still be told apart by date.
+- **Scope:** only the timeline changes. The season list, the weapon key, the selected-range band and the today line keep their current behavior, and the `timelineModel` geometry test is updated for the new x-offset rather than rewritten.
+
+**Acceptance criteria:**
+- With a seeded DB where unit 1 has published deer and elk seasons, the brief timeline shows one text label per bar, reading `Deer` or `Elk` to match the bar's season, and the label is the same string as that season's `species_label` in the API response.
+- Labels are left-aligned in the gutter, vertically centred on their bar's `y + ROW_H / 2`, and no label overlaps a bar or the Aug 1 axis labels.
+- A label longer than the gutter cap is truncated with `…`, and its full species name is still in the bar's `<title>`.
+- `timelineModel` (JS) still returns the same bar order and the same `w` for every bar; only `x` moves by the gutter width. Its node test is updated to match, and a `timelineModel` with an empty season list still renders without error.
+- Settings → "Unit brief shows only the selected species" (T-32) on: the timeline shows labels only for the species that survive the filter.
+- Chrome check (real browser, per AGENT_CONTEXT.md): a unit with deer and elk seasons, the brief open, screenshot of the timeline with labels; Lighthouse accessibility for `#/` is unchanged. The SVG text is readable at the drawer's width (no clipping at the right edge).
+- `pytest -q`, `ruff check .`, `ruff format --check .`, and `TZ=America/Boise node --test static/js/*.test.mjs` are green.
+
+---
 
 ## 13. Annual workflow (what using it looks like)
 
@@ -1289,7 +1307,7 @@ Before building, confirm the matrix against the Big Game brochure's elk tag and 
 - **Golden-data verification (T-22d–f) is human work, done once.** An agent can prepare the page-by-page checklist, but Josh (or a reviewer reading the PDF) ticks off `VERIFICATION.md`. It validates each MVP parser one time against the 2026 brochure; later years are gated by the invariants and the §8.7 review gate, never re-verified row by row.
 - **Split a ticket that won't fit one session.** T-22 was one Size-L ticket bundling the check registry, the publish gate, the golden harness and the hand-verification of ~470 controlled hunts and 235 deer date ranges; it is now T-22a–f (§12). When a ticket looks bigger than one session, split it in §12 first, re-run `docs/tools/make_issues.py`, and close the old issue pointing at the new ones.
 
-**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward; later additions take the next free number instead (T-27 = #36, T-22a–f = #45–#50, T-28 = #54, T-29 = #69, T-30 = #72, T-22g = #82). Retitling T-22d–f made a `--create` run add duplicates #79–81 (it matches on title); those are closed as not planned and the map still points at #48–50. The original T-22 (#24) was closed as superseded when it was split into T-22a–f. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
+**Ticket → GitHub issue map.** Every ticket in §12 is a GitHub issue with the ticket text verbatim, acceptance criteria as a checklist, labels (`phase:*`, `size:*`, area), a phase milestone, and native "blocked by" links. Issue numbers match ticket numbers through T-16, then shift by one from T-17a onward; later additions take the next free number instead (T-27 = #36, T-22a–f = #45–#50, T-28 = #54, T-29 = #69, T-30 = #72, T-22g = #82, T-34 = #104). Retitling T-22d–f made a `--create` run add duplicates #79–81 (it matches on title); those are closed as not planned and the map still points at #48–50. The original T-22 (#24) was closed as superseded when it was split into T-22a–f. `docs/tools/make_issues.py --link` re-syncs the issue bodies after a ticket is edited here.
 
 | Ticket | Issue | Title |
 |---|---|---|
@@ -1336,6 +1354,7 @@ Before building, confirm the matrix against the Big Game brochure's elk tag and 
 | T-31 | [#94](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/94) | Deer sub-species filters: White-tailed & Mule deer (tag-aware) |
 | T-32 | [#98](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/98) | Unit Brief: show only the selected species (setting) |
 | T-33 | [#101](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/101) | Elk sex filters: Bull elk & Cow elk (tag-aware) |
+| T-34 | [#104](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/104) | Unit Brief timeline: label each row with its animal |
 
 **Kickoff prompt template:**
 ```
