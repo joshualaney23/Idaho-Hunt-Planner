@@ -93,6 +93,37 @@ def test_leftover_date_text_flags_unconsumed_months() -> None:
     assert common.leftover_date_text("Oct 10 - Oct 24", ranges) == []
 
 
+def test_a_month_glued_to_its_day_still_parses() -> None:
+    """The brochure sometimes drops the space itself (2026 elk p. 49, Bear River).
+
+    `Aug 30 - Sep14` has no space character between `Sep` and `14` in the PDF's own
+    character stream, while the same window two zone blocks above prints one. Requiring
+    whitespace there dropped that zone's whole B-tag archery season — and silently, in
+    both extraction paths at once, because path B keeps only entries whose text parses
+    to a date, so the two paths agreed on the loss.
+    """
+    for text in ("Aug 30 - Sep14", "Aug30 - Sep 14", "Aug30-Sep14"):
+        parsed = common.parse_date_range(text, YEAR)
+        assert parsed is not None, text
+        assert (parsed.start, parsed.end) == (D(2026, 8, 30), D(2026, 9, 14)), text
+        assert parsed.text == text
+
+
+def test_a_month_glued_to_its_day_is_visible_to_the_accounting_check() -> None:
+    """§8.7 `date_token_accounting` has to be able to *see* the token it cannot parse.
+
+    `\\bSep\\b` does not match `Sep14` (both sides of the boundary are word characters),
+    so before this the dropped window left no leftover month token either: the check
+    that exists to catch a lost date could not report it.
+    """
+    assert common.leftover_date_text("Sep14 only", []) == ["Sep"]
+    # Consumed by a parsed range, it is not leftover — and a month inside a longer word
+    # is still not a month.
+    cell = "Aug 30 - Sep14"
+    assert common.leftover_date_text(cell, common.parse_date_ranges(cell, YEAR)) == []
+    assert common.leftover_date_text("Mayor and Junes", []) == []
+
+
 @pytest.mark.parametrize(
     ("cell", "expected"),
     [("None", True), ("", True), (None, True), ("Closed", True), ("Oct 10 - Oct 24", False)],

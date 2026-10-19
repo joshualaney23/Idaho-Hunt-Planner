@@ -23,6 +23,11 @@ The pages were chosen for the traps they carry (§12 T-12a findings):
 * **p. 46** — Boise River + Smoky-Bennett: `antlerless or spike only` (the phrase a
   shortest-match sex regex silently reads as `antlerless`) and an `Oct 1 - Dec 31`
   window spanning three month columns;
+* **p. 49** — Tex Creek + Bannock + Bear River: Bear River's B-tag archery window is
+  typeset `Aug 30 - Sep14`, with the space between month and day missing from the PDF's
+  own character stream, while Tex Creek prints the same window with it two blocks
+  above — a date the range parser could not read, and so a season dropped by *both*
+  extraction paths at once;
 * **p. 50** — Diamond Creek: the document-level `ELK Notes:` legend (`Notes 1-4`) every
   other page's `See Note N, Page 49` points at.
 
@@ -42,7 +47,8 @@ from tests.fixtures.make_deer_fixtures import write_page  # noqa: E402
 
 #: 1-based PDF page → fixture name.
 PAGES = {38: "bg2026_elk_p38", 41: "bg2026_elk_p41", 42: "bg2026_elk_p42",
-         43: "bg2026_elk_p43", 46: "bg2026_elk_p46", 50: "bg2026_elk_p50"}  # fmt: skip
+         43: "bg2026_elk_p43", 46: "bg2026_elk_p46", 49: "bg2026_elk_p49",
+         50: "bg2026_elk_p50"}  # fmt: skip
 FIXTURE_DIR = Path(__file__).resolve().parent
 
 
