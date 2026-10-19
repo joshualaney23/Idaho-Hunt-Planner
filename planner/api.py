@@ -269,7 +269,9 @@ def availability():
             {"species": unknown},
         )
 
-    species_mode = args.get("species_mode", "any")
+    # Selecting several species means "where can I hunt all of them" — so `all` is the
+    # default the moment there is more than one. One species is identical either way.
+    species_mode = args.get("species_mode") or engine.default_species_mode(species)
     if species_mode not in engine.SPECIES_MODES:
         raise ApiError(
             "bad_species_mode",

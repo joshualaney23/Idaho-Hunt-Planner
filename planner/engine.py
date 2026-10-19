@@ -413,6 +413,15 @@ MAX_SPECIES: Final = 4
 SPECIES_MODES: Final[tuple[str, ...]] = ("any", "all")
 
 
+def default_species_mode(species: Sequence[str]) -> str:
+    """The mode a selection uses when the caller names none.
+
+    A multi-species selection means "open to **every** one of them" (`all`); one species
+    behaves the same in either mode, so it stays on the historical `any`.
+    """
+    return "all" if len(species) > 1 else "any"
+
+
 def combine_status(statuses: Iterable[str], mode: str) -> str:
     """Combine per-species statuses on one unit (§12 T-27).
 

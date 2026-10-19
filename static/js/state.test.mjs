@@ -94,9 +94,14 @@ test("bad URL values fall back to defaults instead of breaking the page", () => 
 test("T-27: a species list and the match mode round-trip through the URL", () => {
   const s = { ...defaults, species: ["deer", "elk"], speciesMode: "all" };
   const q = toQuery(s);
-  assert.equal(q, "species=deer%2Celk&mode=all&start=2026-10-16&end=2026-10-18&weapon=all");
+  // `all` is the default for 2+ species, so it is implied rather than written.
+  assert.equal(q, "species=deer%2Celk&start=2026-10-16&end=2026-10-18&weapon=all");
   assert.deepEqual(stateFromQuery(q, defaults), s);
-  // `any` is the default, so a one-species URL stays exactly T-07's.
+  // Overriding it back to `any` is what now shows up in the URL.
+  const anyQ = toQuery({ ...s, speciesMode: "any" });
+  assert.equal(anyQ.includes("mode=any"), true);
+  assert.equal(stateFromQuery(anyQ, defaults).speciesMode, "any");
+  // One species is `any` either way, so a one-species URL stays exactly T-07's.
   assert.equal(toQuery(defaults).includes("mode="), false);
   assert.equal(hasFilterKeys("mode=all"), true);
   // Order is kept, duplicates and unknown ids drop, and at most 4 survive.
