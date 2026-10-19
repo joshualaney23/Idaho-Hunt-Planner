@@ -120,8 +120,9 @@ test("species chips: enabled only with published seasons; More reveals the rest"
   assert.deepEqual(state, { deer: false, elk: true, black_bear: false, "f-species-more": false });
   sp.find((b) => b.dataset.value === "elk").click(); // disabled: no-op
   sp.find((b) => b.dataset.value === "black_bear").click();
-  // Multi-select since T-27: a second chip adds, it doesn't replace.
-  assert.deepEqual(patches, [{ species: ["deer", "black_bear"], tags: null }]);
+  // Multi-select since T-27: a second chip adds, it doesn't replace, and the Match
+  // control it reveals starts on `all` — two species means "open to both".
+  assert.deepEqual(patches, [{ species: ["deer", "black_bear"], tags: null, speciesMode: "all" }]);
   const more = byId("f-species-more");
   assert.equal(more.getAttribute("aria-expanded"), "false");
   more.click();

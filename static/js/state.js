@@ -15,6 +15,15 @@ export const DEBOUNCE_MS = 150;
 export const MAX_SPECIES = 4;
 export const SPECIES_MODES = ["any", "all"];
 
+/**
+ * The mode a selection uses unless the user says otherwise: picking several species means
+ * "where can I hunt all of them", so 2+ species default to `all`. One species behaves the
+ * same either way and stays `any`, so its URL and query are unchanged.
+ */
+export function defaultMode(species) {
+  return (species || []).length > 1 ? "all" : "any";
+}
+
 // URL query keys, in the order they're written.
 const KEYS = ["species", "mode", "start", "end", "weapon", "tags", "untagged"];
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -93,6 +102,7 @@ export function stateFromQuery(query, defaults, { speciesIds } = {}) {
   if (sp) s.species = sp;
   const mode = q.get("mode");
   if (mode && SPECIES_MODES.includes(mode)) s.speciesMode = mode;
+  else s.speciesMode = defaultMode(s.species);
 
   const start = validISO(q.get("start"));
   const end = validISO(q.get("end"));
@@ -112,8 +122,9 @@ export function stateFromQuery(query, defaults, { speciesIds } = {}) {
 export function toQuery(s) {
   const q = new URLSearchParams();
   q.set("species", s.species.join(","));
-  // Only when it bites: a one-species view is always `any`, so its URL stays T-07's.
-  if (s.speciesMode === "all") q.set("mode", "all");
+  // Only when it bites: the mode is implied by the selection size (one species = `any`,
+  // several = `all`), so the URL carries `mode` only when the user overrode that.
+  if ((s.speciesMode || "any") !== defaultMode(s.species)) q.set("mode", s.speciesMode);
   q.set("start", s.start);
   q.set("end", s.end);
   q.set("weapon", s.weapon);

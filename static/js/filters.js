@@ -8,7 +8,7 @@
 import { chipGroup, textEl } from "./ui.js";
 import { fmtShort, parseISO, presets, toISO } from "./dates.js";
 import { activeTags, tagChipLabel } from "./tags.js";
-import { MAX_SPECIES, toggleSpecies, withDate } from "./state.js";
+import { MAX_SPECIES, defaultMode, toggleSpecies, withDate } from "./state.js";
 
 // §4.2 shows these twelve first; everything else sits behind "More ▾".
 export const FEATURED = [
@@ -216,8 +216,10 @@ export function createFilters(container, opts) {
       return;
     }
     atLimit = false;
-    // The Match control only exists for 2+; dropping back to one returns to `any`.
-    onChange({ species: next, tags: null, ...(next.length < 2 ? { speciesMode: "any" } : {}) });
+    // The Match control only exists for 2+. Crossing that boundary resets it to the mode
+    // the selection implies: `all` once a second species is on, `any` back at one.
+    const crossed = next.length < 2 || cur.length < 2;
+    onChange({ species: next, tags: null, ...(crossed ? { speciesMode: defaultMode(next) } : {}) });
   }
 
   function renderSpecies() {
