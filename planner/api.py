@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as _dt
 import io
 import json
 import tempfile
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,7 @@ from flask import Blueprint, Response, current_app, jsonify, request, send_file
 from planner import __version__, backup, db, diff, engine, importer
 from planner import seasons as seasons_csv
 from planner.dates import DEFAULT_WEEKEND_DEF, WEEKEND_DEFS, default_range, parse_iso, to_iso
+from planner.importer import fetch_idfg
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
@@ -1024,6 +1027,16 @@ def _document_row(doc_id: int):
     return row
 
 
+def _replaced_document(replaces_id: Any) -> dict[str, Any] | None:
+    """`{id, title, status}` of the document a re-posted PDF replaces, or None (T-28)."""
+    if not replaces_id:
+        return None
+    row = db.q1("SELECT id, title, status FROM source_documents WHERE id = ?", replaces_id)
+    if row is None:
+        return {"id": int(replaces_id), "title": None, "status": None}
+    return {"id": row["id"], "title": row["title"], "status": row["status"]}
+
+
 def _document_dict(row) -> dict[str, Any]:
     counts = db.q(
         "SELECT status, COUNT(*) AS n FROM seasons WHERE document_id = ? GROUP BY status",
@@ -1049,6 +1062,8 @@ def _document_dict(row) -> dict[str, Any]:
         "published_at": row["published_at"],
         "error": row["error"],
         "pdf_url": f"/api/documents/{row['id']}/pdf",
+        # The document this one re-posts (same filename on IDFG, new sha256 — T-28).
+        "replaces": _replaced_document(row["replaces_id"]),
         "seasons": {r["status"]: r["n"] for r in counts},
         "checks": {r["status"]: r["n"] for r in checks},
         # Kept forever when a human published past the gate (T-22g); `None` otherwise.
@@ -1266,6 +1281,185 @@ def document_pdf(doc_id: int):
     name = row["filename"] or path.name
     response.headers["Content-Disposition"] = f'inline; filename="{Path(name).name}"'
     return response
+
+
+# ───────── check IDFG for new regulations (T-28, §12) ─────────
+#: Kinds that are discovered and reported but never imported. T-18 (#20) owns the
+#: supplemental-proclamation parser; until it ships, staging a supplement would put a
+#: document with no rows and no checks in front of the reviewer, which says nothing.
+UNIMPORTABLE_KINDS: tuple[str, ...] = ("supplemental",)
+
+
+def _idfg_fetcher() -> fetch_idfg.Fetcher:
+    """The HTTP client for the update check — the one place that opens a socket.
+
+    Tests (and the Chrome check) inject a fake through `app.config["IDFG_FETCHER"]`, so
+    nothing in the suite reaches the network.
+    """
+    configured = current_app.config.get("IDFG_FETCHER")
+    if configured is not None:
+        return configured
+    return fetch_idfg.HttpFetcher()
+
+
+def _source_pages() -> tuple[str, ...]:
+    return tuple(current_app.config.get("IDFG_SOURCE_PAGES") or fetch_idfg.SOURCE_PAGES)
+
+
+def _classify_download(link: fetch_idfg.PdfLink, data: bytes) -> importer.Classification:
+    """What this download is: the PDF's own first pages, with the filename as fallback.
+
+    §12: "infer `kind` and `year` from the filename and let T-10's classifier confirm."
+    The classifier reads the document, so it wins; when it can't tell, the filename's
+    inference is passed in as the manual override the upload form would supply.
+    """
+    try:
+        return importer.classify_bytes(data, filename=link.filename)
+    except importer.ClassifyError:
+        if link.license_year is None:
+            raise
+        info = importer.classify_bytes(
+            data, kind=link.kind, year=link.license_year, filename=link.filename
+        )
+        # `classify` collapses a manual year to a single year; keep the filename's span.
+        return dataclasses.replace(info, year_end=link.year_end or link.license_year)
+
+
+def _stage_download(link: fetch_idfg.PdfLink, data: bytes, sha: str, prior) -> dict[str, Any]:
+    """Store, insert and import one downloaded PDF; returns the `found` entry's extras.
+
+    A re-posting (same filename, new sha256) is staged **above** the document it
+    replaces, so publishing it supersedes that document's rows under §8.5.
+    """
+    info = _classify_download(link, data)
+    path = importer.save_pdf(_regs_dir(), info.license_year, sha, data)
+    priority = info.priority if prior is None else max(info.priority, prior["priority"] + 1)
+    cur = db.exec(
+        "INSERT INTO source_documents (license_year, year_end, kind, title, filename, sha256,"
+        " stored_path, priority, status, parser_version, replaces_id)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'uploaded', ?, ?)",
+        info.license_year,
+        info.year_end,
+        info.kind,
+        info.title or link.filename,
+        link.filename,
+        sha,
+        str(path),
+        priority,
+        importer.PARSER_VERSION,
+        None if prior is None else prior["id"],
+    )
+    doc_id = int(cur.lastrowid or 0)
+    result = importer.run_import(doc_id, pdf_path=path, data_dir=_data_dir())
+    return {
+        "document_id": doc_id,
+        "kind": info.kind,
+        "year": info.license_year,
+        "import": result.to_json(),
+    }
+
+
+def _run_update_check(fetcher: fetch_idfg.Fetcher, pages: Sequence[str]) -> dict[str, Any]:
+    """Read the rules pages, download what is new, and stage it for review (§12 T-28).
+
+    Never publishes and never raises on a bad source: every failure becomes an `error`
+    entry so one dead link can't hide the other four brochures.
+    """
+    found: list[dict[str, Any]] = []
+    imported: list[int] = []
+    discovery = fetch_idfg.discover(fetcher, pages)
+    sources = [s.to_json() for s in discovery.sources]
+
+    for link in discovery.links:
+        entry: dict[str, Any] = {
+            "url": link.url,
+            "filename": link.filename,
+            "kind": link.kind,
+            "year": link.license_year,
+            "state": "new",
+        }
+        if link.kind in UNIMPORTABLE_KINDS:
+            entry["state"] = "unsupported"
+            entry["reason"] = "supplemental proclamations need T-18 (#20) before they can be parsed"
+            found.append(entry)
+            continue
+        try:
+            fetched = fetcher.get(link.url)
+        except fetch_idfg.FetchError as exc:
+            sources.append({"url": link.url, "role": "pdf", "status": "error", "error": str(exc)})
+            found.append({**entry, "state": "error", "error": str(exc)})
+            continue
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            sources.append({"url": link.url, "role": "pdf", "status": "error", "error": detail})
+            found.append({**entry, "state": "error", "error": detail})
+            continue
+
+        data = fetched.data
+        if not importer.looks_like_pdf(data):
+            detail = "the download is not a PDF"
+            sources.append({"url": link.url, "role": "pdf", "status": "error", "error": detail})
+            found.append({**entry, "state": "error", "error": detail})
+            continue
+        sources.append({"url": link.url, "role": "pdf", "status": "ok"})
+
+        sha = importer.sha256_bytes(data)
+        entry["sha256"] = sha
+        known = db.q1("SELECT id, status FROM source_documents WHERE sha256 = ?", sha)
+        if known is not None:
+            found.append(
+                {**entry, "state": "known", "document_id": known["id"], "status": known["status"]}
+            )
+            continue
+        # Same file name, different bytes: IDFG re-posted a corrected brochure (§12).
+        prior = db.q1(
+            "SELECT id, title, priority FROM source_documents WHERE filename = ?"
+            " ORDER BY priority DESC, id DESC",
+            link.filename,
+        )
+        entry["state"] = "changed" if prior is not None else "new"
+        try:
+            extra = _stage_download(link, data, sha, prior)
+        except importer.ClassifyError as exc:
+            found.append({**entry, "state": "error", "error": str(exc)})
+            continue
+        entry.update(extra)
+        if prior is not None:
+            entry["replaces"] = {"id": prior["id"], "title": prior["title"]}
+        imported.append(entry["document_id"])
+        found.append(entry)
+
+    return {
+        "checked_at": _now(),
+        "sources": sources,
+        "found": found,
+        "imported": imported,
+    }
+
+
+@api.post("/documents/check-updates")
+def check_updates():
+    """Check IDFG for newly posted regulation PDFs and stage what is new (§6, T-28).
+
+    Fetch-and-stage only: everything new lands `needs_review` and goes through the same
+    §8.4 review gate as a manual upload. Publishing stays an explicit human step (D3).
+    """
+    body = _run_update_check(_idfg_fetcher(), _source_pages())
+    db.exec(
+        "INSERT INTO fetch_log (checked_at, result) VALUES (?, ?)",
+        body["checked_at"],
+        json.dumps(body),
+    )
+    return jsonify(body)
+
+
+@api.get("/documents/check-updates")
+def last_update_check():
+    """The last check's result, so the UI can say "Last checked 3 days ago" (§6)."""
+    row = db.q1("SELECT checked_at, result FROM fetch_log ORDER BY id DESC LIMIT 1")
+    if row is None:
+        return jsonify({"checked_at": None, "sources": [], "found": [], "imported": []})
+    return jsonify(json.loads(row["result"]))
 
 
 # ───────── review gate (T-22b, §8.4 + §8.7) ─────────

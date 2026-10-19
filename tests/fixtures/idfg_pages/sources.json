@@ -1,0 +1,32 @@
+{
+  "rules": {
+    "bytes": 151974,
+    "recorded_on": "2026-10-19",
+    "sha256": "0ba408643f587354f53f3c008467fb82e533a08a67f954ce0991093582a00704",
+    "url": "https://idfg.idaho.gov/rules"
+  },
+  "rules-big-game": {
+    "bytes": 160236,
+    "recorded_on": "2026-10-19",
+    "sha256": "c37cf3666d28cf79a66b2c9ac04d9298d529ac3a8e99f8236ca7acd949c02073",
+    "url": "https://idfg.idaho.gov/rules/big-game"
+  },
+  "rules-migratory": {
+    "bytes": 152593,
+    "recorded_on": "2026-10-19",
+    "sha256": "394813a3b9ecfc9d6b878d545022fd936bdefced9b58f42997526d066fb74b50",
+    "url": "https://idfg.idaho.gov/rules/migratory"
+  },
+  "rules-moose-sheep-goat": {
+    "bytes": 152185,
+    "recorded_on": "2026-10-19",
+    "sha256": "30e5abd7e936fc9835fed7c2473713c22212bb9567b626824f00d5b5d456b221",
+    "url": "https://idfg.idaho.gov/rules/moose-sheep-goat"
+  },
+  "rules-upland": {
+    "bytes": 153599,
+    "recorded_on": "2026-10-19",
+    "sha256": "8120d18491c5dceafa7391a52ffa76856b6a807530803464c1889a93a8d20249",
+    "url": "https://idfg.idaho.gov/rules/upland"
+  }
+}

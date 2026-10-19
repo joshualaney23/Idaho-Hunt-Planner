@@ -9,9 +9,9 @@
 // the four upload states and the grouping without a browser. The DOM half is
 // verified in real Chrome in the T-15b PR.
 
-import { getJSON, postFile } from "./api.js";
+import { getJSON, postFile, postJSON } from "./api.js";
 import { createReviewScreen } from "./review.js";
-import { badge, card, textEl } from "./ui.js";
+import { badge, button, card, textEl } from "./ui.js";
 
 /** Where the documents live (§6). */
 export const DOCUMENTS_URL = "/api/documents";
@@ -350,6 +350,234 @@ export function createUploadCard({ upload = postDocument, onUploaded } = {}) {
   return el;
 }
 
+// ---- "Get latest regs" (T-28) ---------------------------------------------
+/** Where the update check lives (§6). */
+export const CHECK_UPDATES_URL = "/api/documents/check-updates";
+
+/** A `found` entry that was downloaded and staged for review. */
+const STAGED_STATES = new Set(["new", "changed"]);
+
+/** `"2026-10-19T08:30:00"` → `"today"`, `"yesterday"`, `"3 days ago"`, or `""`. */
+export function sinceLabel(checkedAt, now = Date.now()) {
+  if (!checkedAt) return "";
+  const then = Date.parse(String(checkedAt).replace(" ", "T"));
+  if (Number.isNaN(then)) return "";
+  const days = Math.floor((now - then) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  return `${days} days ago`;
+}
+
+/** `"Last checked 3 days ago"`, or the never-checked prompt. */
+export function lastCheckedLabel(checkedAt, now = Date.now()) {
+  const since = sinceLabel(checkedAt, now);
+  return since ? `Last checked ${since}.` : "IDFG has not been checked yet.";
+}
+
+/**
+ * What one finished check means: `{tone, title, message, items}`.
+ *
+ * `items` are `{text, href}` links to the documents that were staged. Nothing here
+ * publishes: a staged document still goes through the §8.4 review gate.
+ */
+export function updatesSummary(body) {
+  const found = (body && body.found) || [];
+  const sources = (body && body.sources) || [];
+  const staged = found.filter((e) => STAGED_STATES.has(e.state));
+  const failed = sources.filter((s) => s.status === "error");
+  const unsupported = found.filter((e) => e.state === "unsupported");
+
+  const notes = [];
+  if (staged.length) {
+    const changed = staged.filter((e) => e.state === "changed").length;
+    if (changed) notes.push(`${changed} replaces a document already here`);
+  }
+  for (const source of failed) notes.push(`${source.url} — ${source.error || "failed"}`);
+  for (const entry of unsupported) notes.push(`${entry.filename} — ${entry.reason || "skipped"}`);
+
+  const title = staged.length
+    ? `${staged.length} new document${staged.length === 1 ? "" : "s"} staged for review`
+    : failed.length
+      ? "Checked IDFG, but some sources failed"
+      : "Up to date";
+  const tone = staged.length ? "success" : failed.length ? "warn" : "info";
+  return {
+    tone,
+    title,
+    message: notes.join(" · "),
+    items: staged.map((entry) => ({
+      text: `${entry.filename}${entry.state === "changed" ? " (replaces an older version)" : ""}`,
+      href: entry.document_id ? `#/regs/${entry.document_id}` : "",
+    })),
+  };
+}
+
+/**
+ * The view model for the update card. `state` is
+ * `{status:"idle", last}` · `{status:"checking"}` · `{status:"done", body}` ·
+ * `{status:"error", message}`.
+ */
+export function updatesView(state, now = Date.now()) {
+  const s = state || { status: "idle" };
+  if (s.status === "checking") {
+    return {
+      state: "checking",
+      busy: true,
+      disabled: true,
+      tone: "info",
+      title: "Checking idfg.idaho.gov …",
+      message: "Reading the rules pages and downloading anything new. This can take a minute.",
+      items: [],
+      hint: "",
+    };
+  }
+  if (s.status === "done") {
+    const summary = updatesSummary(s.body);
+    return {
+      state: "done",
+      busy: false,
+      disabled: false,
+      ...summary,
+      hint: lastCheckedLabel(s.body && s.body.checked_at, now),
+    };
+  }
+  if (s.status === "error") {
+    return {
+      state: "error",
+      busy: false,
+      disabled: false,
+      tone: "error",
+      title: "The update check failed",
+      message: s.message || "the check could not be run",
+      items: [],
+      hint: "",
+    };
+  }
+  return {
+    state: "idle",
+    busy: false,
+    disabled: false,
+    tone: "info",
+    title: "Check IDFG for new regulations",
+    message: "Anything new is downloaded and staged for review — nothing is published.",
+    items: [],
+    hint: lastCheckedLabel(s.last && s.last.checked_at, now),
+  };
+}
+
+/** `POST /api/documents/check-updates`. Separate so tests can inject it. */
+export function postCheckUpdates() {
+  return postJSON(CHECK_UPDATES_URL);
+}
+
+/** `GET /api/documents/check-updates` — the last run, for "Last checked …". */
+export function fetchLastCheck() {
+  return getJSON(CHECK_UPDATES_URL);
+}
+
+/**
+ * The "Get latest regs" button and its result summary, shown beside the drop zone.
+ * Options: `check()` and `loadLast()` (injectable), `onChecked(body)` after a run,
+ * `now()` for the "3 days ago" label.
+ *
+ * Returns the `<div>` with `{run, getState, setState}` attached.
+ */
+export function createUpdatesCard({
+  check = postCheckUpdates,
+  loadLast = fetchLastCheck,
+  onChecked,
+  now = () => Date.now(),
+} = {}) {
+  const el = document.createElement("div");
+  el.className = "dz-actions";
+  el.id = "regs-updates";
+
+  const btn = button("Get latest regs", "primary", () => start());
+  btn.id = "regs-check-updates";
+
+  const status = document.createElement("div");
+  status.className = "dz-status";
+  status.id = "regs-updates-status";
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  const title = textEl("p", "", "dz-title");
+  const message = textEl("p", "", "dz-msg");
+  const list = document.createElement("ul");
+  list.className = "dz-links";
+  const hint = textEl("p", "", "muted");
+  status.append(title, message, list, hint);
+  btn.setAttribute("aria-describedby", status.id);
+  el.append(btn, status);
+
+  let state = { status: "idle" };
+  let busy = false;
+
+  function paint() {
+    const view = updatesView(state, now());
+    el.dataset.state = view.state;
+    el.dataset.tone = view.tone;
+    btn.disabled = view.disabled;
+    if (view.busy) btn.setAttribute("aria-busy", "true");
+    else btn.removeAttribute("aria-busy");
+    title.textContent = view.title;
+    message.textContent = view.message;
+    hint.textContent = view.hint;
+    hint.hidden = !view.hint;
+    list.replaceChildren(
+      ...view.items.map((item) => {
+        const li = document.createElement("li");
+        if (item.href) {
+          const a = document.createElement("a");
+          a.href = item.href;
+          a.textContent = item.text;
+          li.appendChild(a);
+        } else {
+          li.textContent = item.text;
+        }
+        return li;
+      }),
+    );
+  }
+
+  function setState(next) {
+    state = next || { status: "idle" };
+    paint();
+  }
+
+  async function start() {
+    if (busy) return null;
+    busy = true;
+    setState({ status: "checking" });
+    try {
+      const body = (await check()) || {};
+      setState({ status: "done", body });
+      if (onChecked) onChecked(body);
+      return body;
+    } catch (err) {
+      setState({ status: "error", message: (err && err.message) || String(err) });
+      return null;
+    } finally {
+      busy = false;
+    }
+  }
+
+  paint();
+  // The last run only decorates the button with "Last checked …", so a failure here
+  // must never stop the user from running a new check.
+  const ready = Promise.resolve()
+    .then(loadLast)
+    .then((last) => {
+      if (state.status === "idle") setState({ status: "idle", last });
+    })
+    .catch(() => {});
+
+  el.run = start;
+  el.ready = () => ready;
+  el.getState = () => state;
+  el.setState = setState;
+  return el;
+}
+
 /** An `<a>` to a document's route. */
 function docLink(doc) {
   const a = document.createElement("a");
@@ -446,6 +674,16 @@ export function renderDocumentDetail(container, docId, doc, options = {}) {
       ` ${kindLabel(doc.kind)} · ${yearLabel(doc)} · ${docCounts(doc)}`,
     );
     body.push(head);
+    // A re-posted brochure says what it replaces, so the reviewer knows why it is here (T-28).
+    if (doc.replaces && doc.replaces.id) {
+      const note = document.createElement("p");
+      note.className = "muted";
+      const a = document.createElement("a");
+      a.href = `#/regs/${doc.replaces.id}`;
+      a.textContent = doc.replaces.title || `document ${doc.replaces.id}`;
+      note.append("Replaces ", a);
+      body.push(note);
+    }
     if (doc.sha256) body.push(textEl("p", `sha256 ${shortSha(doc.sha256)}`, "muted"));
   }
   const links = document.createElement("p");
@@ -481,7 +719,13 @@ export function renderDocumentDetail(container, docId, doc, options = {}) {
  * `body[data-regs-ready]` when it lands. Returns `{el, refresh, applyRoute, upload}`.
  */
 export function initRegs(panel = document.getElementById("panel-regs"), options = {}) {
-  const { load = () => fetchDocuments(), upload = postDocument, mount } = options;
+  const {
+    load = () => fetchDocuments(),
+    upload = postDocument,
+    mount,
+    checkUpdates,
+    loadLastCheck,
+  } = options;
   const wrap = document.createElement("div");
   wrap.className = "wrap single";
 
@@ -491,6 +735,15 @@ export function initRegs(panel = document.getElementById("panel-regs"), options 
       refresh();
     },
   });
+  // "Get latest regs" sits in the upload card, beside the drop zone (§4.5, T-28).
+  const updatesCard = createUpdatesCard({
+    ...(checkUpdates ? { check: checkUpdates } : {}),
+    ...(loadLastCheck ? { loadLast: loadLastCheck } : {}),
+    onChecked: () => {
+      refresh();
+    },
+  });
+  uploadCard.appendChild(updatesCard);
 
   const listBody = document.createElement("div");
   listBody.id = "regs-documents";
@@ -552,7 +805,15 @@ export function initRegs(panel = document.getElementById("panel-regs"), options 
     document.body.dataset.regsReady = "error";
   });
 
-  return { el: wrap, refresh, applyRoute, ready, uploadCard, documents: () => documents };
+  return {
+    el: wrap,
+    refresh,
+    applyRoute,
+    ready,
+    uploadCard,
+    updatesCard,
+    documents: () => documents,
+  };
 }
 
 /** `GET /api/documents`. Separate so tests can inject a list without fetch. */
