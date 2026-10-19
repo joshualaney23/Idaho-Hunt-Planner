@@ -14,6 +14,10 @@ The pages were chosen for the traps they carry (§12 T-12a findings):
 * **p. 41** — Middle Fork + Salmon: one printed window carrying **two** sexes split by
   unit (`Units 20A and 26: antlered only  Unit 27: brow-tined bulls only`) and a capped
   B-tag quota sub-row;
+* **p. 42** — Weiser River + McCall: a `Short range weapons only on Payette River and
+  Montour WMAs` note printed *under* a window, which reads exactly like a hunt label —
+  taking it for one strips the note from its own row and gives the next hunt in the
+  entry a weapon the brochure never printed for it;
 * **p. 43** — Lemhi + Beaverhead: zones with **no B tag** (`No B Tags in this Zone`) and
   in-entry unit restrictions under two windows of the same weapon;
 * **p. 46** — Boise River + Smoky-Bennett: `antlerless or spike only` (the phrase a
@@ -37,8 +41,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tests.fixtures.make_deer_fixtures import write_page  # noqa: E402
 
 #: 1-based PDF page → fixture name.
-PAGES = {38: "bg2026_elk_p38", 41: "bg2026_elk_p41", 43: "bg2026_elk_p43",
-         46: "bg2026_elk_p46", 50: "bg2026_elk_p50"}  # fmt: skip
+PAGES = {38: "bg2026_elk_p38", 41: "bg2026_elk_p41", 42: "bg2026_elk_p42",
+         43: "bg2026_elk_p43", 46: "bg2026_elk_p46", 50: "bg2026_elk_p50"}  # fmt: skip
 FIXTURE_DIR = Path(__file__).resolve().parent
 
 

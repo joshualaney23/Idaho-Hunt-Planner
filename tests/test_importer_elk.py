@@ -10,6 +10,9 @@ brochure. The fixtures are one-page excerpts of it
 * **p. 41** — Middle Fork + Salmon: one printed window carrying **two sexes split by
   unit**, and the `Note: 1,551 A Tag Quota Available…` sub-row that sits *between* the
   A and B rows and reads exactly like a note legend;
+* **p. 42** — Weiser River + McCall: a `Short range weapons only on Payette River and
+  Montour WMAs` note printed *under* a window — a weapon phrase that is not a hunt
+  label;
 * **p. 43** — Lemhi + Beaverhead: zones with no B tag, a zone title the margin strap
   interleaves with ("Idaho Motorized Hunting Rule Applies Lemhi in Units Zone 29, …"),
   and a B-tag hunt printed directly under a tall A row;
@@ -44,6 +47,7 @@ UNITS = tuple(u["id"] for u in json.loads(Path("static/data/units_seed.json").re
 PAGES: dict[str, tuple[tuple[str, ...], int]] = {
     "bg2026_elk_p38": (("Panhandle", "Palouse"), 15),
     "bg2026_elk_p41": (("Middle Fork", "Salmon"), 10),
+    "bg2026_elk_p42": (("Weiser River", "McCall"), 11),
     "bg2026_elk_p43": (("Lemhi", "Beaverhead"), 8),
     "bg2026_elk_p46": (("Boise River", "Smoky-Bennett"), 6),
     "bg2026_elk_p50": (("Diamond Creek",), 3),
@@ -133,18 +137,52 @@ def test_checks_report_the_section_invariants(name: str, ctx: ParseContext) -> N
 
 
 def test_a_window_whose_sexes_are_split_by_unit_becomes_one_row_each(ctx: ParseContext) -> None:
-    """Middle Fork prints `Units 20A and 26: antlered only  Unit 27: brow-tined bulls only`."""
+    """Middle Fork prints `Units 20A and 26: antlered only  Unit 27: brow-tined bulls only`.
+
+    Each clause qualifies **only its own units**: the brow-tine restriction is unit 27's
+    alone, and publishing it on 20A and 26 would show two units as brow-tined-bull hunts
+    the brochure opens to any antlered elk (reported on the 2026 verification sheet).
+    """
     rows = [s for s in parse("bg2026_elk_p41", ctx) if s.zone == "Middle Fork"]
     october = [s for s in rows if to_iso(s.start) == "2026-10-01"]
     assert [
         ([u.unit_id for u in s.unit_refs()], s.sex, sorted(s.restrictions)) for s in october
     ] == [
-        (["20A", "26"], "antlered", ["antlered_only", "brow_tined"]),
-        (["27"], "antlered", ["antlered_only", "brow_tined"]),
+        (["20A", "26"], "antlered", ["antlered_only"]),
+        (["27"], "antlered", ["brow_tined"]),
     ]
+    # Every Middle Fork window prints the same two clauses, and none of the six rows may
+    # carry the other clause's animal limit.
+    for season in rows:
+        units = {u.unit_id for u in season.unit_refs()}
+        if units == {"27"}:
+            assert "antlered_only" not in season.restrictions
+        else:
+            assert "brow_tined" not in season.restrictions
     # One printed window, two rows — and the date token is still consumed exactly once.
     checks = {c.name: c for c in run_checks(ctx, elk.SECTION, elk.finalize(ctx))}
     assert checks["date_token_accounting"].status == "pass"
+
+
+def test_a_weapon_note_under_a_window_is_not_the_next_hunts_label(ctx: ParseContext) -> None:
+    """Weiser River prints `Short range weapons only on Payette River and Montour WMAs`.
+
+    That line sits *under* a window and names two WMAs inside unit 32, so it qualifies
+    the hunt above it — the hunt itself stays `Any weapon` and goes to review
+    (`see_notes`, §5.1). Read as a label it did two wrong things at once: its own row
+    lost the note, and the next hunt printed in the same entry (`Any weapon — antlered
+    only  Oct 25 - Nov 3`) was published as a short-range-only season.
+    """
+    rows = [s for s in parse("bg2026_elk_p42", ctx) if s.zone == "Weiser River"]
+    october = next(s for s in rows if to_iso(s.start) == "2026-10-01")
+    assert october.weapon == "any"
+    assert [u.unit_id for u in october.unit_refs()] == ["32"]
+    assert sorted(october.restrictions) == ["antlerless_only", "see_notes"]
+    assert "Payette River and Montour WMAs" in (october.notes or "")
+    for start in ("2026-10-25", "2026-11-16"):
+        following = next(s for s in rows if to_iso(s.start) == start)
+        assert following.weapon == "any"
+        assert "see_notes" in following.restrictions
 
 
 def test_the_sex_vocabulary_matches_the_longest_phrase(ctx: ParseContext) -> None:
