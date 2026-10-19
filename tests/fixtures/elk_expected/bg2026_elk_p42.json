@@ -1,0 +1,187 @@
+[
+ {
+  "zone": "Weiser River",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "22",
+   "32",
+   "32A"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "Weiser River",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-11-01",
+  "end": "2026-11-15",
+  "units": [
+   "32"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Weiser River",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-11-16",
+  "end": "2026-11-30",
+  "units": [
+   "32"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Weiser River",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-08-01",
+  "end": "2026-09-30",
+  "units": [
+   "32"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "private_land_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Weiser River",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlerless",
+  "start": "2026-10-01",
+  "end": "2026-10-31",
+  "units": [
+   "32"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "Weiser River",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-25",
+  "end": "2026-11-03",
+  "units": [
+   "22",
+   "32",
+   "32A"
+  ],
+  "restrictions": [
+   "antlered_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "McCall",
+  "tag": "elk_zone_a",
+  "weapon": "short_range",
+  "sex": "antlerless",
+  "start": "2026-08-15",
+  "end": "2026-09-30",
+  "units": [
+   "23",
+   "24"
+  ],
+  "restrictions": [
+   "antlerless_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "McCall",
+  "tag": "elk_zone_a",
+  "weapon": "archery",
+  "sex": "either",
+  "start": "2026-08-30",
+  "end": "2026-09-30",
+  "units": [
+   "19A",
+   "23",
+   "24",
+   "25"
+  ],
+  "restrictions": [],
+  "tag_quota": null
+ },
+ {
+  "zone": "McCall",
+  "tag": "elk_zone_a",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-05",
+  "end": "2026-10-14",
+  "units": [
+   "19A",
+   "23",
+   "24",
+   "25"
+  ],
+  "restrictions": [
+   "spike_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "McCall",
+  "tag": "elk_zone_a",
+  "weapon": "short_range",
+  "sex": "antlerless",
+  "start": "2026-11-10",
+  "end": "2026-11-30",
+  "units": [
+   "23",
+   "24"
+  ],
+  "restrictions": [
+   "antlerless_only"
+  ],
+  "tag_quota": null
+ },
+ {
+  "zone": "McCall",
+  "tag": "elk_zone_b",
+  "weapon": "any",
+  "sex": "antlered",
+  "start": "2026-10-15",
+  "end": "2026-11-03",
+  "units": [
+   "19A",
+   "23",
+   "24",
+   "25"
+  ],
+  "restrictions": [
+   "antlered_only",
+   "see_notes"
+  ],
+  "tag_quota": null
+ }
+]

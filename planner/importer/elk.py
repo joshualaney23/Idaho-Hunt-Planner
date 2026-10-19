@@ -125,6 +125,9 @@ _UNIT_SEX_RE = re.compile(
     re.IGNORECASE,
 )
 _PORTION_RE = re.compile(r"portion\s+of\s+(?:the\s+)?unit", re.IGNORECASE)
+#: The dash a printed hunt label puts between its weapon and its sex (`Any weapon —
+#: antlerless only`). A weapon phrase printed without one is a note, not a label.
+_LABEL_DASHES: tuple[str, ...] = ("\u2014", "\u2013")
 
 
 # ───────── the printed page, in blocks and entries ─────────
@@ -754,17 +757,40 @@ def _sex_in(text: str) -> tuple[str, tuple[str, ...]] | None:
     )
 
 
-def _unit_sex_clauses(
-    text: str, ctx: ParseContext
-) -> list[tuple[common.UnitList, tuple[str, tuple[str, ...]]]]:
+@dataclass(frozen=True)
+class _UnitSexClause:
+    """One `Units …: <sex> only` clause: the units it names, its sex, and where it sits."""
+
+    units: common.UnitList
+    sex: tuple[str, tuple[str, ...]]
+    span: tuple[int, int]
+
+
+def _unit_sex_clauses(text: str, ctx: ParseContext) -> list[_UnitSexClause]:
     """`Units 20A and 26: antlered only  Unit 27: brow-tined bulls only` → one per clause."""
-    out: list[tuple[common.UnitList, tuple[str, tuple[str, ...]]]] = []
+    out: list[_UnitSexClause] = []
     for match in _UNIT_SEX_RE.finditer(text or ""):
         units = common.parse_units(match.group(1), ctx.units)
         sex = _sex_in(match.group(2))
         if sex is not None and (units.units or units.unknown):
-            out.append((units, sex))
+            out.append(_UnitSexClause(units=units, sex=sex, span=match.span()))
     return out
+
+
+def _without_other_clauses(text: str, clauses: Sequence[_UnitSexClause], keep: int) -> str:
+    """`text` with every clause but `keep` blanked out.
+
+    A clause's qualifier codes belong to **its own** units: leaving `Unit 27: brow-tined
+    bulls only` in the text that qualifies the 20A/26 row publishes a brow-tine
+    restriction on two units that do not carry one (and vice versa).
+    """
+    chars = list(text)
+    for index, clause in enumerate(clauses):
+        if index == keep:
+            continue
+        start, end = clause.span
+        chars[start:end] = " " * (end - start)
+    return "".join(chars)
 
 
 def _units_in(text: str, zone_units: Sequence[str], ctx: ParseContext) -> common.UnitList | None:
@@ -786,18 +812,33 @@ class _Group:
     after: list[str] = field(default_factory=list)
 
 
+def _is_label(line: str) -> bool:
+    """Is this printed line a hunt's own weapon/sex label, or a note about one?
+
+    A label prints its weapon and its sex either side of an em dash (`Any weapon —
+    antlerless only`, `Short range weapons only —`). A weapon phrase **without** that
+    dash is a note qualifying the window above it — `Short range weapons only on Payette
+    River and Montour WMAs` restricts two WMAs inside unit 32, not the hunt (p. 42).
+    Reading it as a label both strips the note from its own row and hands the *next*
+    hunt in the entry a weapon the brochure never printed for it.
+    """
+    if not (_weapon_in(line) or _sex_in(line)):
+        return False
+    return any(dash in line for dash in _LABEL_DASHES)
+
+
 def _group_lines(entry: Entry, license_year: int) -> list[_Group]:
     """An entry's printed lines grouped around the date lines they belong to.
 
     A note printed *under* a date (`See Note A below`, `On or within 1 mile of private
-    …, See Note 3, Page 49`) qualifies the window above it, so it is kept with that
-    group rather than dropped (§12 T-12a gap 1).
+    …, See Note 3, Page 49`, `Short range weapons only on … WMAs`) qualifies the window
+    above it, so it is kept with that group rather than dropped (§12 T-12a gap 1).
     """
     groups: list[_Group] = [_Group()]
     for line in entry.lines:
         dated = bool(common.parse_date_ranges(line, license_year))
         current = groups[-1]
-        if not dated and current.dated and (_weapon_in(line) or _sex_in(line)):
+        if not dated and current.dated and _is_label(line):
             groups.append(_Group(before=[line]))
         elif dated:
             current.dated.append(line)
@@ -843,24 +884,48 @@ def entry_seasons(
                 )
                 line_sex = _sex_in(head) or _sex_in(tail) or sex
                 line_units = _units_in(head, zone_units, ctx) or entry_units
-                qualifier = " ".join(part for part in (head_text, head, tail, note) if part.strip())
                 # `Units 20A and 26: antlered only   Unit 27: brow-tined bulls only` is
                 # one printed window granting two different hunts, so it becomes one row
                 # per clause — merging them would publish brow-tined bulls as plain
                 # antlered elk in two units, and antlered elk as brow-tined in a third.
-                clauses = _unit_sex_clauses(f"{head_text} {head}", ctx)
-                for clause_units, clause_sex in clauses or [(line_units, line_sex)]:  # type: ignore[list-item]
+                clause_text = f"{head_text} {head}"
+                clauses = _unit_sex_clauses(clause_text, ctx)
+                if not clauses:
+                    qualifier = " ".join(
+                        part for part in (head_text, head, tail, note) if part.strip()
+                    )
                     out.append(
                         _season(
                             entry=entry,
                             block=block,
                             zone_units=zone_units,
                             weapon=line_weapon or "any",
-                            sex=clause_sex,
-                            units=clause_units,
+                            sex=line_sex,
+                            units=line_units,
                             found=found_range,
                             qualifier=qualifier,
                             leftovers=tuple(leftovers),
+                            note=note,
+                        )
+                    )
+                    continue
+                for index_of, clause in enumerate(clauses):
+                    # Each clause is qualified by its own text only: the other clauses'
+                    # animal limits are a different hunt in different units (§5.1).
+                    own = _without_other_clauses(clause_text, clauses, index_of)
+                    qualifier = " ".join(part for part in (own, tail, note) if part.strip())
+                    out.append(
+                        _season(
+                            entry=entry,
+                            block=block,
+                            zone_units=zone_units,
+                            weapon=line_weapon or "any",
+                            sex=clause.sex,
+                            units=clause.units,
+                            found=found_range,
+                            qualifier=qualifier,
+                            leftovers=tuple(leftovers),
+                            note=note,
                         )
                     )
     return out
@@ -877,6 +942,7 @@ def _season(
     found: common.DateRange,
     qualifier: str,
     leftovers: tuple[str, ...],
+    note: str = "",
 ) -> ZoneSeason:
     """One `ZoneSeason`, with its units narrowed and its qualifiers mapped to §5.1 codes."""
     codes: list[str] = list(sex[1] if sex else ())
@@ -897,6 +963,12 @@ def _season(
         codes.append("portion_of_unit")
     if _NOTE_REF_RE.search(qualifier) and "see_notes" not in codes:
         # A note this parser does not resolve keeps the row yellow (D3).
+        codes.append("see_notes")
+    note_weapon = _weapon_in(note)
+    if note_weapon is not None and note_weapon != weapon and "see_notes" not in codes:
+        # The note names a *different* weapon rule for part of the hunt's ground
+        # (`Short range weapons only on Payette River and Montour WMAs`). The season's
+        # own weapon stays what the label printed; the row goes to review (D3).
         codes.append("see_notes")
     if sex is None and "see_notes" not in codes:
         codes.append("see_notes")
