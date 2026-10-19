@@ -822,6 +822,38 @@ table.results .ws {
 .dropzone .field {
   margin-top: 12px;
 }
+
+/* "Get latest regs" (T-28): the button and its result summary, beside the drop zone. */
+.dz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--bg5);
+}
+.dz-actions .dz-status {
+  flex: 1 1 320px;
+}
+.dz-actions[data-tone="success"] .dz-title {
+  color: var(--sc5);
+}
+.dz-actions[data-tone="error"] .dz-title {
+  color: var(--sc1);
+}
+.dz-actions button[aria-busy="true"]::after {
+  content: " ⏳";
+}
+ul.dz-links {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--text2);
+}
+ul.dz-links:empty {
+  display: none;
+}
 .docs-year + .docs-year {
   margin-top: 18px;
 }

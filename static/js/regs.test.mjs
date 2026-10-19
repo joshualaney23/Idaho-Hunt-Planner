@@ -24,6 +24,11 @@ import {
   uploadView,
   uploadedOn,
   yearLabel,
+  createUpdatesCard,
+  lastCheckedLabel,
+  sinceLabel,
+  updatesSummary,
+  updatesView,
 } from "./regs.js";
 
 beforeEach(() => {
@@ -483,4 +488,239 @@ test("a successful upload refreshes the documents table", async () => {
     tab.documents().map((d) => d.id),
     [5],
   );
+});
+
+
+// ---- "Get latest regs" (T-28) ----------------------------------------------
+const checkBody = (over = {}) => ({
+  checked_at: "2026-10-16 09:00:00",
+  sources: [{ url: "https://idfg.idaho.gov/rules", role: "page", status: "ok" }],
+  found: [],
+  imported: [],
+  ...over,
+});
+
+test("how long ago the last check was, in plain words", () => {
+  const now = Date.parse("2026-10-19T12:00:00");
+  assert.equal(sinceLabel("2026-10-19 08:00:00", now), "today");
+  assert.equal(sinceLabel("2026-10-18 08:00:00", now), "yesterday");
+  assert.equal(sinceLabel("2026-10-16 09:00:00", now), "3 days ago");
+  assert.equal(sinceLabel(null, now), "");
+  assert.equal(sinceLabel("not a date", now), "");
+  assert.equal(lastCheckedLabel("2026-10-16 09:00:00", now), "Last checked 3 days ago.");
+  assert.equal(lastCheckedLabel(null, now), "IDFG has not been checked yet.");
+});
+
+test("a check that found nothing says so", () => {
+  const summary = updatesSummary(
+    checkBody({ found: [{ filename: "a.pdf", state: "known", document_id: 1 }] }),
+  );
+  assert.equal(summary.title, "Up to date");
+  assert.equal(summary.tone, "info");
+  assert.deepEqual(summary.items, []);
+});
+
+test("staged documents are counted and linked, a replacement says so", () => {
+  const summary = updatesSummary(
+    checkBody({
+      found: [
+        { filename: "big.pdf", state: "new", document_id: 4 },
+        { filename: "upland.pdf", state: "changed", document_id: 5 },
+        { filename: "old.pdf", state: "known", document_id: 1 },
+      ],
+      imported: [4, 5],
+    }),
+  );
+  assert.equal(summary.title, "2 new documents staged for review");
+  assert.equal(summary.tone, "success");
+  assert.deepEqual(summary.items, [
+    { text: "big.pdf", href: "#/regs/4" },
+    { text: "upland.pdf (replaces an older version)", href: "#/regs/5" },
+  ]);
+  assert.match(summary.message, /1 replaces a document already here/);
+});
+
+test("one failing source is reported without hiding the rest", () => {
+  const summary = updatesSummary(
+    checkBody({
+      sources: [
+        { url: "https://idfg.idaho.gov/rules", role: "page", status: "ok" },
+        {
+          url: "https://idfg.idaho.gov/rules/big-game",
+          role: "page",
+          status: "error",
+          error: "HTTP 404 Not Found",
+        },
+      ],
+      found: [{ filename: "upland.pdf", state: "new", document_id: 9 }],
+      imported: [9],
+    }),
+  );
+  // The win is still the headline; the failure rides along in the message.
+  assert.equal(summary.title, "1 new document staged for review");
+  assert.match(summary.message, /rules\/big-game — HTTP 404 Not Found/);
+  assert.deepEqual(summary.items, [{ text: "upland.pdf", href: "#/regs/9" }]);
+});
+
+test("a check with only failures warns instead of claiming it is up to date", () => {
+  const summary = updatesSummary(
+    checkBody({
+      sources: [{ url: "https://idfg.idaho.gov/rules", role: "page", status: "error", error: "x" }],
+    }),
+  );
+  assert.equal(summary.title, "Checked IDFG, but some sources failed");
+  assert.equal(summary.tone, "warn");
+});
+
+test("a supplement is reported as skipped, never as staged", () => {
+  const summary = updatesSummary(
+    checkBody({
+      found: [
+        {
+          filename: "supplemental-proclamation-2026.pdf",
+          state: "unsupported",
+          reason: "supplemental proclamations need T-18 (#20) before they can be parsed",
+        },
+      ],
+    }),
+  );
+  assert.equal(summary.title, "Up to date");
+  assert.deepEqual(summary.items, []);
+  assert.match(summary.message, /supplemental proclamations need T-18/);
+});
+
+test("the view model: idle, checking, done, error", () => {
+  const now = Date.parse("2026-10-19T12:00:00");
+  const idle = updatesView({ status: "idle", last: checkBody() }, now);
+  assert.equal(idle.busy, false);
+  assert.equal(idle.disabled, false);
+  assert.equal(idle.hint, "Last checked 3 days ago.");
+
+  const checking = updatesView({ status: "checking" }, now);
+  assert.equal(checking.busy, true);
+  assert.equal(checking.disabled, true);
+  assert.match(checking.title, /Checking idfg\.idaho\.gov/);
+
+  const done = updatesView({ status: "done", body: checkBody() }, now);
+  assert.equal(done.title, "Up to date");
+  assert.equal(done.hint, "Last checked 3 days ago.");
+
+  const failed = updatesView({ status: "error", message: "offline" }, now);
+  assert.equal(failed.tone, "error");
+  assert.equal(failed.message, "offline");
+});
+
+function mountUpdates(check, last = checkBody()) {
+  const el = createUpdatesCard({
+    check,
+    loadLast: async () => last,
+    now: () => Date.parse("2026-10-19T12:00:00"),
+  });
+  const status = el.querySelector("#regs-updates-status");
+  return {
+    el,
+    btn: el.querySelector("#regs-check-updates"),
+    title: () => status.children[0].textContent,
+    message: () => status.children[1].textContent,
+    links: () => status.children[2],
+    hint: () => status.children[3].textContent,
+  };
+}
+
+test("the button paints idle → checking → done and links the staged documents", async () => {
+  let release;
+  const held = new Promise((r) => {
+    release = r;
+  });
+  const ui = mountUpdates(() => held);
+  assert.equal(ui.el.dataset.state, "idle");
+  assert.equal(ui.btn.textContent, "Get latest regs");
+  assert.equal(ui.btn.disabled, false);
+  await ui.el.ready();
+  assert.equal(ui.hint(), "Last checked 3 days ago.");
+
+  const done = ui.el.run();
+  // Synchronously: the spinner is on and the button can't be clicked twice.
+  assert.equal(ui.el.dataset.state, "checking");
+  assert.equal(ui.btn.getAttribute("aria-busy"), "true");
+  assert.equal(ui.btn.disabled, true);
+
+  release(
+    checkBody({
+      checked_at: "2026-10-19 11:00:00",
+      found: [{ filename: "seasons-rules-big-game-2027.pdf", state: "new", document_id: 12 }],
+      imported: [12],
+    }),
+  );
+  await done;
+  assert.equal(ui.el.dataset.state, "done");
+  assert.equal(ui.el.dataset.tone, "success");
+  assert.equal(ui.btn.hasAttribute("aria-busy"), false);
+  assert.equal(ui.btn.disabled, false);
+  assert.equal(ui.title(), "1 new document staged for review");
+  assert.equal(ui.links().children.length, 1);
+  assert.equal(ui.links().children[0].querySelector("a").getAttribute("href"), "#/regs/12");
+  assert.equal(ui.hint(), "Last checked today.");
+});
+
+test("a failed check shows its message and leaves the button usable", async () => {
+  const ui = mountUpdates(() => Promise.reject(new Error("The planner server is not responding.")));
+  await ui.el.run();
+  assert.equal(ui.el.dataset.state, "error");
+  assert.equal(ui.message(), "The planner server is not responding.");
+  assert.equal(ui.btn.disabled, false);
+});
+
+test("a never-checked planner says so instead of showing a stale date", async () => {
+  const ui = mountUpdates(() => Promise.resolve(checkBody()), {
+    checked_at: null,
+    sources: [],
+    found: [],
+    imported: [],
+  });
+  await ui.el.ready();
+  assert.equal(ui.hint(), "IDFG has not been checked yet.");
+});
+
+test("initRegs puts the button in the upload card and refreshes the table after a run", async () => {
+  const panel = document.createElement("div");
+  let documents = [];
+  const tab = initRegs(panel, {
+    load: async () => ({ documents }),
+    checkUpdates: async () => {
+      documents = [doc({ id: 8 })];
+      return checkBody({
+        found: [{ filename: "x.pdf", state: "new", document_id: 8 }],
+        imported: [8],
+      });
+    },
+    loadLastCheck: async () => checkBody(),
+  });
+  await tab.ready;
+  const button = panel.querySelector("#regs-check-updates");
+  assert.ok(button, "the button is missing");
+  assert.ok(
+    panel.querySelector("#regs-upload").querySelector("#regs-check-updates"),
+    "the button must sit beside the drop zone, in the upload card",
+  );
+  assert.match(panel.textContent, /No regulation PDFs yet/);
+
+  button.dispatch("click");
+  await tab.updatesCard.run();
+  await tick();
+  assert.equal(panel.querySelectorAll("table").length, 1);
+  assert.deepEqual(
+    tab.documents().map((d) => d.id),
+    [8],
+  );
+});
+
+test("the document header names what a re-posted brochure replaces", () => {
+  const host = document.createElement("div");
+  renderDocumentDetail(host, 9, doc({ id: 9, replaces: { id: 4, title: "2026 Big Game (first)" } }), {
+    mount: () => ({ el: textEl("p", "review screen") }),
+  });
+  assert.match(host.textContent, /Replaces 2026 Big Game \(first\)/);
+  const href = [...host.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+  assert.ok(href.includes("#/regs/4"), "the replaced document is linked");
 });
