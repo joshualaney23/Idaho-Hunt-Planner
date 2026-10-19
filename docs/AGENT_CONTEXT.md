@@ -72,7 +72,7 @@ One line per path: what it owns, and the ticket that brought it. Open the file f
 | `tests/fixtures/` | Synthetic PDFs **generated** by `make_*_fixture(s).py` (byte-stable, no writer dependency), plus real 2026 brochure pages with hand-verified `*_expected/*.json` |
 | `tests/golden/<year>/` | Human-verified golden data (T-22d–f) + `VERIFICATION.md`; `deer_general.json` (235 rows, signed 2026-10-16) · `fixture_controlled_deer.json` (81 rows) proves the harness; `sources.json` lists the source PDFs CI caches. **Never mark a golden row verified yourself** |
 | `docs/seasons_template.csv` | The 3-row example CSV the Season Table links to, served by `GET /api/seasons/template.csv` (T-16) |
-| `docs/mockup.html` · `spike_*_parser.py` | UI mockup with real 2026 deer data (also the seed source for map demos) · proven parser spikes that parser tickets productionize |
+| `docs/mockup.html` · `spike_*_parser.py` | UI mockup with real 2026 deer data (also the seed source for map demos) · proven parser spikes that parser tickets productionize (`spike_elk_parser.py` + `elk_parser_notes.md`: the rotated elk A/B zone pages, T-12a) |
 | `docs/tools/` | `section.py` prints a §/ticket · `make_issues.py` syncs issues from §12 (`--dry-run`/`--create`/`--link`) · `issue_map.json` ticket → issue number |
 | `.github/workflows/ci.yml` | `ruff check` + `ruff format --check` + `pytest -q` + node tests (TZ=America/Boise) on 3.12. The `main: require CI` ruleset requires `test (3.12)` and a branch up to date with `main` |
 
