@@ -408,6 +408,7 @@ CREATE TABLE my_tags (
 |---|---|---|
 | 002 | `002_publish_gate.sql` | T-22b review gate: `seasons.section` (the §8.7 section the row came from — the gate groups by it and §8.7 display safety flags a waived section's seasons), `seasons.reviewed_at`, and `import_checks.waived_by` / `waived_at` (a waiver keeps the reason, who typed it and when, forever). |
 | 004 | `004_publish_override.sql` | T-22g: `source_documents.publish_override_reason` / `_by` / `_at` / `_detail` (a human published past the review gate; the reason and the exact blockers it bypassed are kept forever), `seasons.published_unreviewed` (this row went live without anyone confirming it) and `seasons.edited_at` (a hand edit sends the row — and its section — back to review until someone decides on it). |
+| 005 | `005_unit_brief_selected_only.sql` | T-32: `profile.brief_selected_only` (0/1, default 0). When on, the Unit Brief lists only the species selected in the filter. |
 
 ### 5.1 Restriction codes (closed vocabulary)
 `whitetail_only`, `mule_deer_only`, `antlered_only`, `antlerless_only`, `two_point_only`, `spike_only`, `brow_tined`, `youth_only`, `private_land_only`, `portion_of_unit`, `outfitter_only`, `cwd_testing`, `motorized_rule`, `second_tag_prohibited`, `second_tag_allowed`, `bait_prohibited`, `dogs_prohibited`, `electronic_calls`, `grizzly_caution`, `expanded_methods`, `general_methods`, `see_notes`.
@@ -673,9 +674,9 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
-| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, White-tailed & Mule deer filters, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30, T-31 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, White-tailed & Mule deer filters, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30, T-31, T-32 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; {T-06, T-07, T-08, T-09, T-17c} → T-31 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; {T-06, T-07, T-08, T-09, T-17c} → T-31 ; {T-08, T-21, T-27} → T-32 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
 
 ---
 
@@ -1198,6 +1199,27 @@ Before building, confirm the matrix against the Big Game brochure's tag-definiti
 
 ---
 
+### T-32 · Unit Brief: show only the selected species (setting)
+**Depends on:** T-08, T-21, T-27 · **Size:** S
+**Description:** Add a Settings option, **"Unit brief shows only the selected species"** (default **off**, so today's "every species in the unit" behavior is unchanged). When it is on, the Unit Brief drawer (§4.3) lists only seasons for the species the user is viewing: the species chip(s) currently selected in the filter bar (T-27 multi-select; a virtual sub-species id such as `deer_mule` counts as `deer`). Other species are hidden entirely, not collapsed into "N seasons for other species". When it is off, the drawer shows every species as it does now (held species first, others under the collapsed group).
+- **Storage (§5):** migration `005_unit_brief_selected_only.sql` adds `profile.brief_selected_only INTEGER NOT NULL DEFAULT 0` (a 0/1 flag, same style as `youth`). Add the row to the §5 migration table; do not edit §5's SQL block.
+- **API (§6):** `GET/PUT /api/profile` accepts and returns `brief_selected_only` (boolean, validated like `youth`). `GET /api/units/<unit>/seasons` takes an optional `species=<list>` query parameter (same syntax as `/api/availability`). When the profile flag is on and `species` is given, the server filters the seasons to those species; with the flag off, or with no `species` argument, the response is unchanged. Doing the filter server-side keeps one rule for the drawer and the API. The response echoes `brief_species` (the list applied, or `null`) so the UI can say which filter was used.
+- **UI (§4.3, §4.5):** the Settings → Profile card (`createProfileCard`, shared with My Tags) gets a checkbox with that label. The drawer passes the current species selection to the brief request. When the filter is active, the drawer header says `Showing: 🦌 Deer` (or the selected list), so a hidden species is never a silent omission.
+- **Backup/restore:** the new column rides along in `GET /api/backup` and survives restore. A backup taken before this migration restores with the column defaulted to `0`.
+
+**Acceptance criteria:**
+- Migration 005 applies on a fresh DB and on a v4 DB; `profile.brief_selected_only` defaults to `0`; `test_api_backup.py::test_restore_migrates_an_older_backup_forward` drops the new column in its v1 fixture.
+- `PUT /api/profile {"brief_selected_only": true}` persists; a non-boolean value gets a 400 like `youth`. `GET /api/profile` returns the flag.
+- On a seeded DB where unit 1 has published deer and elk seasons: with the flag **off**, `GET /api/units/1/seasons?year=2026&species=deer` returns both species (unchanged from T-08); with the flag **on**, the same request returns only deer seasons and `brief_species: ["deer"]`; with the flag on and `species=elk`, only elk seasons.
+- With the flag on and a virtual id (`species=deer_mule`, T-31), only seasons valid for mule deer by the T-31 matrix are returned.
+- With the flag on and no `species` argument, all species are returned (the flag has nothing to filter by).
+- Node twin test (`drawer.test.mjs`): with the flag on, the drawer renders no group for an unselected species and no "other species" summary; with it off, it renders exactly what it renders today. The header names the filter when it is active.
+- Settings checkbox round-trips through `PUT /api/profile` and updates the saved state; the My Tags copy of the profile card stays in sync (it reads the same `profile` object).
+- Chrome check (real browser, per AGENT_CONTEXT.md): with a seeded DB, select Deer, open a unit with deer and elk seasons, toggle the setting on in Settings, return, reopen the brief, and see only deer. Screenshot in the PR.
+- `pytest -q`, `ruff check .`, `ruff format --check .`, and `TZ=America/Boise node --test static/js/*.test.mjs` are green.
+
+---
+
 ## 13. Annual workflow (what using it looks like)
 
 1. **Spring (Big Game regs drop):** open the app → 📥 Regulations → drop `seasons-rules-big-game-2027.pdf` → fix anything the Accuracy panel flags, review changed rows using the side-by-side PDF and the "changed since 2026" diff → **Publish**. (The Upland brochure covers two years, so it's uploaded every other year: 2026, 2028, ….)
@@ -1273,6 +1295,7 @@ Before building, confirm the matrix against the Big Game brochure's tag-definiti
 | T-29 | [#69](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/69) | Highlight the focused row on the source PDF page (explore) |
 | T-30 | [#72](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/72) | One-step install and launch (setup script + macOS double-click) |
 | T-31 | [#94](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/94) | Deer sub-species filters: White-tailed & Mule deer (tag-aware) |
+| T-32 | [#98](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/98) | Unit Brief: show only the selected species (setting) |
 
 **Kickoff prompt template:**
 ```
