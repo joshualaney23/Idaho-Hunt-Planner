@@ -72,7 +72,7 @@ find_python312() {
   for candidate in \
     "${IHP_PYTHON:-}" \
     "$(command -v python3.12 2>/dev/null || true)" \
-    /opt/homebrew/bin/python3.12 \
+    "${HOMEBREW_PREFIX:-/opt/homebrew}/bin/python3.12" \
     /usr/local/bin/python3.12 \
     "$(command -v python3 2>/dev/null || true)"; do
     if [ -n "$candidate" ] && is_py312 "$candidate"; then
