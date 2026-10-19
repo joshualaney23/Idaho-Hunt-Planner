@@ -11,8 +11,12 @@ import pytest
 from planner.engine import (
     DERIVED_REASONS,
     RESTRICTIONS,
+    combine_status,
     evaluate,
+    evaluate_multi,
+    intersect_spans,
     is_narrowing,
+    merge_spans,
     sort_reasons,
     union_days,
 )
@@ -470,3 +474,96 @@ def test_helpers():
         "partial_dates",
         "zzz",
     ]
+
+
+# ───────── T-27: span algebra and status combination ─────────
+def test_merge_and_intersect_spans():
+    d = date
+    assert merge_spans([]) == [] and intersect_spans([], []) == []
+    a = [(d(2026, 10, 10), d(2026, 10, 20)), (d(2026, 10, 1), d(2026, 10, 5))]
+    assert merge_spans(a) == [(d(2026, 10, 1), d(2026, 10, 5)), (d(2026, 10, 10), d(2026, 10, 20))]
+    # Overlapping spans merge; the merged list is what union_days counts.
+    assert merge_spans([(d(2026, 1, 1), d(2026, 1, 3)), (d(2026, 1, 2), d(2026, 1, 9))]) == [
+        (d(2026, 1, 1), d(2026, 1, 9))
+    ]
+    b = [(d(2026, 10, 3), d(2026, 10, 12))]
+    assert intersect_spans(a, b) == [
+        (d(2026, 10, 3), d(2026, 10, 5)),
+        (d(2026, 10, 10), d(2026, 10, 12)),
+    ]
+    # Disjoint single days: one day each, nothing in common. `min()` of the counts says 1.
+    one, two = [(d(2026, 10, 17), d(2026, 10, 17))], [(d(2026, 10, 18), d(2026, 10, 18))]
+    assert union_days(one) == union_days(two) == 1
+    assert intersect_spans(one, two) == []
+    assert intersect_spans(one, one) == one
+    # Intersection is commutative and idempotent on merged input.
+    assert intersect_spans(b, a) == intersect_spans(a, b)
+
+
+def test_combine_status_ranks():
+    order = ["closed", "untagged", "restricted", "open"]
+    for i, lo in enumerate(order):
+        for hi in order[i:]:
+            assert combine_status([lo, hi], "all") == lo
+            assert combine_status([lo, hi], "any") == hi
+    assert combine_status([], "all") == "closed"
+    # One species behaves identically in both modes.
+    for s in order:
+        assert combine_status([s], "all") == combine_status([s], "any") == s
+
+
+def run_multi(
+    seasons: list[dict[str, Any]],
+    tags: list[dict[str, Any]],
+    species: list[str],
+    *,
+    mode: str = "any",
+    units: dict[int, list[str]] | None = None,
+) -> dict[str, Any]:
+    units = units or {}
+    sus = [
+        {"season_id": s["id"], "unit_id": u, "coverage": "full", "coverage_note": None}
+        for s in seasons
+        for u in units.get(s["id"], ["39"])
+    ]
+    return evaluate_multi(
+        seasons, sus, tags, [], {"youth": 0}, species, SAT, SUN, "all", False, mode
+    )
+
+
+def test_evaluate_multi_validates_its_arguments():
+    with pytest.raises(ValueError, match="at least one"):
+        run_multi([], [], [])
+    with pytest.raises(ValueError, match="at most 4"):
+        run_multi([], [], ["deer", "elk", "pronghorn", "black_bear", "wolf"])
+    with pytest.raises(ValueError, match="species_mode"):
+        run_multi([], [], ["deer"], mode="both")
+
+
+def test_evaluate_multi_leaves_the_single_species_payload_alone():
+    seasons, tags = [season()], [tag()]
+    one = run_multi(seasons, tags, ["deer"])
+    base = run(seasons, tags)
+    assert one["species"] == ["deer"] and one["species_mode"] == "any"
+    assert {k: v for k, v in one.items() if k not in ("species", "species_mode")} == {
+        k: v for k, v in base.items() if k != "species"
+    }
+    assert "open_spans" not in one["units"]["39"]  # the internal day sets never leak
+
+
+def test_evaluate_multi_combines_two_species():
+    deer = season()
+    elk = season(species_id="elk", tag_type_id="elk_zone_a", zone="Lolo")
+    tags = [tag(), tag("elk_zone_a", zone="Lolo")]
+    both = run_multi([deer, elk], tags, ["deer", "elk"], mode="all", units={elk["id"]: ["40"]})
+    assert both["units"]["39"]["status"] == "closed"  # no elk season there
+    assert both["units"]["39"]["per_species"] == {
+        "deer": {"status": "open", "reasons": [], "days_open": 2},
+        "elk": {"status": "closed", "reasons": [], "days_open": 0},
+    }
+    assert (
+        run_multi([deer, elk], tags, ["deer", "elk"], units={elk["id"]: ["40"]})["units"]["39"][
+            "status"
+        ]
+        == "open"
+    )  # `any` takes the best
