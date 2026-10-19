@@ -154,13 +154,17 @@ def test_availability_defaults(client, monkeypatch):
     start, end = default_range(date.today())
     assert body["range"]["start"] == to_iso(start)
     assert body["range"]["end"] == to_iso(end)
-    assert (body["species"], body["weapon"], body["include_untagged"]) == ("deer", "all", False)
+    assert (body["species"], body["weapon"], body["include_untagged"]) == (["deer"], "all", False)
+    assert body["species_mode"] == "any"  # T-27: a bare request is one species, `any`
 
 
 @pytest.mark.parametrize(
     "params, code",
     [
         ({"species": "unicorn"}, "unknown_species"),
+        ({"species": "deer,unicorn"}, "unknown_species"),
+        ({"species": "deer,elk,pronghorn,black_bear,mountain_lion"}, "too_many_species"),
+        ({"species": "deer,elk", "species_mode": "both"}, "bad_species_mode"),
         ({"start": "2026-13-01", "end": "2026-12-01"}, "bad_date"),
         ({"start": "10/17/2026", "end": "2026-10-18"}, "bad_date"),
         ({"start": "2026-10-18", "end": "2026-10-17"}, "bad_range"),
@@ -280,12 +284,12 @@ def build_perf_db(conn, n: int = 5000, *, worst_case: bool = False, seed: int = 
     return len(sus)
 
 
-def time_availability(client, runs: int = 7) -> list[float]:
+def time_availability(client, runs: int = 7, query: dict | None = None) -> list[float]:
     """Request + response time in ms (not the test's own JSON parsing of the body)."""
     timings = []
     for _ in range(runs):
         t0 = time.perf_counter()
-        resp = client.get("/api/availability", query_string=PERF_QUERY)
+        resp = client.get("/api/availability", query_string=query or PERF_QUERY)
         timings.append((time.perf_counter() - t0) * 1000)
         assert resp.status_code == 200
     return timings
@@ -317,3 +321,197 @@ def test_availability_perf_5000_seasons(client, conn, worst_case):
     )
     limit = 500 if worst_case else 150
     assert median < limit, f"median {median:.1f} ms; {timings}"
+
+
+# ───────── T-27: multi-species intersection ─────────
+RANGE = {"start": "2026-10-17", "end": "2026-10-18"}
+
+
+def _deer_and_elk(conn):
+    """Unit 39 open for both, unit 4 deer only, unit 62 elk only (§12 T-27, AC 1)."""
+    doc = _doc(conn)
+    _season(conn, doc, ["39", "4"])
+    _season(conn, doc, ["39", "62"], species_id="elk", tag_type_id="elk_zone_a", zone="Lolo")
+    _tag(conn)
+    _tag(conn, "elk_zone_a", zone="Lolo")
+    return doc
+
+
+def test_species_mode_all_keeps_only_units_open_for_every_species(client, conn):
+    _deer_and_elk(conn)
+    status, body = _get(client, species="deer,elk", species_mode="all", **RANGE)
+    assert status == 200
+    assert body["species"] == ["deer", "elk"]
+    assert body["species_mode"] == "all"
+    units = body["units"]
+    assert units["39"]["status"] == "open"
+    assert units["4"]["status"] == "closed"  # elk is closed there, so the pair is
+    assert units["62"]["status"] == "closed"  # deer is closed there
+
+    # `per_species` reports each species' own status on all three units.
+    assert {u: units[u]["per_species"]["deer"]["status"] for u in ("39", "4", "62")} == {
+        "39": "open",
+        "4": "open",
+        "62": "closed",
+    }
+    assert {u: units[u]["per_species"]["elk"]["status"] for u in ("39", "4", "62")} == {
+        "39": "open",
+        "4": "closed",
+        "62": "open",
+    }
+    assert body["summary"]["open"] == 1
+    # The combined status is what the summary counts, so every other unit is closed.
+    assert body["summary"]["closed"] == sum(1 for u in units.values() if u["status"] == "closed")
+
+
+def test_species_mode_any_takes_the_best_status_per_unit(client, conn):
+    _deer_and_elk(conn)
+    status, body = _get(client, species="deer,elk", species_mode="any", **RANGE)
+    assert status == 200
+    units = body["units"]
+    assert [units[u]["status"] for u in ("39", "4", "62")] == ["open", "open", "open"]
+    assert all(units[u]["status"] != "closed" for u in ("39", "4", "62"))
+    # Each unit still carries both species' own verdicts.
+    assert units["4"]["per_species"]["elk"]["status"] == "closed"
+    assert units["62"]["per_species"]["deer"]["status"] == "closed"
+    # A unit no selected species reaches stays closed in `any` too.
+    assert units["1"]["status"] == "closed"
+
+
+def test_species_mode_all_intersects_the_open_days(client, conn):
+    """AC 3: deer open across the range, elk on one day only → restricted, 1 day."""
+    doc = _doc(conn)
+    _season(conn, doc, ["39"], start_date="2026-10-10", end_date="2026-10-24")
+    _season(
+        conn,
+        doc,
+        ["39"],
+        species_id="elk",
+        tag_type_id="elk_zone_a",
+        zone="Lolo",
+        start_date="2026-10-18",
+        end_date="2026-10-18",
+    )
+    _tag(conn)
+    _tag(conn, "elk_zone_a", zone="Lolo")
+
+    status, body = _get(client, species="deer,elk", species_mode="all", **RANGE)
+    assert status == 200
+    unit = body["units"]["39"]
+    assert unit["status"] == "restricted"
+    assert "elk:partial_dates" in unit["reasons"]
+    assert "deer:partial_dates" not in unit["reasons"]  # deer covers the whole range
+    assert unit["days_open"] == 1
+    assert unit["per_species"]["deer"]["days_open"] == 2
+    assert unit["per_species"]["elk"]["days_open"] == 1
+    assert unit["per_species"]["elk"]["reasons"] == ["partial_dates"]  # unprefixed inside
+    # Every season entry names its species so the tooltip can group them.
+    assert sorted(s["species"] for s in unit["seasons"]) == ["deer", "elk"]
+
+
+def test_all_mode_never_takes_the_min_of_the_day_counts(client, conn):
+    """Two species open one day each, on *different* days: `min()` would say 1, truth is 0."""
+    doc = _doc(conn)
+    _season(conn, doc, ["39"], start_date="2026-10-17", end_date="2026-10-17")
+    _season(
+        conn,
+        doc,
+        ["39"],
+        species_id="elk",
+        tag_type_id="elk_zone_a",
+        zone="Lolo",
+        start_date="2026-10-18",
+        end_date="2026-10-18",
+    )
+    _tag(conn)
+    _tag(conn, "elk_zone_a", zone="Lolo")
+
+    _, body = _get(client, species="deer,elk", species_mode="all", **RANGE)
+    unit = body["units"]["39"]
+    assert (unit["per_species"]["deer"]["days_open"], unit["per_species"]["elk"]["days_open"]) == (
+        1,
+        1,
+    )
+    assert unit["days_open"] == 0
+
+
+def test_single_species_payload_is_unchanged(client, conn):
+    """AC 4 regression: only `species` becoming a list and the `species_mode` echo are new."""
+    _deer_and_elk(conn)
+    _, body = _get(client, species="deer", **RANGE)
+    assert set(body) == {
+        "range",
+        "species",
+        "species_mode",
+        "weapon",
+        "include_untagged",
+        "units",
+        "summary",
+        "tags",
+    }
+    assert body["species"] == ["deer"]
+    assert body["species_mode"] == "any"
+    for unit in body["units"].values():
+        assert "per_species" not in unit  # only multi-species responses carry it
+        assert "open_spans" not in unit  # the engine's internal day sets never ship
+        assert set(unit) == {"status", "reasons", "days_open", "seasons"}
+        for season in unit["seasons"]:
+            assert "species" not in season
+    assert body["units"]["39"]["status"] == "open"
+    assert body["units"]["62"]["status"] == "closed"
+    # `species_mode=all` with one species is identical to `any` (the rank min == max).
+    _, both = _get(client, species="deer", species_mode="all", **RANGE)
+    assert both["units"] == body["units"] and both["summary"] == body["summary"]
+
+
+def test_unknown_species_detail_lists_every_bad_id(client):
+    status, body = _get(client, species="deer,unicorn,dragon")
+    assert status == 400
+    assert body["error"]["code"] == "unknown_species"
+    assert body["error"]["detail"]["species"] == ["unicorn", "dragon"]
+
+
+def test_repeated_species_are_deduped(client, conn):
+    _deer_and_elk(conn)
+    _, body = _get(client, species="deer,elk,deer", species_mode="all", **RANGE)
+    assert body["species"] == ["deer", "elk"]
+    assert body["units"]["39"]["status"] == "open"
+
+
+def test_four_species_is_allowed(client, conn):
+    _deer_and_elk(conn)
+    status, body = _get(client, species="deer,elk,pronghorn,black_bear", species_mode="all")
+    assert status == 200
+    assert len(body["species"]) == 4
+
+
+MULTI_PERF_QUERY = {
+    "species": "deer,elk,pronghorn,black_bear",
+    "species_mode": "all",
+    "start": "2026-10-17",
+    "end": "2026-10-18",
+    "include_untagged": 1,
+}
+
+
+def test_availability_perf_four_species_all(client, conn):
+    """§12 T-27: four species in `all` mode under 375 ms (2.5× T-06's 150 ms bar).
+
+    Measured exactly as T-06 does — `statistics.median` over timed `client.get` calls, no
+    JSON parsing on the client — on the same realistic 5,000-season DB.
+    """
+    n_units = build_perf_db(conn)
+    status, body = _get(client, **MULTI_PERF_QUERY)
+    assert status == 200
+    assert len(body["species"]) == 4
+    reached = sum(len(u["seasons"]) for u in body["units"].values())
+    assert reached > 250  # the engine really does the work four times over
+
+    timings = time_availability(client, query=MULTI_PERF_QUERY)
+    median = statistics.median(timings)
+    print(
+        f"\n/api/availability 4 species, mode=all: 5000 seasons / {n_units} season_units, "
+        f"{reached} unit entries returned: median {median:.1f} ms, "
+        f"min {min(timings):.1f} ms, max {max(timings):.1f} ms"
+    )
+    assert median < 375, f"median {median:.1f} ms; {timings}"
