@@ -185,20 +185,48 @@ def _is_partial(su: Mapping[str, Any]) -> bool:
     return su.get("coverage") == "partial" or (frac is not None and frac < PARTIAL_COVERAGE_FRAC)
 
 
+def merge_spans(spans: Iterable[tuple[date, date]]) -> list[tuple[date, date]]:
+    """The union of inclusive date spans, sorted and non-overlapping.
+
+    Overlapping and touching spans merge; spans a day apart stay separate, which changes
+    no day count (:func:`days` is inclusive on both ends).
+    """
+    out: list[tuple[date, date]] = []
+    for a, b in sorted(spans):
+        if out and a <= out[-1][1]:
+            if b > out[-1][1]:
+                out[-1] = (out[-1][0], b)
+        else:
+            out.append((a, b))
+    return out
+
+
+def intersect_spans(
+    a: Iterable[tuple[date, date]], b: Iterable[tuple[date, date]]
+) -> list[tuple[date, date]]:
+    """The inclusive spans covered by **both** span lists (each merged first).
+
+    This is what `species_mode=all` counts: the days on which every selected species is
+    open. Intersecting the spans is exact, where `min()` of the per-species day counts is
+    not — two species open for one day each may be open on *different* days (§12 T-27).
+    """
+    out: list[tuple[date, date]] = []
+    xs, ys = merge_spans(a), merge_spans(b)
+    i = j = 0
+    while i < len(xs) and j < len(ys):
+        lo, hi = max(xs[i][0], ys[j][0]), min(xs[i][1], ys[j][1])
+        if lo <= hi:
+            out.append((lo, hi))
+        if xs[i][1] < ys[j][1]:
+            i += 1
+        else:
+            j += 1
+    return out
+
+
 def union_days(spans: Iterable[tuple[date, date]]) -> int:
     """Days covered by the union of inclusive date spans."""
-    total = 0
-    cur: tuple[date, date] | None = None
-    for a, b in sorted(spans):
-        if cur is None or a > cur[1]:
-            if cur is not None:
-                total += days(*cur)
-            cur = (a, b)
-        elif b > cur[1]:
-            cur = (cur[0], b)
-    if cur is not None:
-        total += days(*cur)
-    return total
+    return sum(days(*s) for s in merge_spans(spans))
 
 
 def evaluate(
@@ -215,12 +243,18 @@ def evaluate(
     *,
     tag_types: Iterable[Mapping[str, Any]] | None = None,
     unit_ids: Sequence[str] | None = None,
+    with_spans: bool = False,
 ) -> dict[str, Any]:
     """Unit statuses for one query (§7.2), in the §6 `/api/availability` shape.
 
     ``my_tags`` is the tag scope (all the user's tags, or the explicit ids). Filled tags are
     dropped here. ``unit_ids`` lists every unit to report (units with no season are
     ``closed``); without it, only units with at least one kept season appear.
+
+    ``with_spans`` adds each unit's merged open-day spans as ``open_spans`` (a list of
+    ``[start_iso, end_iso]`` pairs). Only :func:`evaluate_multi` asks for them — it needs
+    the day *sets*, not their counts, to intersect them — and it strips them again, so the
+    §6 payload is unchanged by default.
     """
     start_d, end_d = _as_date(start), _as_date(end)
     if end_d < start_d:
@@ -352,12 +386,15 @@ def evaluate(
         status = max((e["status"] for e in entries), key=_STATUS_RANK.__getitem__, default="closed")
         # Reasons: the deduped union across the seasons that reach the unit's best status.
         reasons = sort_reasons(c for e in entries if e["status"] == status for c in e["reasons"])
+        spans = merge_spans(spans_by_unit.get(uid, []))
         units[uid] = {
             "status": status,
             "reasons": reasons,
-            "days_open": union_days(spans_by_unit.get(uid, [])),
+            "days_open": sum(days(*s) for s in spans),
             "seasons": entries,
         }
+        if with_spans:
+            units[uid]["open_spans"] = [[to_iso(a), to_iso(b)] for a, b in spans]
         summary[status] += 1
 
     return {
@@ -365,6 +402,147 @@ def evaluate(
         "species": species,
         "weapon": weapon,
         "include_untagged": bool(include_untagged),
+        "units": units,
+        "summary": summary,
+    }
+
+
+# ───────── multi-species intersection (§12 T-27) ─────────
+#: How many species one query may select. The UI's chip row caps at the same number.
+MAX_SPECIES: Final = 4
+SPECIES_MODES: Final[tuple[str, ...]] = ("any", "all")
+
+
+def combine_status(statuses: Iterable[str], mode: str) -> str:
+    """Combine per-species statuses on one unit (§12 T-27).
+
+    Rank `closed < untagged < restricted < open`. `all` takes the **minimum** — the unit is
+    only as good as the worst selected species — and `any` the maximum, which is exactly
+    what a single species already does, so one species behaves identically in both modes.
+    """
+    ranked = list(statuses)
+    if not ranked:
+        return "closed"
+    pick = min if mode == "all" else max
+    return pick(ranked, key=_STATUS_RANK.__getitem__)
+
+
+def evaluate_multi(
+    seasons: Iterable[Mapping[str, Any]],
+    season_units: Iterable[Mapping[str, Any]],
+    my_tags: Iterable[Mapping[str, Any]],
+    permits: Iterable[Any],
+    profile: Mapping[str, Any] | None,
+    species: Sequence[str],
+    start: date | str,
+    end: date | str,
+    weapon: str = "all",
+    include_untagged: bool = False,
+    mode: str = "any",
+    *,
+    tag_types: Iterable[Mapping[str, Any]] | None = None,
+    unit_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Availability for several species at once, combined per unit (§12 T-27).
+
+    :func:`evaluate` stays single-species and pure; this runs it once per species over the
+    **rows already loaded** (the caller issues one SQL query per table with
+    ``species_id IN (…)``, never one query per species) and combines the results.
+
+    With one species the payload is T-06's, plus ``species`` as a one-element list and the
+    ``species_mode`` echo. With more, every unit gains ``per_species`` and every season
+    entry a ``species`` id, so the map tooltip can group and attribute them.
+    """
+    ids = list(dict.fromkeys(species))
+    if not ids:
+        raise ValueError("species must name at least one species")
+    if len(ids) > MAX_SPECIES:
+        raise ValueError(f"at most {MAX_SPECIES} species (got {len(ids)})")
+    if mode not in SPECIES_MODES:
+        raise ValueError(f"unknown species_mode {mode!r} (expected one of {SPECIES_MODES})")
+
+    rows = list(seasons)
+    sus = list(season_units)
+    tags = list(my_tags)
+    held = list(permits)
+    types = None if tag_types is None else list(tag_types)
+    per = {
+        sp: evaluate(
+            rows,
+            sus,
+            tags,
+            held,
+            profile,
+            sp,
+            start,
+            end,
+            weapon,
+            include_untagged,
+            tag_types=types,
+            unit_ids=unit_ids,
+            with_spans=True,
+        )
+        for sp in ids
+    }
+
+    first = per[ids[0]]
+    if len(ids) == 1:
+        for u in first["units"].values():
+            u.pop("open_spans", None)
+        return {**first, "species": ids, "species_mode": mode}
+
+    # Units in the first species' order (every call saw the same `unit_ids`), then any
+    # unit only a later species reached (possible when `unit_ids` is None).
+    uids = list(first["units"])
+    seen = set(uids)
+    for sp in ids[1:]:
+        uids += [u for u in per[sp]["units"] if u not in seen and not seen.add(u)]
+
+    units: dict[str, dict[str, Any]] = {}
+    summary = {"open": 0, "restricted": 0, "untagged": 0, "closed": 0}
+    closed: dict[str, Any] = {"status": "closed", "reasons": [], "days_open": 0, "seasons": []}
+    for uid in uids:
+        mine = {sp: per[sp]["units"].get(uid, closed) for sp in ids}
+        status = combine_status((u["status"] for u in mine.values()), mode)
+        # Each code is prefixed with the species it came from (`elk:partial_dates`) so the
+        # tooltip can attribute it; the unprefixed codes stay inside `per_species`.
+        reasons = [f"{sp}:{c}" for sp in ids for c in mine[sp]["reasons"]]
+
+        spans = [[tuple(map(_as_date, s)) for s in u.get("open_spans", [])] for u in mine.values()]
+        if mode == "all":
+            # The days on which *every* selected species is open — the intersection of the
+            # per-species open-day sets, never `min()` of their counts (§12 T-27).
+            combined = spans[0]
+            for other in spans[1:]:
+                combined = intersect_spans(combined, other)
+        else:
+            combined = merge_spans([s for group in spans for s in group])
+
+        units[uid] = {
+            "status": status,
+            "reasons": reasons,
+            "days_open": sum(days(*s) for s in combined),
+            "seasons": sorted(
+                ({**e, "species": sp} for sp in ids for e in mine[sp]["seasons"]),
+                key=lambda e: (e["start"], e["species"], str(e["id"])),
+            ),
+            "per_species": {
+                sp: {
+                    "status": u["status"],
+                    "reasons": u["reasons"],
+                    "days_open": u["days_open"],
+                }
+                for sp, u in mine.items()
+            },
+        }
+        summary[status] += 1
+
+    return {
+        "range": first["range"],
+        "species": ids,
+        "species_mode": mode,
+        "weapon": first["weapon"],
+        "include_untagged": first["include_untagged"],
         "units": units,
         "summary": summary,
     }

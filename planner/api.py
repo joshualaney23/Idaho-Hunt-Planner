@@ -248,9 +248,34 @@ def availability():
     args = request.args
     profile = _profile()
 
-    species = args.get("species") or profile["default_species"]
-    if db.q1("SELECT 1 FROM species WHERE id = ?", species) is None:
-        raise ApiError("unknown_species", f"unknown species {species!r}", {"species": species})
+    # §12 T-27: `species` is a comma-separated list of up to 4 ids. `species_mode=all`
+    # keeps only the units where every one of them is huntable in the same range.
+    raw_species = args.get("species") or profile["default_species"]
+    species = list(dict.fromkeys(s.strip() for s in raw_species.split(",") if s.strip()))
+    if not species:
+        raise ApiError("unknown_species", "species must name at least one species", {"species": []})
+    if len(species) > engine.MAX_SPECIES:
+        raise ApiError(
+            "too_many_species",
+            f"at most {engine.MAX_SPECIES} species may be selected (got {len(species)})",
+            {"species": species},
+        )
+    known = {r["id"] for r in db.q("SELECT id FROM species")}
+    unknown = [s for s in species if s not in known]
+    if unknown:
+        raise ApiError(
+            "unknown_species",
+            f"unknown species {', '.join(repr(s) for s in unknown)}",
+            {"species": unknown},
+        )
+
+    species_mode = args.get("species_mode", "any")
+    if species_mode not in engine.SPECIES_MODES:
+        raise ApiError(
+            "bad_species_mode",
+            f"species_mode must be one of {', '.join(engine.SPECIES_MODES)}",
+            {"species_mode": species_mode},
+        )
 
     if "start" in args or "end" in args:
         start = _parse_date("start", args.get("start", ""))
@@ -288,26 +313,26 @@ def availability():
     y1, y2 = start.year, end.year
     s_iso, e_iso = to_iso(start), to_iso(end)
 
-    # One query per table. Published only; the date overlap is filtered in SQL.
+    # One query per table, never one per species (§12 T-27). Published only; the date
+    # overlap is filtered in SQL.
+    marks = ", ".join("?" * len(species))
     season_filter = (
-        "s.status = 'published' AND s.species_id = ? AND s.start_date <= ? AND s.end_date >= ?"
+        f"s.status = 'published' AND s.species_id IN ({marks})"
+        " AND s.start_date <= ? AND s.end_date >= ?"
     )
+    season_args = (*species, e_iso, s_iso)
     seasons = _dicts(
         "SELECT s.id, s.document_id, d.license_year, s.status, s.species_id, s.tag_type_id,"
         " s.zone, s.hunt_number, s.hunt_class, s.weapon, s.sex, s.start_date, s.end_date,"
         " s.restrictions, s.source_page"
         f" FROM seasons s JOIN source_documents d ON d.id = s.document_id WHERE {season_filter}",
-        species,
-        e_iso,
-        s_iso,
+        *season_args,
     )
     season_units = _dicts(
         "SELECT su.season_id, su.unit_id, su.coverage, su.coverage_note, su.coverage_frac"
         " FROM season_units su JOIN seasons s ON s.id = su.season_id"
         f" WHERE {season_filter}",
-        species,
-        e_iso,
-        s_iso,
+        *season_args,
     )
     my_tags = _dicts(
         "SELECT id, license_year, tag_type_id, zone, hunt_number, filled FROM my_tags"
@@ -324,7 +349,7 @@ def availability():
     tag_types = _dicts("SELECT id, requires_zone, requires_hunt_no FROM tag_types")
     unit_ids = [r["id"] for r in db.q("SELECT id FROM units ORDER BY sort_key, id")]
 
-    result = engine.evaluate(
+    result = engine.evaluate_multi(
         seasons,
         season_units,
         my_tags,
@@ -335,6 +360,7 @@ def availability():
         end,
         weapon,
         include_untagged,
+        species_mode,
         tag_types=tag_types,
         unit_ids=unit_ids,
     )
