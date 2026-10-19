@@ -412,16 +412,45 @@ export function tooltipContent(id, unit, geo, labels) {
   );
   frag.push(meta);
   const seasons = unit?.seasons || [];
-  if (geo?.closed) frag.push(textEl("div", "Yellowstone National Park: no hunting.", "muted"));
-  else if (!seasons.length) frag.push(textEl("div", "No season for your tags and dates.", "muted"));
+  if (geo?.closed) {
+    frag.push(textEl("div", "Yellowstone National Park: no hunting.", "muted"));
+    return frag;
+  }
+  // T-27: with several species the seasons are grouped under a species-icon header
+  // carrying that species' own status, so a combined `restricted` says which one narrowed it.
+  const per = unit?.per_species;
+  if (per) {
+    for (const [sp, ps] of Object.entries(per)) {
+      frag.push(speciesHeader(sp, ps, labels));
+      const mine = seasons.filter((s) => s.species === sp);
+      if (!mine.length) frag.push(textEl("div", "No season for your tags and dates.", "muted"));
+      for (const s of mine) frag.push(seasonLine(s, labels));
+    }
+    return frag;
+  }
+  if (!seasons.length) frag.push(textEl("div", "No season for your tags and dates.", "muted"));
   for (const s of seasons) frag.push(seasonLine(s, labels));
   return frag;
 }
 
-/** Legend rows with a count per status (§4.3). Untagged appears only when it's on. */
-export function legendItems(summary = {}, includeUntagged = false) {
+/** "🦌 Deer — restricted": one species' header inside a multi-species tooltip. */
+export function speciesHeader(sp, ps, labels = {}) {
+  const info = (labels.species || {})[sp] || {};
+  const h = textEl("h4", `${info.icon || ""} ${info.label || sp}`.trim(), "sp-head");
+  h.dataset.species = sp;
+  const st = ps?.status || "closed";
+  h.append(" ", textEl("span", st === "untagged" ? "no matching tag" : st, `st ${st}`));
+  return h;
+}
+
+/**
+ * Legend rows with a count per status (§4.3). Untagged appears only when it's on.
+ * With a T-27 `all` selection the green caption says what green now means (§12).
+ */
+export function legendItems(summary = {}, includeUntagged = false, { mode = "any", speciesCount = 1 } = {}) {
+  const everySpecies = mode === "all" && speciesCount > 1;
   const rows = [
-    ["open", "Open — full range, no narrowing rules"],
+    ["open", everySpecies ? "Open — every selected species open" : "Open — full range, no narrowing rules"],
     ["restricted", "Restricted / partial"],
     ["closed", "Closed / no matching tag"],
   ];
@@ -430,9 +459,9 @@ export function legendItems(summary = {}, includeUntagged = false) {
 }
 
 /** Render the legend into `el`. */
-export function renderLegend(el, summary, includeUntagged) {
+export function renderLegend(el, summary, includeUntagged, opts) {
   el.replaceChildren(
-    ...legendItems(summary, includeUntagged).map(({ status, text, count }) => {
+    ...legendItems(summary, includeUntagged, opts).map(({ status, text, count }) => {
       const item = document.createElement("span");
       item.dataset.status = status;
       const sw = document.createElement("i");

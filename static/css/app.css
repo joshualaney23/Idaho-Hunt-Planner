@@ -192,6 +192,29 @@
 .hint[hidden] {
   display: none;
 }
+/* T-27: Match any|all, shown under the species chips once 2+ are selected. */
+.match-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.match-box[hidden] {
+  display: none;
+}
+.sp-head {
+  font-size: 12px;
+  margin: 8px 0 2px;
+  border-top: 1px solid var(--bg5);
+  padding-top: 6px;
+}
+.sp-head:first-of-type {
+  border-top: 0;
+}
+table.results th.sp-col,
+table.results td.sp-col {
+  white-space: nowrap;
+}
 .chip-sep {
   width: 1px;
   align-self: stretch;

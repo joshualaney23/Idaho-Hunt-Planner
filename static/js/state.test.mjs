@@ -7,14 +7,18 @@ import assert from "node:assert/strict";
 
 import {
   DEBOUNCE_MS,
+  MAX_SPECIES,
   availabilityPath,
   createFetcher,
   createStore,
   defaultState,
   hasFilterKeys,
+  parseSpecies,
+  primarySpecies,
   rangeYears,
   stateFromQuery,
   toQuery,
+  toggleSpecies,
   validISO,
   withDate,
 } from "./state.js";
@@ -25,7 +29,8 @@ const defaults = defaultState({ profile: { default_species: "deer" }, today: WED
 
 test("defaults: profile species + the coming Fri–Sun weekend (D5)", () => {
   assert.deepEqual(defaults, {
-    species: "deer",
+    species: ["deer"],
+    speciesMode: "any",
     start: "2026-10-16",
     end: "2026-10-18",
     weapon: "all",
@@ -33,11 +38,11 @@ test("defaults: profile species + the coming Fri–Sun weekend (D5)", () => {
     includeUntagged: false,
   });
   const elk = defaultState({ profile: { default_species: "elk", weekend_def: "sat_sun" }, today: WED });
-  assert.equal(elk.species, "elk");
+  assert.deepEqual(elk.species, ["elk"]);
   assert.deepEqual([elk.start, elk.end], ["2026-10-17", "2026-10-18"]);
   // On a Saturday, Fri–Sun is today through tomorrow.
   const sat = defaultState({ profile: {}, today: SAT });
-  assert.deepEqual([sat.species, sat.start, sat.end], ["deer", "2026-10-17", "2026-10-18"]);
+  assert.deepEqual([sat.species, sat.start, sat.end], [["deer"], "2026-10-17", "2026-10-18"]);
 });
 
 test("no URL params → exactly the defaults", () => {
@@ -49,7 +54,8 @@ test("no URL params → exactly the defaults", () => {
 
 test("URL round-trip restores every filter", () => {
   const s = {
-    species: "elk",
+    species: ["elk"],
+    speciesMode: "any",
     start: "2026-10-24",
     end: "2026-10-31",
     weapon: "archery",
@@ -85,6 +91,50 @@ test("bad URL values fall back to defaults instead of breaking the page", () => 
   assert.equal(stateFromQuery("tags=mine", defaults).tags, null);
 });
 
+test("T-27: a species list and the match mode round-trip through the URL", () => {
+  const s = { ...defaults, species: ["deer", "elk"], speciesMode: "all" };
+  const q = toQuery(s);
+  assert.equal(q, "species=deer%2Celk&mode=all&start=2026-10-16&end=2026-10-18&weapon=all");
+  assert.deepEqual(stateFromQuery(q, defaults), s);
+  // `any` is the default, so a one-species URL stays exactly T-07's.
+  assert.equal(toQuery(defaults).includes("mode="), false);
+  assert.equal(hasFilterKeys("mode=all"), true);
+  // Order is kept, duplicates and unknown ids drop, and at most 4 survive.
+  const ids = ["deer", "elk", "pronghorn", "wolf", "turkey"];
+  assert.deepEqual(parseSpecies("elk,deer,elk", ids), ["elk", "deer"]);
+  assert.deepEqual(parseSpecies("deer,unicorn,elk", ids), ["deer", "elk"]);
+  assert.deepEqual(parseSpecies("deer,elk,pronghorn,wolf,turkey", ids), [
+    "deer",
+    "elk",
+    "pronghorn",
+    "wolf",
+  ]);
+  assert.equal(parseSpecies("unicorn", ids), null);
+  assert.equal(parseSpecies("", ids), null);
+  // A bad mode falls back rather than breaking the page.
+  assert.equal(stateFromQuery("mode=both", defaults).speciesMode, "any");
+  assert.deepEqual(stateFromQuery("species=deer,elk,unicorn", defaults, { speciesIds: ids }).species, [
+    "deer",
+    "elk",
+  ]);
+  assert.equal(
+    availabilityPath(s),
+    "/api/availability?species=deer%2Celk&species_mode=all&start=2026-10-16&end=2026-10-18&weapon=all&tags=mine&include_untagged=0",
+  );
+});
+
+test("T-27: toggleSpecies never goes past 4 or down to none", () => {
+  assert.deepEqual(toggleSpecies(["deer"], "elk"), ["deer", "elk"]);
+  assert.deepEqual(toggleSpecies(["deer", "elk"], "deer"), ["elk"]);
+  // The last species can't be unselected, and a 5th is refused: same array back.
+  const one = ["deer"];
+  assert.equal(toggleSpecies(one, "deer"), one);
+  const four = ["deer", "elk", "pronghorn", "wolf"];
+  assert.equal(toggleSpecies(four, "turkey"), four);
+  assert.equal(MAX_SPECIES, 4);
+  assert.deepEqual(primarySpecies({ species: ["elk", "deer"] }), "elk");
+});
+
 test("validISO rejects impossible dates", () => {
   assert.equal(validISO("2026-10-16"), "2026-10-16");
   assert.equal(validISO("2028-02-29"), "2028-02-29");
@@ -96,12 +146,12 @@ test("validISO rejects impossible dates", () => {
 test("availabilityPath carries every filter in §6 form", () => {
   assert.equal(
     availabilityPath(defaults),
-    "/api/availability?species=deer&start=2026-10-16&end=2026-10-18&weapon=all&tags=mine&include_untagged=0",
+    "/api/availability?species=deer&species_mode=any&start=2026-10-16&end=2026-10-18&weapon=all&tags=mine&include_untagged=0",
   );
   const p = availabilityPath({ ...defaults, tags: [2, 5], includeUntagged: true, weapon: "rifle" });
   assert.equal(
     p,
-    "/api/availability?species=deer&start=2026-10-16&end=2026-10-18&weapon=rifle&tags=2%2C5&include_untagged=1",
+    "/api/availability?species=deer&species_mode=any&start=2026-10-16&end=2026-10-18&weapon=rifle&tags=2%2C5&include_untagged=1",
   );
   assert.ok(availabilityPath({ ...defaults, tags: [] }).includes("tags=&"));
 });

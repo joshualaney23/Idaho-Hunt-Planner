@@ -202,6 +202,42 @@ test("tooltip content follows §4.3: unit, elk zone, season badges, source page"
   assert.equal(unitLabel("4A", "untagged"), "Unit 4A, open with a tag you don't hold");
 });
 
+test("T-27: a multi-species tooltip groups seasons under a species header", () => {
+  const labels = { species: { deer: { label: "Deer", icon: "🦌" }, elk: { label: "Elk", icon: "🫎" } } };
+  const s = (over) => ({
+    weapon: "any",
+    sex: "either",
+    start: "2026-10-10",
+    end: "2026-10-31",
+    status: "open",
+    reasons: [],
+    restrictions: [],
+    ...over,
+  });
+  const unit = {
+    status: "restricted",
+    reasons: ["elk:partial_dates"],
+    days_open: 1,
+    per_species: {
+      deer: { status: "open", reasons: [], days_open: 2 },
+      elk: { status: "restricted", reasons: ["partial_dates"], days_open: 1 },
+    },
+    seasons: [s({ species: "deer", id: 1 }), s({ species: "elk", id: 2, reasons: ["partial_dates"] })],
+  };
+  const nodes = tooltipContent("39", unit, GMU.units["39"], labels);
+  const text = nodes.map((n) => n.textContent);
+  assert.equal(text[1], "Elk zone: Boise River · restricted");
+  assert.match(text[2], /^🦌 Deer open$/);
+  assert.equal(nodes[2].dataset.species, "deer");
+  assert.match(text[4], /^🫎 Elk restricted$/);
+  // Each season sits under its own species header, in the payload's order.
+  assert.equal(nodes.length, 6);
+  assert.match(text[3], /Oct 10 – Oct 31/);
+  // A species with no overlapping season says so instead of leaving a bare header.
+  const none = { ...unit, seasons: [s({ species: "deer", id: 1 })] };
+  assert.equal(tooltipContent("39", none, GMU.units["39"], labels)[5].textContent, "No season for your tags and dates.");
+});
+
 test("legend shows a count per status; untagged only when the toggle is on", () => {
   const sum = { open: 68, restricted: 13, untagged: 4, closed: 15 };
   assert.deepEqual(
@@ -216,6 +252,10 @@ test("legend shows a count per status; untagged only when the toggle is on", () 
     legendItems(sum, true).map((i) => i.status),
     ["open", "restricted", "untagged", "closed"],
   );
+  // T-27: in `all` mode green means every selected species is open.
+  assert.match(legendItems(sum, false, { mode: "all", speciesCount: 2 })[0].text, /every selected species open/);
+  assert.match(legendItems(sum, false, { mode: "any", speciesCount: 2 })[0].text, /full range/);
+  assert.match(legendItems(sum, false, { mode: "all", speciesCount: 1 })[0].text, /full range/);
   const el = doc.createElement("div");
   renderLegend(el, sum, true);
   assert.equal(el.children.length, 4);

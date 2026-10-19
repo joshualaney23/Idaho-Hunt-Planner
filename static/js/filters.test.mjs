@@ -10,6 +10,7 @@ import {
   breadcrumbParts,
   createFilters,
   selectedTagIds,
+  matchPhrase,
   speciesChipLabel,
   tagFilter,
   tagsForSpecies,
@@ -29,7 +30,8 @@ const TAGS = [
   { id: 5, species_id: null, icon: "🎟️", tag_type_label: "Controlled hunt tag", hunt_number: "1001", filled: false },
 ];
 const STATE = {
-  species: "deer",
+  species: ["deer"],
+  speciesMode: "any",
   start: "2026-10-16",
   end: "2026-10-18",
   weapon: "all",
@@ -67,7 +69,19 @@ test("breadcrumb: species · tags · weapon · range", () => {
   const one = { ...STATE, tags: [2], weapon: "archery", start: "2026-11-02", end: "2026-11-02" };
   assert.deepEqual(breadcrumbParts(one, SPECIES, TAGS), ["🦌 Deer", "🦌 White-tailed deer tag", "Archery", "Nov 2"]);
   assert.equal(breadcrumbParts({ ...STATE, tags: [] }, SPECIES, TAGS)[1], "No tags selected");
-  assert.equal(breadcrumbParts({ ...STATE, species: "black_bear" }, SPECIES, [])[1], "No tags yet");
+  assert.equal(breadcrumbParts({ ...STATE, species: ["black_bear"] }, SPECIES, [])[1], "No tags yet");
+});
+
+test("T-27: the breadcrumb joins the species and says how they're matched", () => {
+  const both = { ...STATE, species: ["deer", "elk"], speciesMode: "all" };
+  assert.deepEqual(breadcrumbParts(both, SPECIES, TAGS).slice(0, 2), ["🦌 Deer + 🫎 Elk", "both open"]);
+  assert.equal(breadcrumbParts({ ...both, speciesMode: "any" }, SPECIES, TAGS)[1], "any open");
+  assert.equal(matchPhrase({ ...both, species: ["deer", "elk", "black_bear"] }), "all 3 open");
+  // One species: no match phrase at all, so T-07's breadcrumb is unchanged.
+  assert.equal(matchPhrase(STATE), null);
+  assert.equal(breadcrumbParts(STATE, SPECIES, TAGS).length, 4);
+  // The tag list is the union over the selection (elk tag 4 joins the deer ones).
+  assert.deepEqual(tagsForSpecies(TAGS, ["deer", "elk"]).map((t) => t.id), [1, 2, 4, 5]);
 });
 
 test("species chip labels use the §4.2 short names", () => {
@@ -76,7 +90,7 @@ test("species chip labels use the §4.2 short names", () => {
   assert.equal(FEATURED.length, 12);
 });
 
-function mount(state = STATE, ctx = { tags: TAGS, permits: ["archery", "hip"], year: 2026 }) {
+function mount(state = STATE, ctx = { tags: TAGS, permits: ["archery", "hip"], year: 2026 }, speciesList = SPECIES) {
   const container = doc.createElement("div");
   doc.body.appendChild(container);
   const box = doc.createElement("input");
@@ -85,7 +99,7 @@ function mount(state = STATE, ctx = { tags: TAGS, permits: ["archery", "hip"], y
   const patches = [];
   const permits = [];
   const f = createFilters(container, {
-    species: SPECIES,
+    species: speciesList,
     state,
     today: WED,
     untaggedBox: box,
@@ -106,7 +120,8 @@ test("species chips: enabled only with published seasons; More reveals the rest"
   assert.deepEqual(state, { deer: false, elk: true, black_bear: false, "f-species-more": false });
   sp.find((b) => b.dataset.value === "elk").click(); // disabled: no-op
   sp.find((b) => b.dataset.value === "black_bear").click();
-  assert.deepEqual(patches, [{ species: "black_bear", tags: null }]);
+  // Multi-select since T-27: a second chip adds, it doesn't replace.
+  assert.deepEqual(patches, [{ species: ["deer", "black_bear"], tags: null }]);
   const more = byId("f-species-more");
   assert.equal(more.getAttribute("aria-expanded"), "false");
   more.click();
@@ -117,7 +132,7 @@ test("species chips: enabled only with published seasons; More reveals the rest"
 });
 
 test("a species without published seasons explains why the map is empty", () => {
-  mount({ ...STATE, species: "elk" }, { tags: TAGS, permits: [], year: 2026 });
+  mount({ ...STATE, species: ["elk"] }, { tags: TAGS, permits: [], year: 2026 });
   const hint = byId("f-species-hint");
   assert.equal(hint.hidden, false);
   assert.match(hint.textContent, /No published Elk seasons yet/);
@@ -125,6 +140,48 @@ test("a species without published seasons explains why the map is empty", () => 
   const elk = chips("f-species").find((b) => b.dataset.value === "elk");
   assert.equal(elk.disabled, false);
   assert.equal(elk.getAttribute("aria-pressed"), "true");
+});
+
+test("T-27: Match appears at 2 species, the 5th chip is refused, the last one can't be dropped", () => {
+  const { patches, f } = mount();
+  // One species: no Match control on screen.
+  assert.equal(byId("f-match-box").hidden, true);
+  const chip = (v) => chips("f-species").find((b) => b.dataset.value === v);
+  // Unselecting the only species is a no-op and the chip stays pressed.
+  chip("deer").click();
+  assert.deepEqual(patches, []);
+  assert.equal(chip("deer").getAttribute("aria-pressed"), "true");
+
+  f.update({ ...STATE, species: ["deer", "black_bear"] }, { tags: TAGS, year: 2026 });
+  assert.equal(byId("f-match-box").hidden, false);
+  const match = chips("f-match");
+  assert.deepEqual(match.map((b) => b.textContent), ["Any", "All"]);
+  assert.deepEqual(match.map((b) => b.getAttribute("aria-pressed")), ["true", "false"]);
+  match[1].click();
+  assert.deepEqual(patches.at(-1), { speciesMode: "all" });
+
+  // Dropping back to one species returns to `any` (the control disappears).
+  f.update({ ...STATE, species: ["deer", "black_bear"], speciesMode: "all" }, { tags: TAGS, year: 2026 });
+  chip("black_bear").click();
+  assert.deepEqual(patches.at(-1), { species: ["deer"], tags: null, speciesMode: "any" });
+});
+
+test("T-27: a 5th species is refused with a hint instead of silently replacing one", () => {
+  const five = [...SPECIES, { id: "turkey", label: "Turkey", icon: "🦃", published_seasons: 9 }];
+  const four = ["deer", "black_bear", "moose", "turkey"];
+  const { patches, f } = mount({ ...STATE, species: four }, { tags: TAGS, year: 2026 }, five);
+  f.update({ ...STATE, species: four }, { tags: TAGS, year: 2026 });
+  const chip = (v) => chips("f-species").find((b) => b.dataset.value === v);
+  const spare = chip("elk"); // the only unselected chip, and it is enabled once pressed
+  assert.equal(spare.disabled, true); // no published seasons and not selected
+  spare.disabled = false; // pretend elk has seasons: the limit, not publishing, must stop it
+  spare.click();
+  assert.deepEqual(patches, []);
+  const hint = byId("f-species-hint");
+  assert.equal(hint.hidden, false);
+  assert.match(hint.textContent, /Up to 4 species at a time/);
+  // The chip that was pressed is back off, so the chips still mirror the state.
+  assert.equal(chip(spare.dataset.value).getAttribute("aria-pressed"), "false");
 });
 
 test("tag chips toggle the tag filter; no tags shows the add-one link", () => {
@@ -140,7 +197,7 @@ test("tag chips toggle the tag filter; no tags shows the add-one link", () => {
   assert.deepEqual(patches.at(-1), { tags: [1, 5] });
   assert.equal(byId("f-tags-manage").textContent, "Manage tags");
   assert.equal(byId("f-tags-manage").href, "#/tags");
-  f.update({ ...STATE, species: "black_bear" }, { tags: TAGS.filter((t) => t.species_id), year: 2026 });
+  f.update({ ...STATE, species: ["black_bear"] }, { tags: TAGS.filter((t) => t.species_id), year: 2026 });
   assert.equal(byId("f-tags"), null);
   assert.equal(byId("f-tags-manage").textContent, "No tags yet → add one");
 });
