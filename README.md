@@ -2,6 +2,8 @@
 
 A local, single-user web app for planning Idaho hunts. It parses the official IDFG regulation PDFs into SQLite, stores the tags and permits you hold, and shows an Idaho GMU map of where you can legally hunt in a date range.
 
+![Idaho Hunt Planner showing the GMU map, filters and open-units table](docs/images/app-map-view.png)
+
 > **Disclaimer: verify against the official regulations.** This is a planning aid, not legal advice. Parsed data can be wrong or out of date. Before every hunt, confirm seasons, units, weapons, and rules in the official [Idaho Fish and Game regulations](https://idfg.idaho.gov/rules) and any emergency closures. You are responsible for hunting legally.
 
 ## Setup
