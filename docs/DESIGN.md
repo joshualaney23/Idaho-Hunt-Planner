@@ -678,9 +678,9 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
 | **3 – Upland birds & turkey** | Forest grouse, quail, chukar, partridge, sage/sharp-tailed grouse, pheasant via county areas; turkey general + controlled | T-14, T-23 |
 | **4 – Small game, furbearers, predatory, falconry** | Cottontail, snowshoe hare, red squirrel, badger/bobcat/red fox (hunting), predatory/unprotected, falconry | T-24 |
 | **5 – Moose/sheep/goat & migratory birds** | Upload the MSG and Migratory brochures; all their hunts pass the accuracy gate | T-25, T-26 |
-| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, White-tailed & Mule deer filters, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30, T-31, T-32 |
+| **6 – Polish** | QA report, optional Hunt Planner spot-check, zoom, print, settings, multi-species filter, White-tailed & Mule deer filters, Bull & Cow elk filters, "Get latest regs" button, row highlight on the source PDF (explore), one-step install script and macOS launcher | T-19, T-20, T-21, T-27, T-28, T-29, T-30, T-31, T-32, T-33 |
 
-Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; {T-06, T-07, T-08, T-09, T-17c} → T-31 ; {T-08, T-21, T-27} → T-32 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
+Dependency graph: `T-01 → {T-02, T-04} ; T-02 → {T-03 → T-07, T-17b} ; T-04 → {T-05, T-06, T-09, T-10} ; T-05 → T-06 → T-07 → T-08 ; T-10 → {T-11, T-12, T-13, T-14, T-17a, T-18} ; T-17a → T-17b → T-17c ; T-09 → T-17c ; {T-11, T-17a} → T-22a → {T-22b, T-22c} ; T-22c → {T-22d, T-22e, T-22f} ; T-17b → T-22f ; {T-10, T-11, T-22b} → T-15a ; {T-03, T-10, T-22b} → T-15b ; {T-15a, T-15b, T-22a, T-22b} → T-15c ; {T-22b, T-15c} → T-22g ; T-15c → T-16 ; {T-06, T-07, T-08, T-09, T-17c} → T-31 ; {T-06, T-07, T-08, T-12, T-17c, T-31} → T-33 ; {T-08, T-21, T-27} → T-32 ; T-14 → {T-23, T-24, T-26} ; T-17b → {T-23, T-25, T-26} ; T-08 → T-27 ; {T-10, T-15c, T-18} → T-28 ; {T-10, T-15c} → T-29 ; T-01 → T-30 ; T-19 spans all`.
 
 ---
 
@@ -1224,6 +1224,41 @@ Before building, confirm the matrix against the Big Game brochure's tag-definiti
 
 ---
 
+### T-33 · Elk sex filters: Bull elk & Cow elk (tag-aware)
+**Depends on:** T-06, T-07, T-08, T-12, T-17c, T-31 · **Size:** M
+**Description:** Add two species filters, **Bull elk** and **Cow elk**, next to the existing 🫎 Elk chip. Each one shows only the elk seasons whose sex matches what the user is hunting. The existing **Elk** chip keeps its current meaning (every elk season, any sex) and is unchanged for every user. Together the three options are: Cow only, Bull only, and Elk (all).
+
+Today the Elk chip treats every elk season the same. A hunter who holds an elk tag can't tell at a glance which units are open for a bull hunt and which are open for a cow hunt, even though the seasons carry `antlered` and `antlerless` sex values.
+
+**Tag validity matrix (the rule the filters apply):**
+
+| User holds | Season sex | Valid for Bull filter? | Valid for Cow filter? |
+|---|---|---|---|
+| Elk A or B tag (zone, T-12) | `antlered` | yes | no |
+| Elk A or B tag | `antlerless` | no | yes |
+| Elk A or B tag | `either` | yes | yes |
+| Controlled elk hunt tag (T-17c) | the hunt's own sex | yes, if antlered or either | yes, if antlerless or either |
+
+Before building, confirm the matrix against the Big Game brochure's elk tag and sex wording (bull/antlered vs. cow/antlerless, "either sex", and whether an Elk A or B tag covers both). If the brochure says otherwise, change the matrix here and in §7 in the same PR and flag it. Never guess (D3).
+
+**Design:**
+- **Virtual species ids.** `elk_bull` and `elk_cow` are *filter* ids, not new rows in `species`. They resolve to `species = elk` plus a sex test. This keeps the schema unchanged (no migration) and lets T-27's list syntax work unchanged (`species=elk_cow,deer`). `/api/meta` lists them with their labels and the 🫎 icon.
+- **Engine (§7).** Add a sex step before the tag check, next to the sub-species step from T-31. For `elk_bull`, keep a season only if its `sex` is `antlered` or `either`. For `elk_cow`, keep a season only if its `sex` is `antlerless` or `either`. A season the filter removes is a hard exclusion, like the weapon filter, so the unit shows `closed` (not `untagged`) under that filter.
+- **Animal-limit codes.** `antlered_only`, `antlerless_only`, `spike_only` and `brow_tined` stay informational (§5.1). Under the matching sex filter they are satisfied, so they don't appear in `reasons`. Other narrowing codes still do.
+- **UI (§4.2).** Add the two chips after Elk, in the same single-select group as today (T-27 makes the group multi-select; this ticket must not block it). When a sex filter is active, the Viewing line reads e.g. `🫎 Bull elk · open tags only`.
+- **URL state.** `?species=elk_cow` round-trips through `state.js` and back/forward.
+
+**Acceptance criteria:**
+- On a seeded DB holding a published 2026 elk season with `sex = antlered` (a bull unit) and another with `sex = antlerless` (a cow unit), with only an **Elk A** tag held, `species=elk_bull` shows the bull unit as `open` and the cow unit as `closed`. `species=elk_cow` shows the reverse.
+- A season with `sex = either` is `open` under both `elk_bull` and `elk_cow`.
+- `species=elk` returns the same per-unit status as before this ticket on the same DB (regression test). A unit that is open under `elk_bull` or `elk_cow` is never worse under `elk`.
+- `include_untagged=1` under a sex filter shows only seasons valid for that sex; the other sex's seasons are not listed as `untagged`.
+- An unknown virtual id still returns 400 `{error:{code:"unknown_species"}}`. `/api/meta` lists `elk_bull` and `elk_cow` with labels.
+- Node twin tests cover the chip group (Elk, Bull elk and Cow elk all render, one is selected at a time, selecting one updates `?species=`), and the URL round-trips through back/forward.
+- Chrome check (real browser, per AGENT_CONTEXT.md): with an Elk A tag and a seeded DB, clicking Bull elk then Cow elk changes the map, and Back restores the previous chip. Lighthouse accessibility for `#/` is unchanged.
+- The §7 matrix is confirmed against the brochure text, and the PR quotes the wording it relied on. Any deviation from the table above is listed in the PR.
+
+
 ## 13. Annual workflow (what using it looks like)
 
 1. **Spring (Big Game regs drop):** open the app → 📥 Regulations → drop `seasons-rules-big-game-2027.pdf` → fix anything the Accuracy panel flags, review changed rows using the side-by-side PDF and the "changed since 2026" diff → **Publish**. (The Upland brochure covers two years, so it's uploaded every other year: 2026, 2028, ….)
@@ -1300,6 +1335,7 @@ Before building, confirm the matrix against the Big Game brochure's tag-definiti
 | T-30 | [#72](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/72) | One-step install and launch (setup script + macOS double-click) |
 | T-31 | [#94](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/94) | Deer sub-species filters: White-tailed & Mule deer (tag-aware) |
 | T-32 | [#98](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/98) | Unit Brief: show only the selected species (setting) |
+| T-33 | [#101](https://github.com/joshualaney23/Idaho-Hunt-Planner/issues/101) | Elk sex filters: Bull elk & Cow elk (tag-aware) |
 
 **Kickoff prompt template:**
 ```
