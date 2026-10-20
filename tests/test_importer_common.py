@@ -215,6 +215,7 @@ QUALIFIER_CASES: list[tuple[str, str]] = [
     ("Private land only", "private_land_only"),
     ("In a Portion of Unit", "portion_of_unit"),
     ("(Outfitter allocated only)", "outfitter_only"),
+    ("Upland Game Bird Permit required on this WMA", "wmb_permit_on_wma"),
     ("Chronic Wasting Disease Testing Required", "cwd_testing"),
     ("Motorized Hunting Rule Applies", "motorized_rule"),
     ("Second deer tag may not be used", "second_tag_prohibited"),

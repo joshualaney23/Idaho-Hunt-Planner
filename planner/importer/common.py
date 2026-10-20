@@ -300,6 +300,11 @@ QUALIFIER_PATTERNS: tuple[tuple[str, str], ...] = (
     (r"expanded\s+hunting\s+methods\s+not\s+allowed", "general_methods"),
     (r"expanded\s+hunting\s+methods\s+allowed", "expanded_methods"),
     (r"general\s+hunting\s+rules\s+apply", "general_methods"),
+    # §12 T-14: an Idaho hunting licence covers every upland bird, but pheasants on
+    # the Upland Game Bird Permit Release Areas (the WMAs the brochure stocks) also
+    # need the `wmb` permit. It changes nothing about where or when the season is
+    # open, so it is informational (§5.1).
+    (r"upland\s+game\s+bird\s+permit", "wmb_permit_on_wma"),
 )
 _QUALIFIER_RES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(p, re.IGNORECASE), code) for p, code in QUALIFIER_PATTERNS

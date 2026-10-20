@@ -62,6 +62,8 @@ One line per path: what it owns, and the ticket that brought it. Open the file f
 | `planner/importer/deer.py` | General deer tables, both paths (ruled tables vs. word positions) (T-11) |
 | `planner/importer/bear_lion_wolf.py` | General black bear, mountain lion and wolf season tables (one shared shape), the license-year clipping of recurring/spring windows, and the printed method codes of §5.1 (T-13) |
 | `planner/importer/elk.py` | Elk A/B zone seasons from the rotated calendar pages: the drawn skeleton (path A) vs. word geometry (path B), `zone_units` narrowing, printed tag quotas (T-12) |
+| `planner/importer/upland.py` | Upland game bird sections of the Upland brochure (prose, not tables): the text-layer path vs. the body-column word path, and the §5.2 area → `season_units` resolution from `static/data/county_units.json` (T-14) |
+| `planner/importer/checks/upland.py` | The upland invariants: `county_tokens_resolve`, `area_units_resolved`, `resident_only_windows`, `deferred_season` (T-14) |
 | `planner/importer/controlled.py` | Controlled-hunt tables for every species, data-driven per `Brochure` so T-23/25/26 reuse it (T-17a) |
 | `planner/importer/fetch_idfg.py` | "Get latest regs" discovery: the IDFG source-page list, the filename → kind/year allowlist, link extraction, and `HttpFetcher` (the app's only socket — https + IDFG hosts, 1 req/2 s, 50 MB, 60 s; callers inject it) (T-28) |
 | `planner/importer/hunt_areas.py` | Two-column `CONTROLLED HUNT AREA DESCRIPTIONS` pages → `hunt_areas.description`, and every controlled season's `season_units` resolved from `static/data/hunt_area_coverage/<year>.json` (full ≥ 0.98, else partial + `coverage_frac`); no polygon ⇒ the description's own unit tokens (T-17b) |

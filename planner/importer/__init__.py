@@ -629,5 +629,6 @@ from planner.importer import (  # noqa: E402,F401  (side effect)
     deer,
     elk,
     hunt_areas,
+    upland,
 )
 from planner.importer.checks import SectionFacts  # noqa: E402,F401  (re-exported for parsers)

@@ -66,6 +66,12 @@ RESTRICTIONS: Final[dict[str, Restriction]] = {
         "severity": "informational",
     },
     "general_methods": {"label": "General hunting rules apply", "severity": "informational"},
+    # §12 T-14 — pheasant on an Upland Game Bird Permit Release Area (a WMA) needs
+    # the `wmb` permit on top of the hunting licence; the season itself is unchanged.
+    "wmb_permit_on_wma": {
+        "label": "Upland Game Bird Permit required on WMAs",
+        "severity": "informational",
+    },
     "see_notes": {"label": "See notes", "severity": "narrowing"},
 }
 
