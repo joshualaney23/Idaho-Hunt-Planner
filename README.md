@@ -8,6 +8,8 @@ A local, single-user web app for planning Idaho hunts. It parses the official ID
 
 ## Setup
 
+### macOS
+
 Requires Python 3.12. On macOS the system `python3` may be older, so install one with `brew install python@3.12` if needed.
 
 ```bash
@@ -28,6 +30,24 @@ The regulation download runs automatically only on a first install (an empty dat
 ./scripts/setup.sh --no-fetch-regs   # skip the IDFG check entirely
 PLANNER_PORT=6060 ./scripts/setup.sh # any port
 ```
+
+### Windows
+
+Download **`IdahoHuntPlanner-Setup-<version>.exe`** and double-click it. Nothing else is needed — Python, Flask and the PDF parser are inside the installer, and it installs for your user only (no administrator prompt).
+
+Get it from the **Windows installer** workflow on [GitHub Actions](https://github.com/joshualaney23/Idaho-Hunt-Planner/actions/workflows/windows-installer.yml): open the newest successful run and download the `IdahoHuntPlanner-Setup` artifact.
+
+After installing, start **Idaho Hunt Planner** from the Start menu. It opens a small console window (that's where the first-run regulation download reports what it staged) and your browser at <http://127.0.0.1:5050/>. Starting it twice just reopens the page instead of launching a second server.
+
+Your data — the SQLite database, the downloaded PDFs and the page cache — lives in `%LOCALAPPDATA%\IdahoHuntPlanner` (set `IHP_DIR` to move it). Uninstalling removes the program and leaves that folder alone.
+
+```bat
+"%LOCALAPPDATA%\Programs\Idaho Hunt Planner\IdahoHuntPlanner.exe" --no-browser    REM server only
+"%LOCALAPPDATA%\Programs\Idaho Hunt Planner\IdahoHuntPlanner.exe" --fetch-regs    REM always check IDFG
+"%LOCALAPPDATA%\Programs\Idaho Hunt Planner\IdahoHuntPlanner.exe" --port 6060     REM any port
+```
+
+Building the installer yourself (on Windows) is two commands — see [`packaging/windows/README.md`](packaging/windows/README.md).
 
 <details>
 <summary>Manual setup (fallback)</summary>
