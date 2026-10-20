@@ -2,6 +2,7 @@ pytest
 ruff
 shapely>=2
 pyproj
+pyshp
 requests
 pypdf
 pypdfium2
