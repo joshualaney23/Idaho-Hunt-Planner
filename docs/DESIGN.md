@@ -661,7 +661,10 @@ The app tells Josh where he can legally hunt, so a wrong date or unit is worse t
    Label point = `shapely.ops.polylabel`.
 4. Target size under 150 KB. Print a warning if any unit in the regs DB is missing from geometry.
 
-`scripts/build_county_overlay.py`: download US Census cartographic-boundary counties (cb_*_us_county_500k, filter STATEFP=16), project, intersect with GMUs, and write `{"Ada":{"38":0.62,"39":0.04,…},…}` as fractions of each **unit's** area.
+`scripts/build_county_overlay.py` (T-14): download US Census cartographic-boundary counties (`cb_<vintage>_us_county_500k.zip`, read with `pyshp`, filter STATEFP=16), project to EPSG:8826, intersect with the MapServer/3 GMUs, and write `static/data/county_units.json` — the fraction of each **unit's** area inside each county:
+`{"vintage":2024,"counties":{"Ada":{"38":0.4045,"39":0.0769,…},…},"generated":"…","source":"…"}` (the county map is wrapped with its provenance, like `gmu.json`; `--check` ignores `generated`). Two rules the implementation settled:
+- **Drop a (county, GMU) pair below 0.001 of the GMU.** County and GMU borders are digitised independently, so nearly every shared border laps by a sliver; §5.2's own floor is 2 %, so this cut removes noise without hiding anything the resolver would use.
+- **Every unit's fractions must sum to ~1.0**, because the 44 counties tile the state. `summarize()` reports any unit that doesn't — that arithmetic is the build's own correctness check, and a committed-file test asserts it.
 
 `scripts/build_hunt_area_coverage.py --year YYYY` (T-17b): same overlay method for controlled-hunt areas — MapServer/4 polygons × GMUs → `static/data/hunt_area_coverage/<year>.json`, committed like `gmu.json`. Three rules the implementation settled (§12 T-17b):
 - **Page the service.** An unpaged MapServer/4 query returns 2000 of its 2162 features with `exceededTransferLimit: true` and no error — a plausible-but-wrong year inventory. Years are inventoried with a `returnGeometry=false` query first, so geometry is downloaded only for the year each species actually uses (~4 min for deer+elk+pronghorn).
