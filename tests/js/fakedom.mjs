@@ -189,6 +189,7 @@ function matches(el, sel) {
 
 export function installFakeDom() {
   const body = new FakeElement("body");
+  const docListeners = {};
   const document = {
     body,
     activeElement: null,
@@ -198,6 +199,22 @@ export function installFakeDom() {
       for (const e of body.walk()) if (e.id === id) return e;
       return null;
     },
+    // Document-level listeners (T-31's menu closes on an outside click or Escape).
+    // There is no bubbling here, so a test dispatches straight on the document and
+    // passes the `target`/`key` the handler reads.
+    addEventListener: (type, fn) => {
+      (docListeners[type] ||= []).push(fn);
+    },
+    removeEventListener: (type, fn) => {
+      const l = docListeners[type];
+      if (l && l.includes(fn)) l.splice(l.indexOf(fn), 1);
+    },
+    dispatch: (type, init = {}) => {
+      const ev = { type, target: body, preventDefault() {}, stopPropagation() {}, ...init };
+      for (const fn of [...(docListeners[type] || [])]) fn(ev);
+      return ev;
+    },
+    listenerCount: (type) => (docListeners[type] || []).length,
   };
   globalThis.document = document;
   return document;

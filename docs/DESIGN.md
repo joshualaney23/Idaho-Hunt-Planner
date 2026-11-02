@@ -225,7 +225,7 @@ body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);fon
 └──────────────────────────────┴─────────────────────────────────────────────────────────────┘
 ```
 Below 1100 px the map and table stack vertically. Below 700 px chip rows scroll horizontally.
-- Species chips are single-select through T-08. T-27 makes them multi-select (max 4) and adds a `Match [any|all]` control, so the map can show only the units where **every** selected species is huntable in the range. T-31 adds **White-tailed** and **Mule** chips right after Deer, in the same (multi-select) group.
+- Species chips are single-select through T-08. T-27 makes them multi-select (max 4) and adds a `Match [any|all]` control, so the map can show only the units where **every** selected species is huntable in the range. T-31 gives **Deer** a caret that opens a small menu — *All deer* / *White-tailed only* / *Mule deer only* — and the one chip then reads `Deer · White-tailed`; the sub-species are never chips of their own, so they can't be combined with each other.
 
 ### 4.3 Map behavior
 - **Fill colors**: `open` = `--open` (green), `restricted` = `--restricted` (yellow), `closed` = `--closed`. Units that are open for a tag the user doesn't hold, when the "show untagged" toggle is on: closed fill with a **2 px dashed `--gold` stroke**.
@@ -1196,7 +1196,7 @@ Before building, confirm the matrix against the Big Game brochure's tag-definiti
 - **Virtual species ids.** `deer_whitetail` and `deer_mule` are *filter* ids, not new rows in `species`. They resolve to `species = deer` plus a sub-species test. This keeps the schema unchanged (no migration) and lets T-27's list syntax work unchanged (`species=deer_mule,elk`). `/api/meta` lists them with their labels and the 🦌 icon.
 - **Engine (§7).** Add a sub-species step before the tag check. For `deer_whitetail`, keep a season only if it has no `mule_deer_only` restriction. For `deer_mule`, keep a season only if it has no `whitetail_only` restriction. A held tag is then valid only where the matrix above says. A season the filter removes is a hard exclusion, like the weapon filter, so the unit shows `closed` (not `untagged`) under that filter.
 - **Narrowing under the matching filter.** Choosing White-tailed deer already satisfies `whitetail_only`, so it no longer narrows a unit under that filter. The same holds for `mule_deer_only` under Mule deer. The tooltip still names the restriction, and the Deer chip (no sub-filter) keeps today's behavior.
-- **UI (§4.2).** Add the two chips after Deer, in the same single-select group as today (T-27 makes the group multi-select; this ticket must not block it). When a deer sub-filter is active, the Viewing line reads e.g. `🦌 White-tailed deer · open tags only`.
+- **UI (§4.2).** Deer stays **one** chip, carrying a small caret that opens a menu: *All deer* (default) / *White-tailed only* / *Mule deer only*. Picking one swaps the chip's filter id and the chip reads `Deer · White-tailed`; the sub-species never get chips of their own (they are mutually exclusive, and three deer chips in a multi-select group read as combinable when they are not). The chip itself still toggles Deer in and out of T-27's multi-select selection. When a deer sub-filter is active, the Viewing line reads e.g. `🦌 White-tailed deer · open tags only`.
 - **URL state.** `?species=deer_mule` round-trips through `state.js` and back/forward.
 
 **Acceptance criteria:**
@@ -1206,8 +1206,8 @@ Before building, confirm the matrix against the Big Game brochure's tag-definiti
 - Under `deer_whitetail`, `whitetail_only` does not appear in a unit's `reasons` (it is satisfied), while `partial_dates` and other narrowing codes still do.
 - `include_untagged=1` under a sub-filter shows only seasons valid for that sub-species; the other sub-species' seasons are not listed as `untagged`.
 - An unknown virtual id still returns 400 `{error:{code:\"unknown_species\"}}`. `/api/meta` lists `deer_whitetail` and `deer_mule` with labels.
-- Node twin tests cover the chip group (both chips render, one is selected at a time, selecting one updates `?species=`), and the URL round-trips through back/forward.
-- Chrome check (real browser, per AGENT_CONTEXT.md): with a Regular tag and a seeded DB, clicking White-tailed deer then Mule deer changes the map, and Back restores the previous chip. Lighthouse accessibility for `#/` is unchanged.
+- Node twin tests cover the Deer chip's menu (one Deer chip, three menu items, exactly one ticked, picking one updates `?species=` and the chip's label), and the URL round-trips through back/forward.
+- Chrome check (real browser, per AGENT_CONTEXT.md): with a Regular tag and a seeded DB, picking White-tailed deer then Mule deer from the Deer menu changes the map, and Back restores the previous pick. Lighthouse accessibility for `#/` is unchanged.
 - The §7 matrix is confirmed against the brochure text, and the PR quotes the wording it relied on. Any deviation from the table above is listed in the PR.
 
 ---
@@ -1254,7 +1254,7 @@ Before building, confirm the matrix against the Big Game brochure's elk tag and 
 - **Virtual species ids.** `elk_bull` and `elk_cow` are *filter* ids, not new rows in `species`. They resolve to `species = elk` plus a sex test. This keeps the schema unchanged (no migration) and lets T-27's list syntax work unchanged (`species=elk_cow,deer`). `/api/meta` lists them with their labels and the 🫎 icon.
 - **Engine (§7).** Add a sex step before the tag check, next to the sub-species step from T-31. For `elk_bull`, keep a season only if its `sex` is `antlered` or `either`. For `elk_cow`, keep a season only if its `sex` is `antlerless` or `either`. A season the filter removes is a hard exclusion, like the weapon filter, so the unit shows `closed` (not `untagged`) under that filter.
 - **Animal-limit codes.** `antlered_only`, `antlerless_only`, `spike_only` and `brow_tined` stay informational (§5.1). Under the matching sex filter they are satisfied, so they don't appear in `reasons`. Other narrowing codes still do.
-- **UI (§4.2).** Add the two chips after Elk, in the same single-select group as today (T-27 makes the group multi-select; this ticket must not block it). When a sex filter is active, the Viewing line reads e.g. `🫎 Bull elk · open tags only`.
+- **UI (§4.2).** Reuse T-31's pattern: Elk stays **one** chip with a caret menu — *All elk* (default) / *Bull elk only* / *Cow elk only* — and the chip reads `Elk · Bull`. Generalise `filters.js`'s deer combo rather than copying it. When a sex filter is active, the Viewing line reads e.g. `🫎 Bull elk · open tags only`.
 - **URL state.** `?species=elk_cow` round-trips through `state.js` and back/forward.
 
 **Acceptance criteria:**
@@ -1263,8 +1263,8 @@ Before building, confirm the matrix against the Big Game brochure's elk tag and 
 - `species=elk` returns the same per-unit status as before this ticket on the same DB (regression test). A unit that is open under `elk_bull` or `elk_cow` is never worse under `elk`.
 - `include_untagged=1` under a sex filter shows only seasons valid for that sex; the other sex's seasons are not listed as `untagged`.
 - An unknown virtual id still returns 400 `{error:{code:"unknown_species"}}`. `/api/meta` lists `elk_bull` and `elk_cow` with labels.
-- Node twin tests cover the chip group (Elk, Bull elk and Cow elk all render, one is selected at a time, selecting one updates `?species=`), and the URL round-trips through back/forward.
-- Chrome check (real browser, per AGENT_CONTEXT.md): with an Elk A tag and a seeded DB, clicking Bull elk then Cow elk changes the map, and Back restores the previous chip. Lighthouse accessibility for `#/` is unchanged.
+- Node twin tests cover the Elk chip's menu (one Elk chip, three menu items, exactly one ticked, picking one updates `?species=` and the chip's label), and the URL round-trips through back/forward.
+- Chrome check (real browser, per AGENT_CONTEXT.md): with an Elk A tag and a seeded DB, picking Bull elk then Cow elk from the Elk menu changes the map, and Back restores the previous pick. Lighthouse accessibility for `#/` is unchanged.
 - The §7 matrix is confirmed against the brochure text, and the PR quotes the wording it relied on. Any deviation from the table above is listed in the PR.
 
 ### T-34 · Unit Brief timeline: label each row with its animal
