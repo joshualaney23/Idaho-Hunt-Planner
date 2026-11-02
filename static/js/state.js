@@ -14,6 +14,14 @@ export const DEBOUNCE_MS = 150;
 // T-27: the species filter is a list of up to 4 ids combined by `speciesMode`.
 export const MAX_SPECIES = 4;
 export const SPECIES_MODES = ["any", "all"];
+// T-31: deer sub-species filter ids → the real species they narrow. Mirrors
+// `planner/engine.py::SUB_SPECIES`; `/api/meta` carries the same mapping as `base`.
+export const SUB_SPECIES = { deer_whitetail: "deer", deer_mule: "deer" };
+
+/** The real species id behind a filter id (`deer_mule` → `deer`), T-31. */
+export function baseSpecies(id) {
+  return SUB_SPECIES[id] || id;
+}
 
 /**
  * The mode a selection uses unless the user says otherwise: picking several species means

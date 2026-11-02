@@ -87,7 +87,11 @@ test("T-27: the breadcrumb joins the species and says how they're matched", () =
 test("species chip labels use the §4.2 short names", () => {
   assert.equal(speciesChipLabel({ id: "black_bear", label: "Black bear" }), "Bear");
   assert.equal(speciesChipLabel({ id: "deer", label: "Deer" }), "Deer");
-  assert.equal(FEATURED.length, 12);
+  // T-31: the two deer sub-species filters sit right after Deer, with short chip labels.
+  assert.deepEqual(FEATURED.slice(0, 3), ["deer", "deer_whitetail", "deer_mule"]);
+  assert.equal(speciesChipLabel({ id: "deer_whitetail", label: "White-tailed deer" }), "White-tailed");
+  assert.equal(speciesChipLabel({ id: "deer_mule", label: "Mule deer" }), "Mule");
+  assert.equal(FEATURED.length, 14);
 });
 
 function mount(state = STATE, ctx = { tags: TAGS, permits: ["archery", "hip"], year: 2026 }, speciesList = SPECIES) {
@@ -183,6 +187,34 @@ test("T-27: a 5th species is refused with a hint instead of silently replacing o
   assert.match(hint.textContent, /Up to 4 species at a time/);
   // The chip that was pressed is back off, so the chips still mirror the state.
   assert.equal(chip(spare.dataset.value).getAttribute("aria-pressed"), "false");
+});
+
+test("T-31: the deer sub-species chips sit after Deer and use the deer tags", () => {
+  const species = [
+    { id: "deer", label: "Deer", icon: "🦌", published_seasons: 235 },
+    { id: "deer_whitetail", label: "White-tailed deer", icon: "🦌", base: "deer", published_seasons: 61 },
+    { id: "deer_mule", label: "Mule deer", icon: "🦌", base: "deer", published_seasons: 174 },
+    { id: "elk", label: "Elk", icon: "🫎", published_seasons: 0 },
+  ];
+  const { patches } = mount(STATE, { tags: TAGS, permits: [], year: 2026 }, species);
+  const sp = chips("f-species").filter((b) => b.dataset.value);
+  assert.deepEqual(sp.map((b) => b.dataset.value), ["deer", "deer_whitetail", "deer_mule", "elk"]);
+  assert.deepEqual(sp.slice(1, 3).map((b) => b.textContent), ["White-tailed", "Mule"]);
+  // Only Deer is on to start with.
+  assert.deepEqual(sp.map((b) => b.getAttribute("aria-pressed")), ["true", "false", "false", "false"]);
+
+  // Pressing one reports it as a state patch, which is what rewrites `?species=`.
+  sp.find((b) => b.dataset.value === "deer_whitetail").click();
+  assert.deepEqual(patches.at(-1), {
+    species: ["deer", "deer_whitetail"],
+    tags: null,
+    speciesMode: "all",
+  });
+
+  // A sub-species filter is hunted with the deer tags, so the tag chips don't change.
+  assert.deepEqual(tagsForSpecies(TAGS, ["deer_mule"]).map((t) => t.id), [1, 2, 5]);
+  assert.deepEqual(tagsForSpecies(TAGS, "deer_whitetail").map((t) => t.id), [1, 2, 5]);
+  assert.equal(breadcrumbParts({ ...STATE, species: ["deer_whitetail"] }, species, TAGS)[0], "🦌 White-tailed deer");
 });
 
 test("tag chips toggle the tag filter; no tags shows the add-one link", () => {

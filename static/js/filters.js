@@ -8,11 +8,14 @@
 import { chipGroup, textEl } from "./ui.js";
 import { fmtShort, parseISO, presets, toISO } from "./dates.js";
 import { activeTags, tagChipLabel } from "./tags.js";
-import { MAX_SPECIES, defaultMode, toggleSpecies, withDate } from "./state.js";
+import { MAX_SPECIES, baseSpecies, defaultMode, toggleSpecies, withDate } from "./state.js";
 
-// §4.2 shows these twelve first; everything else sits behind "More ▾".
+// §4.2 shows these first; everything else sits behind "More ▾".
 export const FEATURED = [
   "deer",
+  // T-31: the two deer sub-species filters sit right after Deer, in the same group.
+  "deer_whitetail",
+  "deer_mule",
   "elk",
   "pronghorn",
   "black_bear",
@@ -25,8 +28,10 @@ export const FEATURED = [
   "pheasant",
   "turkey",
 ];
-const BIG_GAME_COUNT = 6; // a separator follows Wolf
+const BIG_GAME_COUNT = 8; // a separator follows Wolf
 const SHORT = {
+  deer_whitetail: "White-tailed",
+  deer_mule: "Mule",
   black_bear: "Bear",
   mountain_lion: "Lion",
   wolf: "Wolf",
@@ -62,7 +67,8 @@ export function speciesChipLabel(sp) {
  * `species` is one id or, since T-27, a list: then it's the union over the selection.
  */
 export function tagsForSpecies(tags, species) {
-  const want = new Set(Array.isArray(species) ? species : [species]);
+  // A deer sub-species filter (T-31) is hunted with the deer tags, so it maps to `deer`.
+  const want = new Set((Array.isArray(species) ? species : [species]).map(baseSpecies));
   return activeTags(tags).filter((t) => want.has(t.species_id) || t.species_id == null);
 }
 

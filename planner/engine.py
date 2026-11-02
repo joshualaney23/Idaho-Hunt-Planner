@@ -82,6 +82,70 @@ RESTRICTIONS: Final[dict[str, Restriction]] = {
     "see_notes": {"label": "See notes", "severity": "narrowing"},
 }
 
+
+class SubSpeciesFilter(TypedDict):
+    species: str  # the real `species.id` the filter narrows
+    label: str
+    icon: str
+    animal: str  # the `seasons.sub_species` marker this filter hunts
+    excludes: str  # §5.1 code a season may not carry under this filter (hard exclusion)
+    satisfies: str  # §5.1 code the filter itself satisfies, so it stops narrowing
+
+
+# §12 T-31 — deer sub-species filters. These are **filter** ids, not rows in `species`:
+# each resolves to a real species plus a sub-species test, so the schema is unchanged and
+# T-27's list syntax (`species=deer_mule,elk`) keeps working. Confirmed against the 2026
+# Big Game brochure (p. 11): "The regular deer tag is valid for any hunt listed under
+# '2026 Regular Deer Tag Seasons' … and may be used to take a mule deer or white-tailed
+# deer during those seasons. The white-tailed deer tag is valid for white-tailed deer
+# only …" — so a Regular tag hunts both animals except where a season says otherwise, and
+# a White-tailed tag never hunts mule deer.
+SUB_SPECIES: Final[dict[str, SubSpeciesFilter]] = {
+    "deer_whitetail": {
+        "species": "deer",
+        "label": "White-tailed deer",
+        "icon": "🦌",
+        "animal": "whitetail",
+        "excludes": "mule_deer_only",
+        "satisfies": "whitetail_only",
+    },
+    "deer_mule": {
+        "species": "deer",
+        "label": "Mule deer",
+        "icon": "🦌",
+        "animal": "mule_deer",
+        "excludes": "whitetail_only",
+        "satisfies": "mule_deer_only",
+    },
+}
+
+
+def base_species(species_id: str) -> str:
+    """The real `species.id` behind a filter id (`deer_mule` → `deer`), §12 T-31."""
+    sub = SUB_SPECIES.get(species_id)
+    return sub["species"] if sub else species_id
+
+
+def season_sub_species(season: Mapping[str, Any], codes: Iterable[str] | None = None) -> str | None:
+    """The one animal a deer season is for, or ``None`` when it is for any deer.
+
+    Three independent sources, all printed in the brochure: the §5.1 restriction codes the
+    parser read off the row, the `seasons.sub_species` column (T-11 sets `whitetail` on the
+    White-tailed Deer Tag tables), and the tag type — a White-tailed deer tag season is
+    white-tailed only by the tag's own definition (p. 11), whatever the row says.
+    """
+    marks = set(codes if codes is not None else _restrictions(season))
+    if (
+        "whitetail_only" in marks
+        or season.get("sub_species") == "whitetail"
+        or season.get("tag_type_id") == "deer_whitetail"
+    ):
+        return "whitetail"
+    if "mule_deer_only" in marks or season.get("sub_species") == "mule_deer":
+        return "mule_deer"
+    return None
+
+
 # Reasons the engine derives from the query (never printed in a PDF). All of them narrow.
 # `needs_*_permit` appears only on `untagged` seasons (include_untagged): the user holds the
 # tag, and the season would count if they also held the permit.
@@ -264,11 +328,16 @@ def evaluate(
     dropped here. ``unit_ids`` lists every unit to report (units with no season are
     ``closed``); without it, only units with at least one kept season appear.
 
+    ``species`` is a real `species.id` or one of the §12 T-31 sub-species filter ids
+    (:data:`SUB_SPECIES`), which resolve to a species plus a sub-species test.
+
     ``with_spans`` adds each unit's merged open-day spans as ``open_spans`` (a list of
     ``[start_iso, end_iso]`` pairs). Only :func:`evaluate_multi` asks for them — it needs
     the day *sets*, not their counts, to intersect them — and it strips them again, so the
     §6 payload is unchanged by default.
     """
+    sub = SUB_SPECIES.get(species)
+    base_species_id = sub["species"] if sub else species
     start_d, end_d = _as_date(start), _as_date(end)
     if end_d < start_d:
         raise ValueError(f"end {end_d} is before start {start_d}")
@@ -294,7 +363,7 @@ def evaluate(
     spans_by_unit: dict[str, list[tuple[date, date]]] = defaultdict(list)
 
     for s in seasons:
-        if s.get("status", "published") != "published" or s["species_id"] != species:
+        if s.get("status", "published") != "published" or s["species_id"] != base_species_id:
             continue
         s_start, s_end = _as_date(s["start_date"]), _as_date(s["end_date"])
         o_start, o_end = max(s_start, start_d), min(s_end, end_d)
@@ -305,6 +374,10 @@ def evaluate(
         if weapon not in allowed:
             continue  # the weapon filter is a hard exclusion, even with include_untagged
         codes = _restrictions(s)
+        if sub is not None and (season_sub_species(s, codes) or sub["animal"]) != sub["animal"]:
+            # §12 T-31: a season for the *other* deer is a hard exclusion, like the weapon
+            # filter — the unit reads `closed` under this filter, never `untagged`.
+            continue
         if "youth_only" in codes and not youth:
             continue  # §7.2: youth-only seasons are hidden for adults
         if s.get("tag_quota") == 0:
@@ -336,6 +409,10 @@ def evaluate(
             continue
 
         reasons = [c for c in codes if is_narrowing(c)]
+        if sub is not None and sub["satisfies"] in reasons:
+            # Choosing White-tailed deer already satisfies `whitetail_only` (and Mule deer
+            # `mule_deer_only`), so it no longer narrows the unit (§12 T-31).
+            reasons.remove(sub["satisfies"])
         if "whitetail_only" in reasons and tag_ok:
             if any(t["tag_type_id"] == "deer_whitetail" for t in unlocking):
                 reasons.remove("whitetail_only")  # the tag is already WT-only: not narrowing
