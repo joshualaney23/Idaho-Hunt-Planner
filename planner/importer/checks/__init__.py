@@ -220,6 +220,12 @@ class SectionFacts:
     unreadable_titles: Sequence[Any] = ()
     #: `corrections_applied` — physical pages that print a "Corrections" heading.
     corrections_pages: Sequence[int] | None = None
+    #: `corrections_applied` — one entry per parsed correction item (§12 T-25): the hunt
+    #: it names, whether a parsed row carries that hunt, and whether the table agrees.
+    corrections: Sequence[dict[str, Any]] | None = None
+    #: `species_title_agreement` — rows whose hunt-number prefix and printed table title
+    #: name different species (§12 T-25: a disagreement is a fail, never a guess).
+    species_conflicts: Sequence[Any] | None = None
     #: `hunt_areas_written` — what the parser wrote while finalizing.
     hunt_areas: dict[str, int] | None = None
     #: `gis_area_match` / `unit_coverage` / `footnote_consistency` / `geometry_year` (T-17b).

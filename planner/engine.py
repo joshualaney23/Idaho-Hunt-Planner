@@ -72,6 +72,13 @@ RESTRICTIONS: Final[dict[str, Restriction]] = {
         "label": "Upland Game Bird Permit required on WMAs",
         "severity": "informational",
     },
+    # §12 T-25 — the MSG legend marks a hunt area as wilderness with extreme terrain
+    # and limited access. It tells the hunter what to expect, never where or when the
+    # season is open, so it is informational (§5.1).
+    "wilderness_terrain": {
+        "label": "Wilderness: extreme terrain, limited access",
+        "severity": "informational",
+    },
     "see_notes": {"label": "See notes", "severity": "narrowing"},
 }
 
@@ -300,6 +307,11 @@ def evaluate(
         codes = _restrictions(s)
         if "youth_only" in codes and not youth:
             continue  # §7.2: youth-only seasons are hidden for adults
+        if s.get("tag_quota") == 0:
+            # A controlled hunt a correction closed for this license year: no tag can
+            # be drawn for it, so it never opens a unit. The row stays in the database
+            # for history and still shows on the unit's season list (§12 T-25).
+            continue
 
         # §7.4: each overlapping day counts only if a tag (and permit) of that day's year holds.
         tt = s["tag_type_id"]

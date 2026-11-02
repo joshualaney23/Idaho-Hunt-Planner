@@ -105,6 +105,9 @@ def footnote_consistency(c: CheckContext) -> CheckResult | None:
       evidence in its own right.
     * footnote `a` (*includes other units*) ⇒ two or more units, or units other than the
       one the area id starts with.
+    * **both** ⇒ the brochure prints one marker for both conditions (MSG's `*`: "either
+      a portion of this unit, includes other units or parts of other units"), so either
+      one satisfies it.
     * no footnote ⇒ exactly one unit, covered in full ("All of Unit X").
     """
     areas = _areas(c)
@@ -113,13 +116,18 @@ def footnote_consistency(c: CheckContext) -> CheckResult | None:
     judged = [a for a in areas if a.resolved_units]
     problems: list[dict[str, Any]] = []
     for area in judged:
-        base = area.area_id.split("-")[0]
+        base = area.area_id.split("-")[0].rstrip("*")
+        portion = bool(area.partial_units or area.portion_in_text)
+        other = len(area.resolved_units) >= 2 or set(area.resolved_units) != {base}
         reason = None
-        if area.portion_only:
-            if not area.partial_units and not area.portion_in_text:
+        if area.portion_only and area.includes_other_units:
+            if not portion and not other:
+                reason = "one marker for both conditions, but the area is its own full unit"
+        elif area.portion_only:
+            if not portion:
                 reason = "footnote b, but every unit is covered in full"
         elif area.includes_other_units:
-            if len(area.resolved_units) < 2 and set(area.resolved_units) == {base}:
+            if not other:
                 reason = "footnote a, but the area resolves to its own unit alone"
         elif len(area.resolved_units) != 1 or area.partial_units:
             reason = "no footnote, but the area is not exactly one full unit"

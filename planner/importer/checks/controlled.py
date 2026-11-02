@@ -48,6 +48,28 @@ def footnote_legend(c: CheckContext) -> CheckResult | None:
 
 
 @check("controlled_*")
+def species_title_agreement(c: CheckContext) -> CheckResult | None:
+    """A row's hunt-number prefix and its printed table title name the same species.
+
+    MSG numbers species by the thousands digit (3xxx moose, 5xxx Rocky Mountain bighorn,
+    7xxx California bighorn, 6xxx goat) *and* prints it in every table title, so the two
+    are a free cross-check — a disagreement means a title was carried across a table
+    boundary and is a fail, never a guess (§12 T-25, D3).
+    """
+    conflicts = c.facts.species_conflicts
+    if conflicts is None:
+        return None
+    found = list(conflicts)
+    return CheckResult(
+        name="species_title_agreement",
+        status="pass" if not found else "fail",
+        expected="every hunt number's species prefix matches its table title",
+        actual=f"{len(found)} rows disagree",
+        detail=found or None,
+    )
+
+
+@check("controlled_*")
 def hunt_areas_written(c: CheckContext) -> CheckResult | None:
     """What the section wrote to `hunt_areas`, and how many notes it attached."""
     written = c.facts.hunt_areas

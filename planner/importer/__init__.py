@@ -32,7 +32,7 @@ from planner.dates import to_iso
 from planner.importer import common
 from planner.importer.classify import CLASSIFY_PAGES, Classification, ClassifyError
 from planner.importer.classify import classify as classify_document
-from planner.importer.extract import Page, cache_dir_for, iter_pages, page_texts
+from planner.importer.extract import SIDE_CROP_PT, Page, cache_dir_for, iter_pages, page_texts
 
 if TYPE_CHECKING:  # pragma: no cover - typing only (the checks package imports this one)
     from planner.importer.checks import SectionFacts
@@ -62,6 +62,13 @@ PARSER_VERSION = "1.0.0"
 #: Upload guards (§8.1).
 MAX_PDF_BYTES = 50 * 1024 * 1024
 PDF_MAGIC = b"%PDF-"
+#: §8.2 side crop per brochure kind. The crop hides the rotated section tab, which
+#: `find_tables` otherwise detects as *the* table — but in the MSG brochure the tab is
+#: printed over the hunt tables' own outer rule, so any crop that hides the tab deletes
+#: the rule and `find_tables` drops every second hunt-number cell (19 of 28 sheep hunts
+#: on p. 19). Uncropped, that tab is just a one-column table the header-driven reader
+#: ignores (§12 T-25).
+SIDE_CROP_BY_KIND: dict[str, float] = {"moose_sheep_goat": 0.0}
 
 
 # ───────── parsed rows ─────────
@@ -480,7 +487,8 @@ def run_import(
             for spec in specs:
                 if spec.begin is not None:
                     spec.begin(ctx)
-            for page in iter_pages(path, cache_dir=cache):
+            margin = SIDE_CROP_BY_KIND.get(ctx.kind, SIDE_CROP_PT)
+            for page in iter_pages(path, cache_dir=cache, margin=margin):
                 pages += 1
                 for spec in specs:
                     try:
@@ -629,6 +637,7 @@ from planner.importer import (  # noqa: E402,F401  (side effect)
     deer,
     elk,
     hunt_areas,
+    msg,
     upland,
 )
 from planner.importer.checks import SectionFacts  # noqa: E402,F401  (re-exported for parsers)
