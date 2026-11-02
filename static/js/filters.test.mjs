@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 
 import { installFakeDom } from "../../tests/js/fakedom.mjs";
 import {
+  DEER_IDS,
   FEATURED,
   breadcrumbParts,
   createFilters,
@@ -87,6 +88,13 @@ test("T-27: the breadcrumb joins the species and says how they're matched", () =
 test("species chip labels use the §4.2 short names", () => {
   assert.equal(speciesChipLabel({ id: "black_bear", label: "Black bear" }), "Bear");
   assert.equal(speciesChipLabel({ id: "deer", label: "Deer" }), "Deer");
+  // T-31: the sub-species filters are not FEATURED chips — they live in the Deer
+  // chip's menu, and the chip takes their label while one is picked.
+  assert.deepEqual(FEATURED.slice(0, 2), ["deer", "elk"]);
+  assert.ok(!FEATURED.includes("deer_whitetail") && !FEATURED.includes("deer_mule"));
+  assert.deepEqual(DEER_IDS, ["deer", "deer_whitetail", "deer_mule"]);
+  assert.equal(speciesChipLabel({ id: "deer_whitetail", label: "White-tailed deer" }), "Deer · White-tailed");
+  assert.equal(speciesChipLabel({ id: "deer_mule", label: "Mule deer" }), "Deer · Mule");
   assert.equal(FEATURED.length, 12);
 });
 
@@ -183,6 +191,117 @@ test("T-27: a 5th species is refused with a hint instead of silently replacing o
   assert.match(hint.textContent, /Up to 4 species at a time/);
   // The chip that was pressed is back off, so the chips still mirror the state.
   assert.equal(chip(spare.dataset.value).getAttribute("aria-pressed"), "false");
+});
+
+const DEER_SPECIES = [
+  { id: "deer", label: "Deer", icon: "🦌", published_seasons: 235 },
+  { id: "deer_whitetail", label: "White-tailed deer", icon: "🦌", base: "deer", published_seasons: 61 },
+  { id: "deer_mule", label: "Mule deer", icon: "🦌", base: "deer", published_seasons: 174 },
+  { id: "elk", label: "Elk", icon: "🫎", published_seasons: 12 },
+];
+// The Deer chip lives inside `<span class="combo">`, so it is not a direct child of
+// the chip row any more; this is every species button in the row, in order.
+const speciesButtons = () =>
+  byId("f-species")
+    .querySelectorAll("button")
+    .filter((b) => b.dataset.value);
+const menuItems = () => byId("f-deer-menu").children.filter((c) => c.tagName === "BUTTON");
+
+test("T-31: Deer is one chip with a caret; the sub-species live in its menu", () => {
+  const { patches } = mount(STATE, { tags: TAGS, permits: [], year: 2026 }, DEER_SPECIES);
+
+  // No White-tailed / Mule chips of their own — just Deer and Elk.
+  assert.deepEqual(speciesButtons().map((b) => b.dataset.value), ["deer", "elk"]);
+  assert.equal(byId("f-species-more"), null); // nor behind "More ▾"
+  const combo = byId("f-species").querySelector(".combo");
+  assert.deepEqual(combo.children.map((c) => c.className), ["chip", "chip caret", "menu"]);
+  assert.equal(combo.children[0].textContent, "Deer");
+
+  const caret = byId("f-deer-caret");
+  assert.equal(caret.getAttribute("aria-haspopup"), "menu");
+  assert.equal(caret.getAttribute("aria-expanded"), "false");
+  assert.equal(byId("f-deer-menu").hidden, true);
+  assert.equal(byId("f-deer-menu").getAttribute("role"), "menu");
+
+  caret.click();
+  assert.equal(caret.getAttribute("aria-expanded"), "true");
+  assert.equal(byId("f-deer-menu").hidden, false);
+  assert.deepEqual(menuItems().map((i) => i.textContent), [
+    "All deer",
+    "White-tailed only",
+    "Mule deer only",
+  ]);
+  assert.deepEqual(menuItems().map((i) => i.getAttribute("aria-checked")), ["true", "false", "false"]);
+
+  // Picking one swaps the selected id — that is what rewrites `?species=`.
+  menuItems()[1].click();
+  assert.deepEqual(patches.at(-1), { species: ["deer_whitetail"], tags: null });
+});
+
+test("T-31: the chip reads 'Deer · White-tailed' once the menu picks it", () => {
+  const { f, patches } = mount(STATE, { tags: TAGS, permits: [], year: 2026 }, DEER_SPECIES);
+  f.update({ ...STATE, species: ["deer_whitetail"] }, { tags: TAGS, permits: [], year: 2026 });
+
+  const chip = byId("f-species").querySelector(".combo").children[0];
+  assert.equal(chip.textContent, "Deer · White-tailed");
+  assert.equal(chip.dataset.value, "deer_whitetail");
+  assert.equal(chip.getAttribute("aria-pressed"), "true");
+  assert.deepEqual(speciesButtons().map((b) => b.dataset.value), ["deer_whitetail", "elk"]);
+  // The menu's tick follows the chip, and so does the caret's accessible name.
+  byId("f-deer-caret").click();
+  assert.deepEqual(menuItems().map((i) => i.getAttribute("aria-checked")), ["false", "true", "false"]);
+  assert.equal(byId("f-deer-caret").getAttribute("aria-label"), "Deer sub-species: Deer · White-tailed");
+
+  // Back to all deer.
+  menuItems()[0].click();
+  assert.deepEqual(patches.at(-1), { species: ["deer"], tags: null });
+});
+
+test("T-31: the menu closes on Escape, on an outside click and after a pick", () => {
+  mount(STATE, { tags: TAGS, permits: [], year: 2026 }, DEER_SPECIES);
+  const open = () => {
+    byId("f-deer-caret").click();
+    assert.equal(byId("f-deer-menu").hidden, false);
+  };
+
+  open();
+  doc.dispatch("keydown", { key: "Escape" });
+  assert.equal(byId("f-deer-menu").hidden, true);
+  assert.equal(byId("f-deer-caret").getAttribute("aria-expanded"), "false");
+
+  open();
+  doc.dispatch("click", { target: doc.body });
+  assert.equal(byId("f-deer-menu").hidden, true);
+
+  // A click inside the combo (the chip itself) leaves it open…
+  open();
+  doc.dispatch("click", { target: byId("f-species").querySelector(".combo").children[0] });
+  assert.equal(byId("f-deer-menu").hidden, false);
+  // …and the listeners are released every time it closes, so they never pile up.
+  doc.dispatch("keydown", { key: "Escape" });
+  assert.deepEqual([doc.listenerCount("click"), doc.listenerCount("keydown")], [0, 0]);
+});
+
+test("T-31: opening the menu moves focus into it, and picking returns it to the caret", () => {
+  mount(STATE, { tags: TAGS, permits: [], year: 2026 }, DEER_SPECIES);
+  byId("f-deer-caret").click();
+  assert.equal(doc.activeElement.dataset.deer, "deer"); // the checked item
+  byId("f-deer-menu").dispatch("keydown", { key: "ArrowDown", preventDefault() {} });
+  assert.equal(doc.activeElement.dataset.deer, "deer_whitetail");
+  doc.activeElement.click();
+  // Focus comes back to the caret, so the keyboard user never lands on <body>.
+  assert.equal(doc.activeElement.id, "f-deer-caret");
+  assert.ok(byId("f-species").contains(doc.activeElement));
+  assert.equal(byId("f-deer-menu").hidden, true);
+});
+
+test("T-31: a sub-species filter is hunted with the deer tags", () => {
+  assert.deepEqual(tagsForSpecies(TAGS, ["deer_mule"]).map((t) => t.id), [1, 2, 5]);
+  assert.deepEqual(tagsForSpecies(TAGS, "deer_whitetail").map((t) => t.id), [1, 2, 5]);
+  assert.equal(
+    breadcrumbParts({ ...STATE, species: ["deer_whitetail"] }, DEER_SPECIES, TAGS)[0],
+    "🦌 White-tailed deer",
+  );
 });
 
 test("tag chips toggle the tag filter; no tags shows the add-one link", () => {

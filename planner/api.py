@@ -82,6 +82,30 @@ def health():
     return jsonify({"ok": True, "version": __version__})
 
 
+def _sub_species_counts() -> dict[str, int]:
+    """Published seasons each §12 T-31 sub-species filter can show, for the chip's title.
+
+    A deer season counts for both filters unless it is for one animal only, which the
+    engine decides (restriction code, `sub_species`, or a White-tailed deer tag).
+    """
+    out = dict.fromkeys(engine.SUB_SPECIES, 0)
+    bases = {f["species"] for f in engine.SUB_SPECIES.values()}
+    if not bases:
+        return out
+    marks = ", ".join("?" * len(bases))
+    rows = db.q(
+        "SELECT species_id, sub_species, tag_type_id, hunt_class, restrictions FROM seasons"
+        f" WHERE status = 'published' AND species_id IN ({marks})",
+        *sorted(bases),
+    )
+    for r in rows:
+        animal = engine.season_sub_species(dict(r))
+        for fid, f in engine.SUB_SPECIES.items():
+            if f["species"] == r["species_id"] and animal in (None, f["animal"]):
+                out[fid] += 1
+    return out
+
+
 @api.get("/meta")
 def meta():
     profile = _profile()
@@ -90,16 +114,34 @@ def meta():
         " GROUP BY species_id"
     )
     counts = {r["species_id"]: r["n"] for r in published}
-    species = [
-        {
-            "id": r["id"],
-            "label": r["label"],
-            "icon": r["icon"],
-            "grp": r["grp"],
-            "published_seasons": counts.get(r["id"], 0),
-        }
-        for r in db.q("SELECT id, label, icon, grp FROM species ORDER BY rowid")
-    ]
+    sub_counts = _sub_species_counts()
+    species = []
+    for r in db.q("SELECT id, label, icon, grp FROM species ORDER BY rowid"):
+        species.append(
+            {
+                "id": r["id"],
+                "label": r["label"],
+                "icon": r["icon"],
+                "grp": r["grp"],
+                "published_seasons": counts.get(r["id"], 0),
+            }
+        )
+        # §12 T-31: the deer sub-species filters ride beside their base species. They are
+        # filter ids, not rows in `species` — `base` says which species they narrow, so a
+        # client can map a selection back to the tags and labels of the real species.
+        for fid, f in engine.SUB_SPECIES.items():
+            if f["species"] != r["id"]:
+                continue
+            species.append(
+                {
+                    "id": fid,
+                    "label": f["label"],
+                    "icon": f["icon"],
+                    "grp": r["grp"],
+                    "base": f["species"],
+                    "published_seasons": sub_counts.get(fid, 0),
+                }
+            )
     tag_types = [
         {
             "id": r["id"],
@@ -260,7 +302,8 @@ def availability():
             f"at most {engine.MAX_SPECIES} species may be selected (got {len(species)})",
             {"species": species},
         )
-    known = {r["id"] for r in db.q("SELECT id FROM species")}
+    # §12 T-31: the deer sub-species filters are *filter* ids, not rows in `species`.
+    known = {r["id"] for r in db.q("SELECT id FROM species")} | set(engine.SUB_SPECIES)
     unknown = [s for s in species if s not in known]
     if unknown:
         raise ApiError(
@@ -317,14 +360,18 @@ def availability():
 
     # One query per table, never one per species (§12 T-27). Published only; the date
     # overlap is filtered in SQL.
-    marks = ", ".join("?" * len(species))
+    # A sub-species filter loads its base species' rows; the engine applies the §12 T-31
+    # sub-species test per season.
+    base = list(dict.fromkeys(engine.base_species(s) for s in species))
+    marks = ", ".join("?" * len(base))
     season_filter = (
         f"s.status = 'published' AND s.species_id IN ({marks})"
         " AND s.start_date <= ? AND s.end_date >= ?"
     )
-    season_args = (*species, e_iso, s_iso)
+    season_args = (*base, e_iso, s_iso)
     seasons = _dicts(
-        "SELECT s.id, s.document_id, d.license_year, s.status, s.species_id, s.tag_type_id,"
+        "SELECT s.id, s.document_id, d.license_year, s.status, s.species_id, s.sub_species,"
+        " s.tag_type_id,"
         " s.zone, s.hunt_number, s.hunt_class, s.weapon, s.sex, s.start_date, s.end_date,"
         " s.restrictions, s.source_page, s.tag_quota"
         f" FROM seasons s JOIN source_documents d ON d.id = s.document_id WHERE {season_filter}",

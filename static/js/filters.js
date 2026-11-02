@@ -8,7 +8,7 @@
 import { chipGroup, textEl } from "./ui.js";
 import { fmtShort, parseISO, presets, toISO } from "./dates.js";
 import { activeTags, tagChipLabel } from "./tags.js";
-import { MAX_SPECIES, defaultMode, toggleSpecies, withDate } from "./state.js";
+import { MAX_SPECIES, baseSpecies, defaultMode, toggleSpecies, withDate } from "./state.js";
 
 // §4.2 shows these twelve first; everything else sits behind "More ▾".
 export const FEATURED = [
@@ -26,7 +26,22 @@ export const FEATURED = [
   "turkey",
 ];
 const BIG_GAME_COUNT = 6; // a separator follows Wolf
+
+/**
+ * T-31: the deer sub-species filters are not chips of their own — Deer is one chip
+ * with a caret, and these are the choices in its menu. `[filter id, menu label]`;
+ * the chip's own label comes from `SHORT` ("Deer · White-tailed").
+ */
+export const DEER_OPTIONS = [
+  ["deer", "All deer"],
+  ["deer_whitetail", "White-tailed only"],
+  ["deer_mule", "Mule deer only"],
+];
+export const DEER_IDS = DEER_OPTIONS.map(([id]) => id);
+
 const SHORT = {
+  deer_whitetail: "Deer · White-tailed",
+  deer_mule: "Deer · Mule",
   black_bear: "Bear",
   mountain_lion: "Lion",
   wolf: "Wolf",
@@ -62,7 +77,8 @@ export function speciesChipLabel(sp) {
  * `species` is one id or, since T-27, a list: then it's the union over the selection.
  */
 export function tagsForSpecies(tags, species) {
-  const want = new Set(Array.isArray(species) ? species : [species]);
+  // A deer sub-species filter (T-31) is hunted with the deer tags, so it maps to `deer`.
+  const want = new Set((Array.isArray(species) ? species : [species]).map(baseSpecies));
   return activeTags(tags).filter((t) => want.has(t.species_id) || t.species_id == null);
 }
 
@@ -133,8 +149,17 @@ export function renderViewing(el, state, speciesList, tags) {
 /** Run `render()` and put keyboard focus back on the chip that had it (by `data-value`). */
 function keepFocus(container, render) {
   const active = typeof document !== "undefined" ? document.activeElement : null;
-  const value = active && container.contains?.(active) ? active.dataset?.value : undefined;
+  const inside = Boolean(active && container.contains?.(active));
+  const value = inside ? active.dataset?.value : undefined;
+  const id = inside ? active.id : ""; // T-31: the deer caret has an id, not a data-value
   render();
+  if (id) {
+    const again = document.getElementById(id);
+    if (again) {
+      again.focus();
+      return;
+    }
+  }
   if (value === undefined) return;
   for (const b of container.querySelectorAll?.("button") || []) {
     if (b.dataset.value === value) {
@@ -173,9 +198,19 @@ export function createFilters(container, opts) {
   // ---- species ------------------------------------------------------------
   const byId = Object.fromEntries(species.map((s) => [s.id, s]));
   const featured = FEATURED.filter((id) => byId[id]);
-  const more = species.map((s) => s.id).filter((id) => !featured.includes(id));
+  // The deer sub-species filters never get a chip of their own, not even behind "More ▾":
+  // they live in the Deer chip's menu (T-31).
+  const more = species
+    .map((s) => s.id)
+    .filter((id) => !featured.includes(id) && !DEER_IDS.includes(id));
   let expanded = more.some((id) => state.species.includes(id));
   const unpublished = (id) => !(byId[id]?.published_seasons > 0) && !state.species.includes(id);
+
+  // T-31: which deer filter the single Deer chip stands for. It follows the selection
+  // (so a `?species=deer_mule` URL or a Back press repaints the chip) and otherwise
+  // remembers the user's last pick while Deer is off.
+  let deerVariant = state.species.find((id) => DEER_IDS.includes(id)) || "deer";
+  const haveDeerMenu = () => DEER_IDS.every((id) => byId[id]);
 
   const speciesBox = document.createElement("div");
   speciesBox.className = "species-box";
@@ -222,8 +257,109 @@ export function createFilters(container, opts) {
     onChange({ species: next, tags: null, ...(crossed ? { speciesMode: defaultMode(next) } : {}) });
   }
 
+  // ---- the Deer chip's sub-species menu (T-31) ------------------------------
+  let closeDeerMenu = () => {};
+
+  /** Switch which deer filter the chip stands for, swapping it in the selection. */
+  function pickDeer(id) {
+    const prev = deerVariant;
+    deerVariant = id;
+    if (prev !== id && state.species.includes(prev)) {
+      // Deer is on: swap the id, which is what rewrites `?species=` and refetches.
+      onChange({ species: state.species.map((s) => (s === prev ? id : s)), tags: null });
+    } else {
+      speciesKey = null; // Deer is off (or nothing moved): just repaint the chip
+      keepFocus(speciesBox, renderSpecies);
+    }
+    document.getElementById("f-deer-caret")?.focus();
+  }
+
+  /** Wrap the Deer chip in `<span class="combo">chip caret menu</span>`. */
+  function deerCombo(chip) {
+    const combo = document.createElement("span");
+    combo.className = "combo";
+    const caret = textEl("button", "▾", "chip caret");
+    caret.type = "button";
+    caret.id = "f-deer-caret";
+    caret.setAttribute("aria-haspopup", "menu");
+    caret.setAttribute("aria-expanded", "false");
+    caret.setAttribute("aria-controls", "f-deer-menu");
+    caret.setAttribute("aria-label", `Deer sub-species: ${speciesChipLabel(byId[deerVariant])}`);
+
+    const menu = document.createElement("div");
+    menu.className = "menu";
+    menu.id = "f-deer-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", "Deer sub-species");
+    menu.hidden = true;
+    const items = DEER_OPTIONS.map(([id, label]) => {
+      const it = textEl("button", label, "menu-item");
+      it.type = "button";
+      it.dataset.deer = id;
+      it.setAttribute("role", "menuitemradio");
+      it.setAttribute("aria-checked", id === deerVariant ? "true" : "false");
+      it.addEventListener("click", () => {
+        closeDeerMenu();
+        pickDeer(id);
+      });
+      menu.appendChild(it);
+      return it;
+    });
+
+    const onDocClick = (e) => {
+      if (!combo.contains(e.target)) closeDeerMenu();
+    };
+    const onDocKey = (e) => {
+      if (e.key === "Escape") closeDeerMenu();
+    };
+    function setOpen(open) {
+      menu.hidden = !open;
+      caret.setAttribute("aria-expanded", open ? "true" : "false");
+      const doc = typeof document !== "undefined" ? document : null;
+      if (!doc?.addEventListener) return;
+      if (open) {
+        doc.addEventListener("click", onDocClick, true);
+        doc.addEventListener("keydown", onDocKey, true);
+      } else {
+        doc.removeEventListener("click", onDocClick, true);
+        doc.removeEventListener("keydown", onDocKey, true);
+      }
+    }
+    closeDeerMenu = () => {
+      if (!menu.hidden) setOpen(false);
+    };
+    caret.addEventListener("click", (e) => {
+      e.stopPropagation?.();
+      const open = menu.hidden;
+      setOpen(open);
+      if (open) (items.find((i) => i.dataset.deer === deerVariant) || items[0]).focus();
+    });
+    // Arrow keys walk the menu; the caret opens it the way a menu button should.
+    caret.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault?.();
+      if (menu.hidden) setOpen(true);
+      (e.key === "ArrowDown" ? items[0] : items[items.length - 1]).focus();
+    });
+    menu.addEventListener("keydown", (e) => {
+      const i = items.indexOf(typeof document !== "undefined" ? document.activeElement : null);
+      if (i < 0) return;
+      if (e.key === "ArrowDown") items[(i + 1) % items.length].focus();
+      else if (e.key === "ArrowUp") items[(i - 1 + items.length) % items.length].focus();
+      else return;
+      e.preventDefault?.();
+    });
+
+    combo.append(chip, caret, menu);
+    return combo;
+  }
+
   function renderSpecies() {
-    const ids = expanded ? [...featured, ...more] : featured;
+    closeDeerMenu();
+    closeDeerMenu = () => {};
+    const ids = (expanded ? [...featured, ...more] : featured).map((id) =>
+      id === "deer" && haveDeerMenu() ? deerVariant : id,
+    );
     speciesChips = chipGroup({
       id: "f-species",
       items: ids.map((id) => ({
@@ -239,6 +375,16 @@ export function createFilters(container, opts) {
       disabled: unpublished,
       onChange: onSpeciesChip,
     });
+    if (haveDeerMenu()) {
+      const i = ids.indexOf(deerVariant);
+      const chip = speciesChips.children[i];
+      const after = speciesChips.children[i + 1]; // read before deerCombo() detaches the chip
+      if (chip) {
+        const combo = deerCombo(chip);
+        if (after) speciesChips.insertBefore(combo, after);
+        else speciesChips.appendChild(combo);
+      }
+    }
     const sep = document.createElement("span");
     sep.className = "chip-sep";
     sep.setAttribute("aria-hidden", "true");
@@ -250,7 +396,7 @@ export function createFilters(container, opts) {
       toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
       toggle.addEventListener("click", () => {
         expanded = !expanded;
-        speciesKey = `${state.species.join(",")}|${expanded}|${atLimit}`;
+        speciesKey = speciesSig();
         renderSpecies();
         document.getElementById("f-species-more")?.focus();
       });
@@ -389,14 +535,21 @@ export function createFilters(container, opts) {
 
   let speciesKey = null;
   let tagsKey = null;
+  // Everything the species row's markup depends on, including which deer filter the
+  // single Deer chip currently stands for (T-31).
+  const speciesSig = () =>
+    `${state.species.join(",")}|${expanded}|${atLimit}|${deerVariant}`;
   function update(next, nextCtx) {
     const speciesChanged = String(next.species) !== String(state.species);
     state = next;
     if (nextCtx) ctx = { ...ctx, ...nextCtx };
     if (speciesChanged && state.species.some((id) => more.includes(id))) expanded = true;
+    // A deer filter arriving from the URL, Back/Forward or another view owns the chip.
+    const selectedDeer = state.species.find((id) => DEER_IDS.includes(id));
+    if (selectedDeer) deerVariant = selectedDeer;
     // Rebuild chip rows only when their content changes; otherwise just repaint the
     // pressed state, so a keyboard user's focus stays on the chip they toggled.
-    const sk = `${state.species.join(",")}|${expanded}|${atLimit}`;
+    const sk = speciesSig();
     if (sk !== speciesKey) {
       speciesKey = sk;
       keepFocus(speciesBox, renderSpecies);

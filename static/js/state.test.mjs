@@ -13,6 +13,8 @@ import {
   createStore,
   defaultState,
   hasFilterKeys,
+  SUB_SPECIES,
+  baseSpecies,
   parseSpecies,
   primarySpecies,
   rangeYears,
@@ -138,6 +140,26 @@ test("T-27: toggleSpecies never goes past 4 or down to none", () => {
   assert.equal(toggleSpecies(four, "turkey"), four);
   assert.equal(MAX_SPECIES, 4);
   assert.deepEqual(primarySpecies({ species: ["elk", "deer"] }), "elk");
+});
+
+test("T-31: a deer sub-species filter id round-trips through the URL", () => {
+  const ids = ["deer", "deer_whitetail", "deer_mule", "elk"];
+  assert.deepEqual(Object.keys(SUB_SPECIES), ["deer_whitetail", "deer_mule"]);
+  assert.equal(baseSpecies("deer_mule"), "deer");
+  assert.equal(baseSpecies("deer_whitetail"), "deer");
+  assert.equal(baseSpecies("elk"), "elk"); // a real id is unchanged
+
+  // They are ordinary ids to the URL layer, so `?species=` carries them as written…
+  const s = stateFromQuery("species=deer_mule", defaults, { speciesIds: ids });
+  assert.deepEqual(s.species, ["deer_mule"]);
+  assert.equal(s.speciesMode, "any");
+  assert.equal(toQuery(s), "species=deer_mule&start=2026-10-16&end=2026-10-18&weapon=all");
+  // …and T-27's list syntax keeps working beside another species.
+  const two = stateFromQuery("species=deer_mule,elk", defaults, { speciesIds: ids });
+  assert.deepEqual([two.species, two.speciesMode], [["deer_mule", "elk"], "all"]);
+  assert.ok(availabilityPath(s).startsWith("/api/availability?species=deer_mule&species_mode=any"));
+  // An id `/api/meta` doesn't list is still dropped.
+  assert.deepEqual(parseSpecies("deer_elk", ids), null);
 });
 
 test("validISO rejects impossible dates", () => {

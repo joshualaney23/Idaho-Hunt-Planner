@@ -180,6 +180,71 @@
 .chip.more {
   border-style: dashed;
 }
+/* T-31: Deer is one chip plus a caret that opens its sub-species menu. The two read
+   as a single control: shared radius, and the caret follows the chip's pressed state. */
+.combo {
+  position: relative;
+  display: inline-flex;
+}
+.combo > .chip:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.chip.caret {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-width: 0;
+  padding: 4px 7px;
+  min-width: 26px; /* WCAG 2.2 target size: 24×24 minimum (Lighthouse `target-size`) */
+}
+.combo > .chip[aria-pressed="true"] + .caret {
+  background: var(--chip-on-bg);
+  border-color: var(--tl-green);
+  color: var(--tl-green2);
+}
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 2px;
+  background: var(--bg2);
+  border: 1px solid var(--bg5);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px var(--shadow);
+}
+.menu[hidden] {
+  display: none;
+}
+.menu-item {
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.menu-item:hover {
+  background: var(--bg3);
+  color: var(--text);
+}
+.menu-item[aria-checked="true"] {
+  color: var(--tl-green2);
+}
+.menu-item[aria-checked="true"]::before {
+  content: "✓ ";
+}
+.menu-item[aria-checked="false"]::before {
+  content: "   ";
+}
 .tags-row {
   display: flex;
   gap: 4px;

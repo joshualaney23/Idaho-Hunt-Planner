@@ -194,8 +194,10 @@ def test_meta(client, conn):
     assert resp.status_code == 200
     m = resp.get_json()
     species = {s["id"]: s for s in m["species"]}
-    assert len(species) == 35
+    # 35 real species + the two T-31 deer sub-species filter ids.
+    assert len(species) == 37
     assert species["deer"]["published_seasons"] == 1
+    assert species["deer_whitetail"]["base"] == species["deer_mule"]["base"] == "deer"
     assert species["elk"]["published_seasons"] == 0
     assert m["restrictions"] == json.loads(json.dumps(RESTRICTIONS))
     assert m["reasons"]["no_tag_next_year"]["severity"] == "narrowing"

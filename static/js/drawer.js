@@ -13,6 +13,7 @@
 import { badge, textEl } from "./ui.js";
 import { days, fmtShort, parseISO } from "./dates.js";
 import { pageLink, pdfHref, seasonLine } from "./map.js";
+import { baseSpecies } from "./state.js";
 
 const NS = "http://www.w3.org/2000/svg";
 export const TIMELINE_WIDTH = 460;
@@ -150,8 +151,9 @@ export function renderTimeline(model, seasons) {
  * viewing. Returns `{primary, other}` (both keep the API's order).
  */
 export function splitSeasons(seasons, { heldSpecies = [], viewing = null } = {}) {
-  // `viewing` is one id or, since T-27, the whole species selection.
-  const seen = Array.isArray(viewing) ? viewing : [viewing];
+  // `viewing` is one id or, since T-27, the whole species selection. A T-31 deer
+  // sub-species filter stands for its real species, which is what a season carries.
+  const seen = (Array.isArray(viewing) ? viewing : [viewing]).filter(Boolean).map(baseSpecies);
   const want = new Set([...heldSpecies, ...seen].filter(Boolean));
   const primary = [];
   const other = [];
