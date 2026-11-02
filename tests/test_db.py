@@ -303,6 +303,9 @@ def test_restrictions_match_design_5_1():
         # §12 T-14: the Upland Game Bird Permit is an extra permit on a WMA, not a
         # change to where or when the pheasant season is open.
         "wmb_permit_on_wma",
+        # §12 T-25: the MSG wilderness marker says what the terrain is like, never
+        # where or when the hunt is open.
+        "wilderness_terrain",
     }
     for code, r in RESTRICTIONS.items():
         assert r["label"]

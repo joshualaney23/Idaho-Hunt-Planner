@@ -103,16 +103,16 @@ def test_a_boundary_between_two_units_assigns_neither() -> None:
 
 def test_the_section_is_found_by_its_heading(pages) -> None:
     headings = {
-        species_heading(page, BIG_GAME): number
+        species_id: number
         for number, page in pages.items()
-        if species_heading(page, BIG_GAME)
+        for species_id in species_heading(page, BIG_GAME)
     }
     assert set(headings) == {"deer", "elk", "pronghorn", "black_bear"}
 
 
 def test_a_full_width_line_belongs_to_no_column(pages) -> None:
     """The heading, its preamble and the page footer run through the gutter."""
-    page = next(p for p in pages.values() if species_heading(p, BIG_GAME) == "deer")
+    page = next(p for p in pages.values() if species_heading(p, BIG_GAME) == ("deer",))
     columns = columns_of(page)
     assert len(columns) == 2 and all(columns)
     text = " ".join(w.text for column in columns for w in column)

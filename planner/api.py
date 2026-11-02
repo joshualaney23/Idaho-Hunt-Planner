@@ -326,7 +326,7 @@ def availability():
     seasons = _dicts(
         "SELECT s.id, s.document_id, d.license_year, s.status, s.species_id, s.tag_type_id,"
         " s.zone, s.hunt_number, s.hunt_class, s.weapon, s.sex, s.start_date, s.end_date,"
-        " s.restrictions, s.source_page"
+        " s.restrictions, s.source_page, s.tag_quota"
         f" FROM seasons s JOIN source_documents d ON d.id = s.document_id WHERE {season_filter}",
         *season_args,
     )

@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import partial
 from typing import Any
@@ -84,6 +84,36 @@ FOOTER_RE = re.compile(
 AREA_ENTRY = r"Hunt Area {area}\s*[—–-]"
 #: Tags cell meaning "no quota" (`seasons.tag_quota` NULL).
 UNLIMITED_RE = re.compile(r"\bunlimited\b", re.IGNORECASE)
+#: A footnote marker printed as a legend line's own first word (`* See controlled hunt…`).
+MARKER_RE = re.compile(r"[a-z*†‡]")
+#: What a hunt table's title must say for the block above a header row to be one.
+TITLE_MARKER_RE = re.compile(r"controlled", re.IGNORECASE)
+#: A legend meaning that covers **both** footnote conditions at once: MSG prints one
+#: `*` for "either a portion of this unit, includes other units or parts of other
+#: units", so the area satisfies `footnote_consistency` either way (§12 T-25).
+BOTH_CONDITIONS = "portion_or_other_units"
+#: Printed header label → the `HuntRow` field that column fills. A brochure may repeat
+#: the whole group side by side (MSG prints two hunts per printed row, T-25) and may
+#: leave a column out (the MSG sheep and goat tables print no Notes column), so the
+#: columns of a table are located from its **header labels**, never by a fixed index.
+COLUMNS: tuple[tuple[str, str], ...] = (
+    ("hunt no", "number"),
+    ("hunt area", "area"),
+    ("tags", "tags"),
+    ("season dates", "dates"),
+    ("notes", "notes"),
+)
+#: The columns a hunt record cannot be read without.
+REQUIRED_COLUMNS: frozenset[str] = frozenset({"number", "area", "tags", "dates"})
+#: `MOOSE CONTROLLED HUNT AREA DESCRIPTIONS` — the description section's heading, whose
+#: species prefix may name more than one species (MSG prints one sheep section for both
+#: bighorn species, T-25). Read by `planner.importer.hunt_areas`.
+HEADING_RE = re.compile(r"^(?P<species>[A-Z][A-Z ]*?)\s+CONTROLLED HUNT AREA DESCRIPTIONS", re.M)
+
+#: Path B's signature: one page → its rows plus the title to carry to the next page.
+TextPathFn = Callable[
+    ["Page", "Brochure", "TitleInfo | None", int], tuple[list["HuntRow"], "TitleInfo | None"]
+]
 
 
 @dataclass(frozen=True)
@@ -96,15 +126,38 @@ class Brochure:
     #: Printed species word in a table title → species id, for the title/number cross-check.
     species_words: tuple[tuple[str, str], ...]
     header: tuple[str, ...] = ("hunt no.", "controlled hunt areas", "tags", "season dates", "notes")
+    columns: tuple[tuple[str, str], ...] = COLUMNS
     total_re: re.Pattern[str] = TOTAL_RE
     legend_re: re.Pattern[str] = LEGEND_RE
     legend_meanings: tuple[tuple[str, str], ...] = LEGEND_MEANINGS
+    #: Legend meaning → the §5.1 restriction code it puts on every row that prints it.
+    mark_codes: Mapping[str, str] = field(
+        default_factory=lambda: {"portion_only": "portion_of_unit"}
+    )
+    #: What makes a printed block a hunt-table title. The Big Game brochure always
+    #: prints "Controlled Hunts"; MSG also prints `Antlered Moose Archery ONLY Hunt`
+    #: over a table of two hunts, and dropping it loses 5 of its 510 moose tags (T-25).
+    title_marker: re.Pattern[str] = TITLE_MARKER_RE
     area_re: re.Pattern[str] = AREA_RE
     footer_re: re.Pattern[str] = FOOTER_RE
     area_entry: str = AREA_ENTRY
+    heading_re: re.Pattern[str] = HEADING_RE
+    #: The brochure covers two license years and prints one date cell for both (MSG's
+    #: `2025 & 2026 … Controlled Hunts`), so every printed window recurs in `year_end`
+    #: as well — one printed token, two seasons (§12 T-25, like T-13's recurring windows).
+    both_years: bool = False
+    #: Path B. A brochure whose tables the shared text path can't read supplies its own
+    #: (MSG: two hunt records per printed row and a two-line header) — it must stay an
+    #: **independent** reading of the text layer, never a second look at the rules (§8.7).
+    read_text: TextPathFn | None = None
 
     def species_of(self, hunt_number: str) -> str | None:
         return self.species_by_prefix.get(hunt_number[:1])
+
+    def species_in(self, text: str) -> str | None:
+        """The species a printed title or heading names, if any (longest word first)."""
+        low = text.lower()
+        return next((sp for word, sp in self.species_words if word in low), None)
 
     def section(self, species_id: str) -> str:
         return f"controlled_{species_id}"
@@ -173,15 +226,19 @@ def parse_title(text: str, spec: Brochure = BIG_GAME) -> TitleInfo:
     if m := TITLE_DISCLAIMER_RE.search(head):
         head = head[: m.start()].strip()
     low = head.lower()
-    species = next((sp for word, sp in spec.species_words if word in low), None)
+    species = spec.species_in(head)
     sex = next((value for phrase, value in SEX_TITLES if phrase in low), "any")
     weapon = next((code for phrase, code in common.WEAPON_TITLES if phrase in low), "any")
     hunt_class = next((code for phrase, code in CLASS_TITLES if phrase in low), "controlled")
     flags = tuple(code for phrase, code in FLAG_TITLES if phrase in low)
     year = int(m.group(0)) if (m := re.search(r"\b(?:19|20)\d{2}\b", raw)) else None
-    total = int(m.group(1).replace(",", "")) if (m := spec.total_re.search(raw)) else None
-    # A controlled table always says so, and must map to at least one printed attribute.
-    matched = "controlled" in low and bool(
+    # The **last** total printed in the block is the one that scopes this table: MSG's
+    # sheep block prints the document-wide umbrella first (`100 Total Tags Including
+    # …`) and the table's own sub-header total (`77 Tags`) last (§12 T-25).
+    totals = list(spec.total_re.finditer(raw))
+    total = int(totals[-1].group(1).replace(",", "")) if totals else None
+    # A hunt table always says what it is, and must map to at least one printed attribute.
+    matched = bool(spec.title_marker.search(head)) and bool(
         species or sex != "any" or weapon != "any" or hunt_class != "controlled" or flags
     )
     return TitleInfo(
@@ -268,13 +325,36 @@ def _text(cell: Cell | str | None) -> str:
     return re.sub(r"[ \t]+", " ", (value or "").replace("\n", " ")).strip()
 
 
-def _header_index(table: CellTable, spec: Brochure) -> int | None:
-    """Index of the `Hunt No. | … | Notes` header row, or None when there is none."""
+#: One hunt record's columns inside a header row: field name → cell index.
+Group = dict[str, int]
+
+
+def _header_groups(table: CellTable, spec: Brochure) -> tuple[int | None, list[Group]]:
+    """The header row's index and one column group per `Hunt No.` cell printed in it.
+
+    The 2026 Big Game tables print one group of five columns; the MSG sheep and goat
+    tables print **two** records per row and no Notes column at all (§12 T-25), and the
+    nested California table starts in column 1. So every group runs from its own
+    `Hunt No.` cell to the next one, and its columns are matched by printed label.
+    """
     for index, row in enumerate(table):
         names = [_text(c).lower().rstrip(".") for c in row]
-        if names and names[0].startswith("hunt no") and any(n == "notes" for n in names):
-            return index
-    return None
+        starts = [k for k, name in enumerate(names) if name.startswith("hunt no")]
+        if not starts:
+            continue
+        groups: list[Group] = []
+        for position, start in enumerate(starts):
+            stop = starts[position + 1] if position + 1 < len(starts) else len(names)
+            columns: Group = {}
+            for cell in range(start, stop):
+                for label, field_name in spec.columns:
+                    if label in names[cell]:
+                        columns.setdefault(field_name, cell)
+            if REQUIRED_COLUMNS <= set(columns):
+                groups.append(columns)
+        if groups:
+            return index, groups
+    return None, []
 
 
 def _title_text(table: CellTable, header_index: int) -> str:
@@ -312,7 +392,7 @@ def rows_from_tables(
     bad_titles: list[str] = []
     keys = list(legend_keys)
     for table in page.cell_tables:
-        header_index = _header_index(table, spec)
+        header_index, groups = _header_groups(table, spec)
         if header_index is None:
             continue
         text = _title_text(table, header_index)
@@ -321,39 +401,58 @@ def rows_from_tables(
             bad_titles.append(text or "(no title, nothing to carry forward)")
             continue
         carried = info
-        for row in table[header_index + 1 :]:
-            cells = list(row) + [None] * (len(spec.header) - len(row))
-            number = _text(cells[0])
-            if not re.fullmatch(r"\d{4}", number):
-                # A continuation row: no hunt number, one more season window for the
-                # hunt above it (2026 deer 1123 prints four). Never dropped (D3).
-                extra = _text(cells[3])
-                if out and extra and common.parse_date_ranges(extra, 2000):
-                    out[-1] = replace(out[-1], dates_texts=(*out[-1].dates_texts, extra))
-                continue
-            area_cell = cells[1]
-            area_text = _text(area_cell)
-            page_ref = PAGE_REF_RE.search(area_text)
-            area = PAGE_REF_RE.sub("", area_text).strip()
-            bbox = area_cell.bbox if isinstance(area_cell, Cell) else None
-            out.append(
-                HuntRow(
-                    hunt_number=number,
-                    area=area,
-                    marks=marks_in(bbox, page.small_chars, keys) if bbox else (),
-                    tags_text=_text(cells[2]),
-                    dates_texts=(_text(cells[3]),),
-                    notes=_text(cells[4]) or _notes_beside(page, row, table[header_index]),
-                    page=page.number,
-                    title=info,
-                    description_page=int(page_ref.group(1)) if page_ref else None,
-                    bbox=_row_bbox(row),
+        header = table[header_index]
+        # Group by group, so a two-record table reads down its left column first — the
+        # order it is printed in, and the order the golden files keep.
+        for columns in groups:
+            start = len(out)
+            for row in table[header_index + 1 :]:
+                cells = list(row) + [None] * (max(columns.values()) + 1 - len(row))
+                number = _text(cells[columns["number"]])
+                if not re.fullmatch(r"\d{4}", number):
+                    # A continuation row: no hunt number, one more season window for the
+                    # hunt above it (2026 deer 1123 prints four). Never dropped (D3).
+                    extra = _text(cells[columns["dates"]])
+                    if len(out) > start and extra and common.parse_date_ranges(extra, 2000):
+                        out[-1] = replace(out[-1], dates_texts=(*out[-1].dates_texts, extra))
+                    continue
+                area_cell = cells[columns["area"]]
+                area_text = _text(area_cell)
+                page_ref = PAGE_REF_RE.search(area_text)
+                area = PAGE_REF_RE.sub("", area_text).strip()
+                bbox = area_cell.bbox if isinstance(area_cell, Cell) else None
+                notes_index = columns.get("notes")
+                out.append(
+                    HuntRow(
+                        hunt_number=number,
+                        area=area,
+                        marks=marks_in(bbox, page.small_chars, keys) if bbox else (),
+                        tags_text=_text(cells[columns["tags"]]),
+                        dates_texts=(_text(cells[columns["dates"]]),),
+                        notes=_notes_of(page, row, header, notes_index),
+                        page=page.number,
+                        title=info,
+                        description_page=int(page_ref.group(1)) if page_ref else None,
+                        bbox=_row_bbox([cells[c] for c in sorted(columns.values())]),
+                    )
                 )
-            )
     return out, carried, bad_titles
 
 
-def _notes_beside(page: Page, row: Sequence[Cell | None], header: Sequence[Cell | None]) -> str:
+def _notes_of(
+    page: Page, row: Sequence[Cell | None], header: Sequence[Cell | None], column: int | None
+) -> str:
+    """The row's Notes cell, or the empty string for a table that prints no Notes column."""
+    if column is None:
+        return ""
+    cells = list(row)
+    text = _text(cells[column]) if column < len(cells) else ""
+    return text or _notes_beside(page, row, header, column)
+
+
+def _notes_beside(
+    page: Page, row: Sequence[Cell | None], header: Sequence[Cell | None], column: int
+) -> str:
     """The Notes cell read from the page words inside the row's own ruled box.
 
     pdfplumber drops the Notes cell of every row of these tables (2026: 469 of 469) the
@@ -361,7 +460,7 @@ def _notes_beside(page: Page, row: Sequence[Cell | None], header: Sequence[Cell 
     inside the row band, right of the Notes column's left edge — which the *header* row
     does have a cell for.
     """
-    notes_cell = header[4] if len(header) > 4 else None
+    notes_cell = header[column] if column < len(header) else None
     box = _row_bbox(row)
     if not isinstance(notes_cell, Cell) or box is None:
         return ""
@@ -676,8 +775,11 @@ def _text_row(
 def legend_for(page: Page, spec: Brochure) -> dict[str, str]:
     """Marker letter → meaning, read from the legend printed at the foot of the page.
 
-    The marker itself is a superscript printed *left of* the text and often outside the
-    `SIDE_CROP_PT` crop, so it is matched by geometry against `page.small_chars`.
+    The marker is a superscript printed *left of* the text and often outside the
+    `SIDE_CROP_PT` crop, so it is matched by geometry against `page.small_chars`. Some
+    brochures print it as the legend line's own first word instead (MSG's `*` is
+    full-size and its `a` sits inside the line), so a single-character word at the
+    line's left edge counts too (§12 T-25).
     """
     out: dict[str, str] = {}
     for line in group_lines(page.words):
@@ -694,9 +796,12 @@ def legend_for(page: Page, spec: Brochure) -> dict[str, str]:
             for w in page.small_chars
             if w.text.isalpha()
             and len(w.text) == 1
-            and w.x1 <= line.x0 + 2
+            and w.x0 <= line.x0 + 2
             and line.top - MARK_PAD_PT <= w.top <= line.bottom
         ]
+        first = min(line.words, key=lambda w: w.x0, default=None)
+        if first is not None and len(first.text) == 1 and MARKER_RE.fullmatch(first.text):
+            keys.append(first.text)
         for key in keys:
             out[key] = meaning
     return out
@@ -814,7 +919,8 @@ def page_rows(page: Page, ctx: ParseContext, spec: Brochure) -> list[tuple[HuntR
     state.legend = legend or state.legend
 
     rules, carried_a, bad = rows_from_tables(page, spec, state.titles.get("rules"), legend)
-    text, carried_b = rows_from_text(page, spec, state.titles.get("text"), ctx.license_year)
+    read_text = spec.read_text or rows_from_text
+    text, carried_b = read_text(page, spec, state.titles.get("text"), ctx.license_year)
     state.titles["rules"], state.titles["text"] = carried_a, carried_b
     state.bad_titles += [{"page": page.number, "title": t} for t in bad]
     state.totals += [
@@ -882,15 +988,22 @@ class Window:
     text: str
 
 
-def resolve_dates(row: HuntRow, ctx: ParseContext) -> tuple[list[Window], list[str]]:
+def resolve_dates(
+    row: HuntRow, ctx: ParseContext, spec: Brochure | None = None
+) -> tuple[list[Window], list[str]]:
     """Every season window of the row, plus the date text no window consumed.
 
     Dates are read with the license year's Jul→Jun rule, then shifted to the year the
     table title prints when it prints one (`2027 Controlled Hunts` → 2027 dates, spring
     bear → 2027). An end before the start rolls into the next year (`parse_date_ranges`).
+
+    A brochure that covers **two** license years prints one date cell for both (MSG's
+    `2025 & 2026 Antlered Moose Controlled Hunts`), so each printed window recurs in
+    `year_end` too and one printed token legitimately produces two seasons (§12 T-25).
     """
     windows: list[Window] = []
     leftovers: list[str] = []
+    both = bool(spec and spec.both_years and ctx.year_end > ctx.license_year)
     for text in row.dates_texts:
         ranges = common.parse_date_ranges(text, ctx.license_year)
         leftovers += common.leftover_date_text(text, ranges)
@@ -905,7 +1018,30 @@ def resolve_dates(row: HuntRow, ctx: ParseContext) -> tuple[list[Window], list[s
                 start = start.replace(year=start.year + shift)
                 end = end.replace(year=end.year + shift)
             windows.append(Window(start, end, found.text))
+            if both:
+                windows.append(Window(_add_year(start), _add_year(end), found.text))
     return windows, leftovers
+
+
+def _add_year(day: dt.date) -> dt.date:
+    """The same calendar day one year later (Feb 29 → Feb 28, as `dates.py` does)."""
+    try:
+        return day.replace(year=day.year + 1)
+    except ValueError:
+        return day.replace(year=day.year + 1, day=day.day - 1)
+
+
+def marker_meanings(row: HuntRow, legend: Mapping[str, str]) -> set[str]:
+    """What the markers printed on this row mean, per the page's own legend.
+
+    A marker is usually a superscript beside the area id, but it can also be printed
+    full-size as **part** of the id — MSG's `20A*` is the GIS area id and the `*` is
+    its footnote at the same time (§12 T-25).
+    """
+    keys = set(row.marks)
+    if row.area and row.area[-1:] in legend:
+        keys.add(row.area[-1:])
+    return {legend[k] for k in keys if k in legend}
 
 
 def base_unit(area: str) -> str | None:
@@ -925,15 +1061,17 @@ def to_parsed(
     """
     species = spec.species_of(row.hunt_number) or f"unknown_prefix_{row.hunt_number[:1]}"
     section = spec.section(species)
-    windows, leftovers = resolve_dates(row, ctx)
+    windows, leftovers = resolve_dates(row, ctx, spec)
     codes, unmatched = notes_codes(row.notes)
     for code in row.title.restrictions:
         if code not in codes:
             codes.append(code)
     legend = _STATE[ctx.document_id].legend
-    meanings = {legend.get(m) for m in row.marks}
-    if "portion_only" in meanings and "portion_of_unit" not in codes:
-        codes.append("portion_of_unit")
+    meanings = marker_meanings(row, legend)
+    for meaning in sorted(meanings):
+        code = spec.mark_codes.get(meaning)
+        if code and code not in codes:
+            codes.append(code)
     note = (
         f"Controlled hunt area {row.area}"
         f"{' — includes other units' if 'includes_other_units' in meanings else ''}"
@@ -1000,7 +1138,7 @@ def parse_page(
 # ───────── §8.7 checks, hunt areas and note texts ─────────
 
 
-def _rows_for(state: DocState, spec: Brochure, species: str) -> list[tuple[HuntRow, bool]]:
+def rows_for(state: DocState, spec: Brochure, species: str) -> list[tuple[HuntRow, bool]]:
     return [
         (row, agree)
         for page in sorted(state.rows)
@@ -1034,7 +1172,7 @@ def checksum_scopes(
     A total opens a scope that runs until the next total of the same species, so the
     2026 bear page's `(240 Tags)` covers its fall tables and `(150 Tags)` the spring one.
     """
-    rows = [row for row, _ in _rows_for(state, spec, species)]
+    rows = [row for row, _ in rows_for(state, spec, species)]
     totals = [
         (page, title, amount)
         for page, title, amount in state.totals
@@ -1070,16 +1208,17 @@ def write_hunt_areas(ctx: ParseContext, state: DocState, spec: Brochure, species
         species,
     )
     seen: dict[tuple[int, str], tuple[int | None, bool, bool]] = {}
-    for row, _ in _rows_for(state, spec, species):
-        found = resolve_dates(row, ctx)[0]
+    for row, _ in rows_for(state, spec, species):
+        found = resolve_dates(row, ctx, spec)[0]
         year = found[0].start.year if found else ctx.license_year
-        meanings = {state.legend.get(m) for m in row.marks}
+        meanings = marker_meanings(row, state.legend)
         physical = state.printed_pages.get(row.description_page or -1)
         previous = seen.get((year, row.area), (None, False, False))
+        both = BOTH_CONDITIONS in meanings
         seen[(year, row.area)] = (
             physical or previous[0],
-            previous[1] or "includes_other_units" in meanings,
-            previous[2] or "portion_only" in meanings,
+            previous[1] or both or "includes_other_units" in meanings,
+            previous[2] or both or "portion_only" in meanings,
         )
     db.exec_many(
         "INSERT OR REPLACE INTO hunt_areas (license_year, species_id, area_id, description_page,"
@@ -1098,7 +1237,7 @@ def attach_note_texts(ctx: ParseContext, state: DocState, spec: Brochure, specie
     Runs at finalize, because the referenced page is usually read after the table.
     """
     updates: list[tuple[str, int, str]] = []
-    for row, _ in _rows_for(state, spec, species):
+    for row, _ in rows_for(state, spec, species):
         extra: list[str] = []
         for m in NOTE_REF_RE.finditer(row.notes):
             physical = state.printed_pages.get(int(m.group(2)))
@@ -1124,13 +1263,13 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
     the note texts attached to staged seasons).
     """
     state = state_for(ctx)
-    pairs = _rows_for(state, spec, species)
+    pairs = rows_for(state, spec, species)
     rows = [row for row, _ in pairs]
     if not rows:
         return None
     # One resolution per row — a hunt number can legitimately repeat, and proving it
     # does not is `no_duplicate_keys`' job, not this one's.
-    resolved = [(row, resolve_dates(row, ctx)) for row in rows]
+    resolved = [(row, resolve_dates(row, ctx, spec)) for row in rows]
     keys = [
         (row.hunt_number, to_iso(window.start), to_iso(window.end))
         for row, (wins, _) in resolved
@@ -1145,6 +1284,8 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
             leftovers=tuple(leftovers),
             bbox=row.bbox,
             must_produce=True,  # every controlled hunt prints at least one season window
+            # A two-year brochure prints one window for both years (§12 T-25).
+            recurring=spec.both_years,
         )
         for row, (wins, leftovers) in resolved
     ]
@@ -1200,6 +1341,17 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
         ],
         unreadable_titles=list(state.bad_titles),
         corrections_pages=_corrections_pages(state),
+        species_conflicts=[
+            {
+                "page": row.page,
+                "hunt": row.hunt_number,
+                "from_number": species,
+                "from_title": row.title.species_id,
+                "title": row.title.text,
+            }
+            for row in rows
+            if row.title.species_id is not None and row.title.species_id != species
+        ],
         hunt_areas={
             "distinct": len({row.area for row in rows}),
             "areas": areas,
@@ -1229,7 +1381,7 @@ def register_brochure(spec: Brochure) -> list[ParserSpec]:
                 ParserSpec(
                     name=section,
                     kind=spec.kind,
-                    match=_matches,
+                    match=matches_upright,
                     fn=partial(parse_page, spec=spec, species=species),
                     section=section,
                     begin=begin,
@@ -1240,7 +1392,7 @@ def register_brochure(spec: Brochure) -> list[ParserSpec]:
     return out
 
 
-def _matches(page: Page) -> bool:
+def matches_upright(page: Page) -> bool:
     """Every upright page: the hunt tables plus the pages whose footers, notes and hunt
     area descriptions the §8.7 checks resolve against."""
     return not page.rotated

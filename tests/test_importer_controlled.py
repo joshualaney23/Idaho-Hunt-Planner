@@ -163,7 +163,7 @@ def test_notes_are_recovered_and_turned_into_restriction_codes(parsed) -> None:
     """Path A's ruled output drops every Notes cell; the staged rows still carry them."""
     page = next(p for p in iter_pages(FIXTURE) if "13,226" in p.text)
     table = page.cell_tables[0]
-    header = controlled._header_index(table, BIG_GAME)
+    header, _groups = controlled._header_groups(table, BIG_GAME)
     assert all(row[4] is None or not row[4].text for row in table[header + 1 :])
 
     _, rows = parsed
@@ -350,8 +350,8 @@ def test_an_unreadable_date_cell_is_staged_as_a_failing_row_never_dropped() -> N
 
 
 def test_rotated_pages_are_ignored() -> None:
-    assert not controlled._matches(Page(number=1, text="Hunt No.", rotated=True))
-    assert controlled._matches(Page(number=1, text="anything"))
+    assert not controlled.matches_upright(Page(number=1, text="Hunt No.", rotated=True))
+    assert controlled.matches_upright(Page(number=1, text="anything"))
 
 
 # ───────── wired into the pipeline ─────────

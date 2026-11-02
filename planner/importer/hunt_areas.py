@@ -45,19 +45,26 @@ from planner.importer.textlayer import group_lines, join_words
 #: Where part 1's committed build output lives (`static/`, never the git-ignored `data/`).
 COVERAGE_DIR = Path(__file__).resolve().parents[2] / "static" / "data" / "hunt_area_coverage"
 
-#: `DEER CONTROLLED HUNT AREA DESCRIPTIONS` — the section heading, per species.
-HEADING_RE = re.compile(r"^(?P<species>[A-Z][A-Z ]*?)\s+CONTROLLED HUNT AREA DESCRIPTIONS", re.M)
 #: `Hunt Area 36A-1X — All of Units 36A, 36B, 37 and 37A.` The separator is an em or en
 #: dash (a plain hyphen is part of the area id, and 2026 elk 60-1 prints `—All` with no
-#: space after it), and the id is matched by the same shape the hunt tables print.
-ENTRY_RE = re.compile(r"^Hunt Area\s+(?P<area>\d{1,2}[A-Z]?(?:-\d+)?[A-Z]*)\s*[—–]\s*")
+#: space after it), and the id is matched by the same shape the hunt tables print. One
+#: entry may describe **several** areas at once (MSG sheep: `Hunt Area 28-1 and 28-1L —`).
+AREA_ID = r"\d{1,2}[A-Z]?(?:-\d+)?[A-Z]*"
+ENTRY_RE = re.compile(rf"^Hunt Areas?\s+(?P<areas>{AREA_ID}(?:\s+and\s+{AREA_ID})*)\s*[—–]\s*")
+#: A single area id inside that list.
+AREA_ID_RE = re.compile(AREA_ID)
 #: The page footer and the legend, printed inside a column and never part of an entry.
 JUNK_RE = re.compile(r"Seasons & Rules|idfg\.idaho\.gov|See controlled hunt area", re.IGNORECASE)
 #: `Unit 8A/10A boundary` names the line between two units, not an area's units.
 BOUNDARY_PAIR_RE = re.compile(r"\bUnits?\s+\d{1,2}[A-Z]?\s*/\s*\d{1,2}[A-Z]?", re.IGNORECASE)
-#: `All of Units 1, 2, 3, 4, 4A, 5, 6, 7 and 9` / `All of Unit 43 and 48`.
+#: `All of Units 1, 2, 3, 4, 4A, 5, 6, 7 and 9` / `All of Unit 43 and 48`. The period
+#: is a typo the 2025 MSG brochure prints (`All of Unit. 63A.`), and a description may
+#: also name the unit without the word at all (`That portion of 19A within the South
+#: Fork …`), which is still the unit and nothing else (§12 T-25).
 UNIT_PHRASE_RE = re.compile(
-    r"\bUnits?\s+((?:\d{1,2}[A-Z]?)(?:\s*(?:,|and|,? and)\s*\d{1,2}[A-Z]?)*)", re.IGNORECASE
+    r"(?:\bUnits?\.?|\bportions?\s+of)\s+"
+    r"((?:\d{1,2}[A-Z]?)(?:\s*(?:,|and|,? and)\s*\d{1,2}[A-Z]?)*)",
+    re.IGNORECASE,
 )
 #: A unit token inside such a phrase.
 UNIT_TOKEN_RE = re.compile(r"\d{1,2}[A-Z]?")
@@ -175,12 +182,21 @@ def columns_of(page: Page) -> list[list[Word]]:
     no such whitespace runs **through** the gutter, so it is a full-width heading, the
     section's preamble or the page footer — never part of a description, which always
     stays inside its column — and its words belong to neither column.
+
+    The rotated section tab is not a column: a page read with a crop narrower than the
+    tab (MSG, §12 T-25) keeps its sideways chars in `words`, where they shift the
+    midpoint and silently drop the printed lines they sit beside, so they go first.
     """
-    if not page.words:
+    body = [
+        w
+        for w in page.words
+        if w.x0 >= page.tab_left - 0.5 and w.x1 <= (page.width or w.x1) - page.tab_right + 0.5
+    ]
+    if not body:
         return []
-    mid = (min(w.x0 for w in page.words) + max(w.x1 for w in page.words)) / 2
+    mid = (min(w.x0 for w in body) + max(w.x1 for w in body)) / 2
     columns: list[list[Word]] = [[], []]
-    for line in group_lines(page.words):
+    for line in group_lines(body):
         words = sorted(line.words, key=lambda w: w.x0)
         left = [w for w in words if w.x1 <= mid]
         right = [w for w in words if w.x0 >= mid]
@@ -196,37 +212,44 @@ def columns_of(page: Page) -> list[list[Word]]:
 
 
 def entries_on(
-    page: Page, species_id: str, carried: AreaDescription | None
-) -> tuple[list[AreaDescription], AreaDescription | None]:
+    page: Page, species: Sequence[str], carried: list[AreaDescription], spec: Brochure
+) -> tuple[list[AreaDescription], list[AreaDescription]]:
     """Every entry printed on one page, continuing `carried` from the previous page.
 
-    Returns the entries that start here plus the one still open, which the next column
-    — on this page or the next — goes on appending to.
+    Returns the entries that start here plus the ones still open, which the next column
+    — on this page or the next — goes on appending to. An entry that names several
+    areas becomes one `AreaDescription` per area **sharing one `parts` list**, so the
+    continuation lines reach every area the entry describes.
     """
     found: list[AreaDescription] = []
-    current = carried
-    printed = printed_page(page)
+    current = list(carried)
+    printed = printed_page(page, spec)
     for column in columns_of(page):
         previous_bottom: float | None = None
         for line in sorted(group_lines(column), key=lambda ln: ln.top):
             if previous_bottom is not None and line.top - previous_bottom > BREAK_GAP_PT:
-                current = None
+                current = []
             previous_bottom = line.bottom
             text = join_words(line.words)
             if JUNK_RE.search(text):
                 continue
             match = ENTRY_RE.match(text)
             if match is not None:
-                current = AreaDescription(
-                    species_id=species_id,
-                    area_id=match.group("area"),
-                    page=page.number,
-                    printed_page=printed,
-                    parts=[text[match.end() :]],
-                )
-                found.append(current)
-            elif current is not None:
-                current.parts.append(text)
+                parts = [text[match.end() :]]
+                current = [
+                    AreaDescription(
+                        species_id=species_id,
+                        area_id=area_id,
+                        page=page.number,
+                        printed_page=printed,
+                        parts=parts,  # shared on purpose: one entry, several areas
+                    )
+                    for area_id in AREA_ID_RE.findall(match.group("areas"))
+                    for species_id in species
+                ]
+                found += current
+            elif current:
+                current[0].parts.append(text)
     return found, current
 
 
@@ -246,25 +269,29 @@ def _joined(parts: Sequence[str]) -> str:
     return out.strip()
 
 
-def printed_page(page: Page) -> int | None:
+def printed_page(page: Page, spec: Brochure = BIG_GAME) -> int | None:
     """The brochure's own page number, read from the uncropped footer band."""
-    match = BIG_GAME.footer_re.search(page.footer)
+    match = spec.footer_re.search(page.footer)
     if match is None:
         return None
     value = match.group("right") or match.group("left")
     return int(value) if value else None
 
 
-def species_heading(page: Page, spec: Brochure) -> str | None:
-    """The species whose description section starts on this page, if any."""
-    match = HEADING_RE.search(page.text)
+def species_heading(page: Page, spec: Brochure) -> tuple[str, ...]:
+    """The species whose description section starts on this page (empty tuple: none).
+
+    One section can describe **two** species: MSG prints a single `ROCKY MOUNTAIN &
+    CALIFORNIA BIGHORN SHEEP HUNT AREA DESCRIPTIONS` section for both bighorn species
+    (§12 T-25), so every species word the heading names claims its entries.
+    """
+    match = spec.heading_re.search(page.text)
     if match is None:
-        return None
-    heading = match.group("species").strip().lower()
-    for word, species_id in spec.species_words:
-        if word in heading:
-            return species_id
-    return None
+        return ()
+    heading = re.sub(r"\s+", " ", match.group("species")).strip().lower()
+    return tuple(
+        dict.fromkeys(species_id for word, species_id in spec.species_words if word in heading)
+    )
 
 
 # ───────── per-document state ─────────
@@ -275,8 +302,8 @@ class DocState:
     """What the hunt-area parsers share while reading one document."""
 
     seen: set[int] = field(default_factory=set)
-    species: str | None = None
-    open_entry: AreaDescription | None = None
+    species: tuple[str, ...] = ()
+    open_entries: list[AreaDescription] = field(default_factory=list)
     descriptions: dict[tuple[str, str], AreaDescription] = field(default_factory=dict)
     pages: dict[str, list[int]] = field(default_factory=dict)
 
@@ -300,21 +327,22 @@ def read_page(page: Page, ctx: ParseContext, spec: Brochure) -> None:
         return
     state.seen.add(page.number)
     heading = species_heading(page, spec)
-    if heading is not None:
+    if heading:
         state.species = heading
-        state.open_entry = None
-    if state.species is None:
+        state.open_entries = []
+    if not state.species:
         return
     starts_entry = any(ENTRY_RE.match(line.strip()) for line in page.text.splitlines())
-    if heading is None and not starts_entry:
+    if not heading and not starts_entry:
         # Past the end of the section: an entry is never continued onto a page that
         # starts none of its own (2026: every continuation page prints further entries).
-        state.species = None
-        state.open_entry = None
+        state.species = ()
+        state.open_entries = []
         return
-    entries, state.open_entry = entries_on(page, state.species, state.open_entry)
+    entries, state.open_entries = entries_on(page, state.species, state.open_entries, spec)
     if entries:
-        state.pages.setdefault(state.species, []).append(page.number)
+        for species_id in state.species:
+            state.pages.setdefault(species_id, []).append(page.number)
     for entry in entries:
         state.descriptions[(entry.species_id, entry.area_id)] = entry
 
@@ -467,6 +495,19 @@ def write_descriptions(
 # ───────── §8.7 facts ─────────
 
 
+def description_for(state: DocState, species_id: str, area_id: str) -> AreaDescription | None:
+    """The description of one hunt area, as the hunt table prints its id.
+
+    MSG prints a full-size `*` as part of the id in the hunt tables (it is part of the
+    GIS id too, §12 T-25) but never in the description heading, so the marked id falls
+    back to the bare one.
+    """
+    entry = state.descriptions.get((species_id, area_id))
+    if entry is None and area_id.endswith("*"):
+        entry = state.descriptions.get((species_id, area_id.rstrip("*")))
+    return entry
+
+
 def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts | None:
     """Resolve this species' hunt areas, write them, and report what the checks read."""
     state = state_for(ctx)
@@ -492,7 +533,7 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
     staged = _staged_areas(ctx, species)
     facts: list[AreaFacts] = []
     for area_id, (includes_other_units, portion_only) in sorted(footnotes.items()):
-        description = state.descriptions.get((species, area_id))
+        description = description_for(state, species, area_id)
         resolved = resolve_area(species, area_id, description, coverage)
         write_descriptions(ctx, species, resolved, description)
         seasons = write_units(staged.get(area_id, []), resolved, known_units)

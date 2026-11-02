@@ -47,7 +47,7 @@ SUPERSCRIPT_SHARE = 0.75
 #: number there, in the margin the side crop removes (T-17a printed → physical map).
 FOOTER_BAND_PT = 40.0
 #: Bumped whenever the cached shape changes, which invalidates older cache files.
-CACHE_VERSION = 5
+CACHE_VERSION = 6
 
 Table = list[list[str | None]]
 
@@ -173,6 +173,12 @@ class Page:
     rot_words: list[Word] = field(default_factory=list)
     rot_rects: list[Shape] = field(default_factory=list)
     rot_rules: list[Shape] = field(default_factory=list)
+    #: How far the rotated section tab reaches into each side (`tab_margins`, measured
+    #: on the uncropped page). A page extracted with a smaller crop than the tab keeps
+    #: those sideways chars in `words`, where they belong to no text column — the MSG
+    #: brochure is read uncropped, so its reader needs to know where the tab ends (T-25).
+    tab_left: float = 0.0
+    tab_right: float = 0.0
 
     @property
     def lines(self) -> list[str]:
@@ -216,6 +222,8 @@ class Page:
             "rot_words": [w.to_json() for w in self.rot_words],
             "rot_rects": [s.to_json() for s in self.rot_rects],
             "rot_rules": [s.to_json() for s in self.rot_rules],
+            "tab_left": self.tab_left,
+            "tab_right": self.tab_right,
         }
 
     @classmethod
@@ -241,6 +249,8 @@ class Page:
             rot_words=[Word.from_json(w) for w in data.get("rot_words") or ()],
             rot_rects=[Shape.from_json(s) for s in data.get("rot_rects") or ()],
             rot_rules=[Shape.from_json(s) for s in data.get("rot_rules") or ()],
+            tab_left=float(data.get("tab_left") or 0.0),
+            tab_right=float(data.get("tab_right") or 0.0),
         )
 
 
@@ -449,6 +459,9 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
     wide_tables: list[Table] = []
     wide_words: list[Word] = []
     wide_text = ""
+    # The tab's reach is always recorded, measured against the *default* cap: a page
+    # cropped less than that (MSG, §12 T-25) keeps the tab's sideways chars in `words`.
+    tab_left, tab_right = tab_margins(body, SIDE_CROP_PT)
     left, right = tab_margins(body, margin)
     if tables and (left, right) != (margin, margin):
         wide = crop_page(body, left, right)
@@ -481,6 +494,8 @@ def extract_page(page: Any, number: int, *, margin: float = SIDE_CROP_PT) -> Pag
         rot_words=rot_words,
         rot_rects=rot_rects,
         rot_rules=rot_rules,
+        tab_left=tab_left,
+        tab_right=tab_right,
     )
 
 

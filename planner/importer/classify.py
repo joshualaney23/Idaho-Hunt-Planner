@@ -28,8 +28,9 @@ CLASSIFY_PAGES = 3
 PRIORITY = {"supplemental": 10, "manual": 20}
 
 _YEAR = r"(?:19|20)\d{2}"
-#: "2026-2027", "2026–27", "2025-26" → (start, end).
-_YEAR_RANGE_RE = re.compile(rf"\b({_YEAR})\s*[-–—/]\s*((?:19|20)?\d{{2}})\b")
+#: "2026-2027", "2026–27", "2025-26", "2025 & 2026" → (start, end). The MSG brochure
+#: prints its two license years with an ampersand on the cover (§12 T-25).
+_YEAR_RANGE_RE = re.compile(rf"\b({_YEAR})\s*(?:[-–—/]|&|and)\s*((?:19|20)?\d{{2}})\b")
 _YEAR_RE = re.compile(rf"\b({_YEAR})\b")
 
 #: kind → (patterns that must all match, at least one of which names the document).

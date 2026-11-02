@@ -138,17 +138,27 @@ def unit_tokens_valid(c: CheckContext) -> CheckResult | None:
 
 @check()
 def tag_checksum(c: CheckContext) -> CheckResult | None:
-    """Σ the Tags column == every total printed in a section header or sub-header (§8.7)."""
+    """Σ the Tags column == every total printed in a section header or sub-header (§8.7).
+
+    A printed total may legitimately cover tags that have **no table row** (MSG's sheep
+    header: `100 Total Tags Including Special Lottery and Auction Tag`) or rows a
+    correction has since zeroed (California 7 → 5). Such a total carries `accounted`
+    — how many of its tags the parser explained — and the explanation itself, which the
+    detail always names (§8.7: the extra tags must be named explicitly).
+    """
     totals = c.facts.tag_totals
     if totals is None:
         return None
     summed = list(totals)
-    bad = [s for s in summed if s["header"] != s["parsed"]]
+    bad = [s for s in summed if s["header"] != s["parsed"] + int(s.get("accounted") or 0)]
     return CheckResult(
         name="tag_checksum",
         status="pass" if summed and not bad else "fail",
         expected=", ".join(f"{s['header']}" for s in summed) or "a printed tag total",
-        actual=", ".join(f"{s['parsed']}" for s in summed) or "no total found",
+        actual=", ".join(
+            f"{s['parsed']}" + (f"+{s['accounted']}" if s.get("accounted") else "") for s in summed
+        )
+        or "no total found",
         detail=summed or None,
     )
 
@@ -184,20 +194,30 @@ def general_coverage(c: CheckContext) -> CheckResult | None:
 
 @check()
 def yoy_diff(c: CheckContext) -> CheckResult | None:
-    """Warn on rows that need a year-over-year look — here, a season that starts in a
-    calendar year other than the license year (§8.7 `yoy_diff` is a warning, never a block)."""
+    """Warn on rows that need a year-over-year look — here, a season that starts outside
+    the years the document covers (§8.7 `yoy_diff` is a warning, never a block).
+
+    A two-year brochure covers `license_year` **and** `year_end` (MSG 2025 & 2026), so
+    both are in range; for a single-year brochure the two are the same year.
+    """
     windows = c.facts.first_windows
     if windows is None:
         return None
+    years = range(c.license_year, c.parse.year_end + 1)
     other_year = [
         {"label": w.label, "title": w.title, "start": w.start.isoformat()}
         for w in windows
-        if w.start.year != c.license_year
+        if w.start.year not in years
     ]
+    covered = (
+        str(c.license_year)
+        if c.parse.year_end == c.license_year
+        else f"{c.license_year}–{c.parse.year_end}"
+    )
     return CheckResult(
         name="yoy_diff",
         status="warn" if other_year else "pass",
-        expected=f"dates inside the {c.license_year} license year",
+        expected=f"dates inside the {covered} license year",
         actual=f"{len(other_year)} rows dated in another calendar year",
         detail=other_year or None,
     )
@@ -207,19 +227,33 @@ def yoy_diff(c: CheckContext) -> CheckResult | None:
 def corrections_applied(c: CheckContext) -> CheckResult | None:
     """Every item on the brochure's Corrections page is matched to the rows it changes.
 
-    Matching the items themselves is T-22b's review gate; this records the pages that
-    print one so no correction can pass unnoticed (§8.7).
+    A brochure whose corrections the parser reads item by item (MSG, §12 T-25) hands
+    them over in `facts.corrections`: each one names a hunt number, and the check fails
+    when a correction matches no parsed row or the parsed row disagrees with it. A
+    brochure whose corrections are not parsed records the pages that print one, so no
+    correction can pass unnoticed (§8.7).
     """
+    items = c.facts.corrections
+    if items is not None:
+        found = list(items)
+        unmatched = [i for i in found if not i.get("matched") or not i.get("agrees")]
+        return CheckResult(
+            name="corrections_applied",
+            status="pass" if not unmatched else "fail",
+            expected=f"{len(found)} correction items match the rows they change",
+            actual=f"{len(found) - len(unmatched)} applied, {len(unmatched)} unexplained",
+            detail=found or None,
+        )
     pages = c.facts.corrections_pages
     if pages is None:
         return None
-    found = list(pages)
+    found_pages = list(pages)
     return CheckResult(
         name="corrections_applied",
         status="pass",
         expected="every item on the brochure's corrections page is matched",
         actual="no corrections page in this document"
-        if not found
-        else f"corrections on pages {found} need review",
-        detail=found or None,
+        if not found_pages
+        else f"corrections on pages {found_pages} need review",
+        detail=found_pages or None,
     )

@@ -239,7 +239,8 @@ def test_qualifier_codes(text: str, code: str) -> None:
 
 def test_every_qualifier_code_is_covered_and_valid() -> None:
     """Every code this module can emit has a case above, and is a §5.1 code."""
-    covered = {code for _, code in QUALIFIER_CASES} | {"see_notes"}
+    # `wilderness_terrain` comes from a printed footnote legend, not a qualifier (T-25).
+    covered = {code for _, code in QUALIFIER_CASES} | {"see_notes", "wilderness_terrain"}
     assert covered == common.RESTRICTION_CODES
     assert common.RESTRICTION_CODES <= set(engine.RESTRICTIONS)
 

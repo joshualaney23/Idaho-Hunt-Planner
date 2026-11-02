@@ -309,9 +309,11 @@ QUALIFIER_PATTERNS: tuple[tuple[str, str], ...] = (
 _QUALIFIER_RES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
     (re.compile(p, re.IGNORECASE), code) for p, code in QUALIFIER_PATTERNS
 )
-#: Restriction codes this module can produce (`see_notes` is the catch-all).
+#: Restriction codes a parser may stage (`see_notes` is the catch-all). Most come from
+#: a printed qualifier; `wilderness_terrain` comes from a printed footnote legend
+#: instead (§12 T-25), never from a qualifier phrase.
 RESTRICTION_CODES: frozenset[str] = frozenset(
-    {code for _, code in QUALIFIER_PATTERNS} | {"see_notes"}
+    {code for _, code in QUALIFIER_PATTERNS} | {"see_notes", "wilderness_terrain"}
 )
 _PAREN_RE = re.compile(r"\(([^)]*)\)")
 #: Parentheticals that are never a restriction (page pointers, tag counts).
