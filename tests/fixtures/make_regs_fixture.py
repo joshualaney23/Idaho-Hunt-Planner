@@ -246,6 +246,163 @@ def upland_bird_pages() -> list[list[str]]:
     return [cover, grouse, chukar, sage, sharptail, pheasant]
 
 
+def turkey_pages() -> list[list[str]]:
+    """The turkey pages of the Upland brochure, with the traps the real one prints (T-23).
+
+    Page 2 is the general-season page (real printed p. 22): a Spring youth table and a
+    Fall table separated by a **full-width banner** (`2026 & 2027 Fall Turkey - General
+    Seasons`, which names no sex and so is not a table title but is certainly not a row
+    either), a sideways section tab printed up the page edge, a unit cell that wraps
+    over two lines, a Notes cell wrapping over three (`Archery only, / Archery Permit /
+    Required` — the hunt's **weapon**, not a note), and a `See note 1` pointer into the
+    numbered notes block. Every table prints its title inside its own ruled box, as the
+    real one does.
+
+    Page 3 adds the row the real 2026 brochure never prints: a unit list that defers to
+    the p. 23 **maps** (`See map on page 23`), which are images and are deliberately not
+    a data source (§12 T-23) — so the row must be staged for manual entry, never guessed.
+
+    Page 4 is the controlled-hunt page (real printed pp. 24-25): `Hunt No` with **no
+    period**, each hunt area's description printed **inside** its area cell, hunts
+    numbered `9xxx`, and a youth table whose Season Dates cell prints `Youth Hunt`
+    above its window.
+    """
+
+    def cell(x0: float, widths: list[float], column: int, y: float, s: str) -> str:
+        """One line of a wrapped cell, placed by hand at the column's left edge."""
+        return text_op(x0 + sum(widths[:column]) + 3, y, 8, s)
+
+    cover = [
+        text_op(90, 650, 22, "Idaho Upland Game,"),
+        text_op(90, 620, 22, "Turkey & Furbearer"),
+        text_op(90, 592, 16, "2026 & 2027 Seasons & Rules"),
+        text_op(90, 566, 11, "Idaho Department of Fish and Game"),
+    ]
+
+    gen_w = [300.0, 110.0, 90.0]
+    general = [
+        # The sideways section tab: zero-width words that merge into a printed line and
+        # bridge the gap between two tables unless they are filtered out.
+        text_op(14, 300, 11, "Turkey General Seasons", rotated=True),
+        text_op(60, 756, 14, "WILD TURKEY GENERAL SEASONS 2026 & 2027"),
+        text_op(60, 740, 11, "2026 & 2027 Spring Turkey - General Seasons"),
+        text_op(60, 728, 9, "For turkey season limits, see page 20."),
+        *table(
+            36,
+            714,
+            gen_w,
+            30,
+            [
+                ["Spring Turkey - Youth Only - Male or Bearded Turkey", "", ""],
+                ["Game Management Units", "Season Dates", "Notes"],
+                ["", "April 8 - April 14", "See note 1"],
+                ["21, 21A, 28, 29, 30, 36A, 36B, 37 & 37A", "April 8 - May 25", "See note 1"],
+            ],
+            size=8,
+        ),
+        # The first row's unit cell wraps over two printed lines.
+        cell(36, gen_w, 0, 648, "1, 2 (except Farragut State Park and WMA), 3, 4, 4A,"),
+        cell(36, gen_w, 0, 639, "5, 6, 7, 8, 8A, 9, 10, 10A, 11 & 12"),
+        # The full-width banner between the two tables.
+        text_op(60, 580, 11, "2026 & 2027 Fall Turkey - General Seasons"),
+        text_op(60, 568, 9, "For turkey season limits, see page 20."),
+        *table(
+            36,
+            554,
+            gen_w,
+            42,
+            [
+                ["Fall Turkey - Either Sex Turkey", "", ""],
+                ["Game Management Units", "Season Dates", "Notes"],
+                [
+                    "1, 2 (except Farragut State Park and WMA), 3, 4 & 4A",
+                    "August 30 - January 31",
+                    "See note 2",
+                ],
+                ["2 (Farragut State Park and WMA only)", "November 1 - December 1", ""],
+            ],
+            size=8,
+        ),
+        # The Notes cell of the last row wraps over three printed lines, **centred on
+        # its own row** as the real brochure prints it: the cell is taller than its
+        # neighbours, so its first line reaches up towards the row above. Only the
+        # vertical-centre rule path B uses keeps it in the right row.
+        cell(36, gen_w, 2, 405, "Archery only,"),
+        cell(36, gen_w, 2, 396, "Archery Permit"),
+        cell(36, gen_w, 2, 387, "Required"),
+        text_op(36, 356, 10, "Notes:"),
+        text_op(36, 342, 9, "1. These are Youth Only hunts. See page 18 for age requirements."),
+        text_op(36, 328, 9, "2. These hunts overlap calendar years. Turkey tags expire Dec 31."),
+        text_op(36, 40, 8, "22 Upland Game, Turkey & Furbearer, 2026 & 2027 Seasons & Rules"),
+        text_op(480, 40, 8, "idfg.idaho.gov"),
+    ]
+
+    see_map = [
+        text_op(14, 300, 11, "Turkey General Seasons", rotated=True),
+        text_op(60, 756, 14, "WILD TURKEY GENERAL SEASONS 2026 & 2027"),
+        text_op(60, 740, 11, "2026 & 2027 Spring Turkey - General Seasons"),
+        *table(
+            36,
+            714,
+            gen_w,
+            24,
+            [
+                ["Spring Turkey - Male or Bearded Turkey", "", ""],
+                ["Game Management Units", "Season Dates", "Notes"],
+                ["See map on page 23", "April 15 - May 25", ""],
+            ],
+            size=8,
+        ),
+        text_op(36, 40, 8, "23 Upland Game, Turkey & Furbearer, 2026 & 2027 Seasons & Rules"),
+        text_op(480, 40, 8, "idfg.idaho.gov"),
+    ]
+
+    ctl_w = [56.0, 250.0, 150.0, 44.0]
+    controlled = [
+        text_op(14, 300, 11, "Hunt Seasons", rotated=True),
+        text_op(60, 756, 14, "WILD TURKEY CONTROLLED HUNT SEASONS 2026 & 2027"),
+        text_op(60, 740, 12, "SPRING"),
+        text_op(60, 726, 9, "Spring controlled hunt application period: February 1 - March 1."),
+        *table(
+            36,
+            706,
+            ctl_w,
+            30,
+            [
+                ["2026 & 2027 Spring Controlled Hunts", "", "", ""],
+                ["Youth Only - Male or Bearded Turkey", "", "", ""],
+                ["Hunt No", "Controlled Hunt Area Descriptions", "Season Dates", "Tags"],
+                ["9001", "50-1: All of Unit 50, 51, 58, 59 and 59A", "", "100"],
+                ["9002", "54-1: All of Units 54 and 55", "", "25"],
+            ],
+            size=8,
+        ),
+        # `Youth Hunt` is printed above the window inside the Season Dates cell, the
+        # pair centred on its row.
+        text_op(36 + ctl_w[0] + ctl_w[1] + 3, 601, 8, "Youth Hunt"),
+        text_op(36 + ctl_w[0] + ctl_w[1] + 3, 592, 8, "April 8 - May 25"),
+        text_op(36 + ctl_w[0] + ctl_w[1] + 3, 571, 8, "Youth Hunt"),
+        text_op(36 + ctl_w[0] + ctl_w[1] + 3, 562, 8, "April 8 - May 25"),
+        *table(
+            36,
+            520,
+            ctl_w,
+            26,
+            [
+                ["2026 & 2027 Spring Controlled Hunts", "", "", ""],
+                ["Male or Bearded Turkey", "", "", ""],
+                ["Hunt No", "Controlled Hunt Area Descriptions", "Season Dates", "Tags"],
+                ["9009", "63A: All of Unit 63A", "April 15 - April 30", "50"],
+                ["9010", "63A: All of Unit 63A", "May 1 - May 25", "50"],
+            ],
+            size=8,
+        ),
+        text_op(36, 40, 8, "24 Upland Game, Turkey & Furbearer, 2026 & 2027 Seasons & Rules"),
+        text_op(480, 40, 8, "idfg.idaho.gov"),
+    ]
+    return [cover, general, see_map, controlled]
+
+
 def supplemental_pages() -> list[list[str]]:
     return [
         [
@@ -261,6 +418,7 @@ def main() -> None:
         ("big_game_sample.pdf", big_game_pages()),
         ("upland_sample.pdf", upland_pages()),
         ("upland_birds_sample.pdf", upland_bird_pages()),
+        ("upland_turkey_sample.pdf", turkey_pages()),
         ("supplemental_sample.pdf", supplemental_pages()),
     ):
         path = FIXTURES / name

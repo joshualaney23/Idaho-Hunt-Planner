@@ -479,6 +479,13 @@ def row_seasons(row: GeneralRow, ctx: ParseContext) -> list[GeneralSeason]:
         codes.append("youth_only")
     weapon = "archery" if ARCHERY_RE.search(row.notes_text) else "any"
     see_map = bool(SEE_MAP_RE.search(row.units_text))
+    if see_map:
+        # `See map on page 23` names a **page**, and `parse_units` reads `23` as GMU 23
+        # — a valid-looking unit nothing on the page says is in the hunt. The p. 23
+        # maps are images and are not a data source (§12 T-23), so nothing is read out
+        # of such a cell: the row carries no units, which makes the pipeline stage it
+        # as a failing row for manual unit entry (D3: never guess).
+        parsed = replace(parsed, units=[], unknown=[])
     ranges = common.parse_date_ranges(row.dates_text, ctx.license_year)
     leftovers = list(common.leftover_date_text(row.dates_text, ranges))
     both = ctx.year_end > ctx.license_year
