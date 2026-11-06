@@ -110,9 +110,22 @@ def footnote_consistency(c: CheckContext) -> CheckResult | None:
       one satisfies it.
     * no footnote ⇒ exactly one unit, covered in full ("All of Unit X").
     """
+    facts = c.facts.hunt_area_coverage
     areas = _areas(c)
-    if areas is None:
+    if facts is None or areas is None:
         return None
+    if not facts.footnotes_printed:
+        # A brochure that prints no footnote legend has nothing for this invariant to
+        # compare: every turkey area spells its own units out in full, and judging it
+        # against absent markers failed 10 of 11 correct areas (§12 T-23). `skipped`
+        # rather than `pass`, so the gate reports that nothing was measured (§8.7).
+        return CheckResult(
+            name="footnote_consistency",
+            status="skipped",
+            expected="each area agrees with its printed footnote",
+            actual=f"this brochure prints no footnote legend; {len(areas)} areas"
+            " resolved from their printed descriptions",
+        )
     judged = [a for a in areas if a.resolved_units]
     problems: list[dict[str, Any]] = []
     for area in judged:
