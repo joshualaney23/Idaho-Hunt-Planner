@@ -173,6 +173,10 @@ class HuntAreaCoverage:
     has_geometry: bool
     coverage_file: str
     areas: Sequence[AreaFacts] = ()
+    #: Does this brochure print a footnote legend beside its hunt areas at all? The
+    #: turkey tables print none — every area spells its own description out in full —
+    #: so `footnote_consistency` has no printed marker to agree with (§12 T-23).
+    footnotes_printed: bool = True
 
 
 @dataclass(frozen=True)

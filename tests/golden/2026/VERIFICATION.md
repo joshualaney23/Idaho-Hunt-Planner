@@ -64,3 +64,28 @@ Source: `data/regs/2026/feb85a9c8741a72a1aeb40462cceaa391e8d1849df3604fdaa156a07
 | **total** | **99** | josh | 2026-10-19 | 1 row restored (p049) |
 
 <!-- /section: elk_zones -->
+
+<!-- section: turkey_general -->
+## `turkey_general`
+
+Source: `data/regs/2026/8d85df043de020f99771085ca22734996e26e7c7c445fd7e6bb623d6f3a976b0.pdf` · **10 rows** on 1 pages · images: `data/verify/2026/turkey_general/`
+
+| PDF page | Rows | Verified by | Date | Corrections made |
+|---|---:|---|---|---|
+| p022 | 10 | | | |
+| **total** | **10** | | | |
+
+<!-- /section: turkey_general -->
+
+<!-- section: controlled_turkey -->
+## `controlled_turkey`
+
+Source: `data/regs/2026/8d85df043de020f99771085ca22734996e26e7c7c445fd7e6bb623d6f3a976b0.pdf` · **16 rows** on 2 pages · images: `data/verify/2026/controlled_turkey/`
+
+| PDF page | Rows | Verified by | Date | Corrections made |
+|---|---:|---|---|---|
+| p024 | 10 | | | |
+| p025 | 6 | | | |
+| **total** | **16** | | | |
+
+<!-- /section: controlled_turkey -->

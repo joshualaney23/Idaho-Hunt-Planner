@@ -151,7 +151,7 @@ def committed() -> dict[str, Any]:
 
 def test_committed_file_shape(committed):
     assert committed["license_year"] == 2026
-    assert sorted(committed["species"]) == ["deer", "elk", "pronghorn"]
+    assert sorted(committed["species"]) == ["deer", "elk", "pronghorn", "turkey"]
     assert COVERAGE_2026.stat().st_size < 150 * 1024
 
 
@@ -165,13 +165,22 @@ def test_every_hunt_area_resolves_to_at_least_one_unit(committed):
     assert empty == []
 
 
-def test_2026_uses_2025_geometry_everywhere(committed):
+def test_each_species_uses_the_newest_geometry_it_has(committed):
+    """Deer/elk/pronghorn lag a year; turkey's 2026 polygons exist (T-23).
+
+    A `geometry_year` below the license year is the review flag `geometry_year` raises,
+    so the two cases must stay distinguishable in the committed file.
+    """
     years = {
-        entry["geometry_year"]
-        for areas in committed["species"].values()
-        for entry in areas.values()
+        species: {entry["geometry_year"] for entry in areas.values()}
+        for species, areas in committed["species"].items()
     }
-    assert years == {2025}  # every area is a geometry_year < license_year review flag
+    assert years == {
+        "deer": {2025},
+        "elk": {2025},
+        "pronghorn": {2025},
+        "turkey": {2026},
+    }
 
 
 def test_fractions_are_in_range(committed):
@@ -197,6 +206,24 @@ def test_acceptance_deer_38_1_is_unit_38_partial(committed):
     units = committed["species"]["deer"]["38-1"]["units"]
     assert list(units) == ["38"]
     assert 0 < units["38"] < 0.98  # -> coverage 'partial' with this fraction
+
+
+def test_acceptance_turkey_has_every_2026_hunt_area_the_brochure_prints(committed):
+    """T-23 AC 2: every controlled turkey hunt area must match a 2026 GIS polygon.
+
+    The 2026 & 2027 Upland brochure prints 11 turkey areas (pp. 24-25); the layer holds
+    15 for 2026, so the brochure's set must be a subset. `38-2`, `50-3`, `54-3` and
+    `22-3` are polygons for hunts this brochure does not print.
+    """
+    turkey = committed["species"]["turkey"]
+    printed = {
+        "21-1", "22-1", "22-2", "36B-1", "38-1",
+        "50-1", "50-2", "54-1", "54-2", "60-1", "63A",
+    }  # fmt: skip
+    assert printed <= set(turkey)
+    assert sorted(turkey["63A"]["units"]) == ["63A"]
+    assert turkey["63A"]["units"]["63A"] >= 0.98  # the whole GMU -> coverage 'full'
+    assert sorted(turkey["54-1"]["units"]) == ["54", "55"]
 
 
 def test_committed_units_exist_in_the_seeded_unit_list(committed):

@@ -122,10 +122,23 @@ def is_no_season(cell: str | None) -> bool:
     return (cell or "").strip().strip(".").lower() in NO_SEASON_VALUES
 
 
-def in_license_year(d: dt.date, license_year: int, year_end: int | None = None) -> bool:
-    """Is `d` inside Jul 1 `license_year` … Jun 30 (`year_end` or `license_year`) + 1?"""
-    last = (year_end if year_end is not None else license_year) + 1
-    return dt.date(license_year, 7, 1) <= d <= dt.date(last, 6, 30)
+def in_license_year(
+    d: dt.date, license_year: int, year_end: int | None = None, *, calendar: bool = False
+) -> bool:
+    """Is `d` inside Jul 1 `license_year` … Jun 30 (`year_end` or `license_year`) + 1?
+
+    `calendar=True` instead accepts Jan 1 `license_year` … Dec 31 `year_end`: an Upland
+    brochure's turkey tags "expire on December 31 the year of purchase" (printed p. 22),
+    so its spring seasons are dated in `license_year` itself and the Jul→Jun window
+    would reject every one of them (§12 T-23).
+    """
+    last = year_end if year_end is not None else license_year
+    if calendar:
+        # The window starts on Jan 1 (a spring season is dated in `license_year`) and
+        # still runs to the Jul→Jun end, because the brochure's own note 2 says these
+        # hunts overlap calendar years: fall 2027 runs Aug 30 2027 – Jan 31 2028.
+        return dt.date(license_year, 1, 1) <= d <= dt.date(last + 1, 6, 30)
+    return dt.date(license_year, 7, 1) <= d <= dt.date(last + 1, 6, 30)
 
 
 # ───────── unit lists ─────────

@@ -88,6 +88,10 @@ UNLIMITED_RE = re.compile(r"\bunlimited\b", re.IGNORECASE)
 MARKER_RE = re.compile(r"[a-z*†‡]")
 #: What a hunt table's title must say for the block above a header row to be one.
 TITLE_MARKER_RE = re.compile(r"controlled", re.IGNORECASE)
+#: What marks a page as carrying a hunt table. The Big Game and MSG brochures print
+#: `Hunt No.`; the Upland brochure's turkey tables print `Hunt No` with no period
+#: (§12 T-23), so the marker is part of the `Brochure` rather than a literal.
+HUNT_PAGE_RE = re.compile(r"Hunt No\.", re.IGNORECASE)
 #: A legend meaning that covers **both** footnote conditions at once: MSG prints one
 #: `*` for "either a portion of this unit, includes other units or parts of other
 #: units", so the area satisfies `footnote_consistency` either way (§12 T-25).
@@ -105,6 +109,24 @@ COLUMNS: tuple[tuple[str, str], ...] = (
 )
 #: The columns a hunt record cannot be read without.
 REQUIRED_COLUMNS: frozenset[str] = frozenset({"number", "area", "tags", "dates"})
+#: Printed title phrase → `seasons.sex`. Longest/most specific first. A brochure with
+#: its own vocabulary overrides it (`Brochure.sex_titles`: the turkey tables print
+#: `Male or Bearded Turkey`, §12 T-23).
+SEX_TITLES: tuple[tuple[str, str], ...] = (
+    ("either sex", "either"),
+    ("doe or fawn", "antlerless"),
+    ("antlerless", "antlerless"),
+    ("antlered", "antlered"),
+)
+#: Printed title phrase → `seasons.hunt_class` (a controlled table is `controlled` by default).
+CLASS_TITLES: tuple[tuple[str, str], ...] = (("outfitter", "outfitter"), ("extra", "extra"))
+#: Printed title phrase → restriction code (§5.1).
+FLAG_TITLES: tuple[tuple[str, str], ...] = (
+    ("youth", "youth_only"),
+    ("outfitter", "outfitter_only"),
+)
+#: The sentence under a title that names other tags and would hijack the mapping.
+TITLE_DISCLAIMER_RE = re.compile(r"\btags?\s+(?:is|are)\s+valid\b", re.IGNORECASE)
 #: `MOOSE CONTROLLED HUNT AREA DESCRIPTIONS` — the description section's heading, whose
 #: species prefix may name more than one species (MSG prints one sheep section for both
 #: bighorn species, T-25). Read by `planner.importer.hunt_areas`.
@@ -146,10 +168,42 @@ class Brochure:
     #: `2025 & 2026 … Controlled Hunts`), so every printed window recurs in `year_end`
     #: as well — one printed token, two seasons (§12 T-25, like T-13's recurring windows).
     both_years: bool = False
+    #: Are this brochure's seasons dated by **calendar** year rather than by the Jul→Jun
+    #: license year? Turkey tags "expire on December 31 the year of purchase" (printed
+    #: p. 22), and its tables are titled `2026 & 2027 Spring Turkey`, so a printed
+    #: `April 8` belongs to the title's own year — not to `license_year + 1`, which is
+    #: what §8.3's Jul→Jun rule gives a spring month (§12 T-23).
+    calendar_years: bool = False
+    #: Printed title phrase → `seasons.sex`. The Big Game and MSG brochures print
+    #: antlered/antlerless; the turkey tables print `Male or Bearded Turkey` (§12 T-23).
+    sex_titles: tuple[tuple[str, str], ...] = SEX_TITLES
+    #: What marks a page as carrying a hunt table. The Big Game brochure prints
+    #: `Hunt No.`; the Upland brochure's turkey tables print `Hunt No` with no period.
+    hunt_page_re: re.Pattern[str] = HUNT_PAGE_RE
+    #: Is a 4-digit hunt number counted **anywhere** in the page text, not only at the
+    #: start of a line? Scanning everything invites false positives (years, phone
+    #: numbers, addresses — §8.7 `hunt_number_completeness`), so it is opt-in: the
+    #: turkey tables number every hunt `9xxx`, a prefix nothing else on those pages
+    #: uses, and their printed rows interleave in the text layer so a line start is not
+    #: reliable there (§12 T-23).
+    numbers_anywhere: bool = False
+    #: Does this brochure print a tag total in its section headers? The turkey tables
+    #: print none, so there is no checksum to run and `tag_checksum` records nothing
+    #: rather than failing on a total that was never printed (§12 T-23).
+    prints_tag_totals: bool = True
+    #: Is the hunt area's description printed **inside** the area cell (`50-1: All of
+    #: Units 54 and 55`) instead of on its own description pages? The turkey tables are
+    #: printed that way, so the id and its description are split at the colon (T-23).
+    area_descriptions_in_cell: bool = False
     #: Path B. A brochure whose tables the shared text path can't read supplies its own
     #: (MSG: two hunt records per printed row and a two-line header) — it must stay an
     #: **independent** reading of the text layer, never a second look at the rules (§8.7).
     read_text: TextPathFn | None = None
+
+    @property
+    def prints_footnotes(self) -> bool:
+        """Does this brochure print a footnote legend beside its hunt areas (§12 T-23)?"""
+        return bool(self.legend_meanings)
 
     def species_of(self, hunt_number: str) -> str | None:
         return self.species_by_prefix.get(hunt_number[:1])
@@ -176,22 +230,6 @@ BIG_GAME = Brochure(
     ),
 )
 
-#: Printed title phrase → `seasons.sex`. Longest/most specific first.
-SEX_TITLES: tuple[tuple[str, str], ...] = (
-    ("either sex", "either"),
-    ("doe or fawn", "antlerless"),
-    ("antlerless", "antlerless"),
-    ("antlered", "antlered"),
-)
-#: Printed title phrase → `seasons.hunt_class` (a controlled table is `controlled` by default).
-CLASS_TITLES: tuple[tuple[str, str], ...] = (("outfitter", "outfitter"), ("extra", "extra"))
-#: Printed title phrase → restriction code (§5.1).
-FLAG_TITLES: tuple[tuple[str, str], ...] = (
-    ("youth", "youth_only"),
-    ("outfitter", "outfitter_only"),
-)
-#: The sentence under a title that names other tags and would hijack the mapping.
-TITLE_DISCLAIMER_RE = re.compile(r"\btags?\s+(?:is|are)\s+valid\b", re.IGNORECASE)
 #: Distance (pt) a superscript may poke above its cell's top edge.
 MARK_PAD_PT = 4.0
 #: How far below its last date line a table's rows may still carry text (path B).
@@ -227,7 +265,7 @@ def parse_title(text: str, spec: Brochure = BIG_GAME) -> TitleInfo:
         head = head[: m.start()].strip()
     low = head.lower()
     species = spec.species_in(head)
-    sex = next((value for phrase, value in SEX_TITLES if phrase in low), "any")
+    sex = next((value for phrase, value in spec.sex_titles if phrase in low), "any")
     weapon = next((code for phrase, code in common.WEAPON_TITLES if phrase in low), "any")
     hunt_class = next((code for phrase, code in CLASS_TITLES if phrase in low), "controlled")
     flags = tuple(code for phrase, code in FLAG_TITLES if phrase in low)
@@ -275,6 +313,9 @@ class HuntRow:
         )
     )
     description_page: int | None = None  # printed page number, resolved at finalize
+    #: The area's description when the brochure prints it **inside** the area cell
+    #: (`50-1: All of Units 54 and 55`) rather than on its own pages (§12 T-23).
+    area_description: str = ""
     notes: str = ""
     bbox: tuple[float, float, float, float] | None = None
     leftovers: tuple[str, ...] = ()
@@ -325,6 +366,28 @@ def _text(cell: Cell | str | None) -> str:
     return re.sub(r"[ \t]+", " ", (value or "").replace("\n", " ")).strip()
 
 
+#: `50-1: All of Units 54 and 55` — an area cell that carries its own description.
+_AREA_CELL_RE = re.compile(r"^\s*(?P<area>[^:]{1,24}?)\s*:\s*(?P<description>.+)$", re.DOTALL)
+
+
+def split_area_cell(text: str, spec: Brochure) -> tuple[str, str]:
+    """An area cell as `(area id, description)`.
+
+    The Big Game and MSG brochures print the id alone and describe the area on its own
+    pages, so the description is empty here and `hunt_areas.py` reads it from those
+    pages. The turkey tables print both in one cell (§12 T-23) — the id before the
+    colon, the description after it — and **both paths must split it the same way**, or
+    every row disagrees on its area.
+    """
+    value = _text(text)
+    if not spec.area_descriptions_in_cell:
+        return value, ""
+    m = _AREA_CELL_RE.match(value)
+    if m is None:
+        return value, ""
+    return m.group("area").strip(), m.group("description").strip()
+
+
 #: One hunt record's columns inside a header row: field name → cell index.
 Group = dict[str, int]
 
@@ -355,6 +418,11 @@ def _header_groups(table: CellTable, spec: Brochure) -> tuple[int | None, list[G
         if groups:
             return index, groups
     return None, []
+
+
+def _is_header_row(row: Sequence[Cell | None], spec: Brochure) -> bool:
+    """Is this body row actually another table's header row (§12 T-23)?"""
+    return any(_text(c).lower().rstrip(".").startswith("hunt no") for c in row)
 
 
 def _title_text(table: CellTable, header_index: int) -> str:
@@ -406,9 +474,25 @@ def rows_from_tables(
         # order it is printed in, and the order the golden files keep.
         for columns in groups:
             start = len(out)
+            row_title = info
             for row in table[header_index + 1 :]:
                 cells = list(row) + [None] * (max(columns.values()) + 1 - len(row))
                 number = _text(cells[columns["number"]])
+                # Two printed tables can come back as ONE `cell_table` when they share a
+                # drawn rule: the 2026 Upland turkey page prints its Youth Only table
+                # directly above its Male or Bearded one, so the second table's title
+                # and header arrive as body rows. Without re-reading the title there,
+                # every hunt below inherits the first table's `youth_only` — and both
+                # extraction paths agree on it, so no check fires (§12 T-23).
+                joined = " ".join(_text(c) for c in row if _text(c))
+                if _is_header_row(row, spec):
+                    continue
+                if not re.fullmatch(r"\d{4}", number) and joined:
+                    found = parse_title(joined, spec)
+                    if found.matched:
+                        row_title = found
+                        start = len(out)  # a continuation row may not reach back past it
+                        continue
                 if not re.fullmatch(r"\d{4}", number):
                     # A continuation row: no hunt number, one more season window for the
                     # hunt above it (2026 deer 1123 prints four). Never dropped (D3).
@@ -419,7 +503,7 @@ def rows_from_tables(
                 area_cell = cells[columns["area"]]
                 area_text = _text(area_cell)
                 page_ref = PAGE_REF_RE.search(area_text)
-                area = PAGE_REF_RE.sub("", area_text).strip()
+                area, description = split_area_cell(PAGE_REF_RE.sub("", area_text).strip(), spec)
                 bbox = area_cell.bbox if isinstance(area_cell, Cell) else None
                 notes_index = columns.get("notes")
                 out.append(
@@ -429,9 +513,10 @@ def rows_from_tables(
                         marks=marks_in(bbox, page.small_chars, keys) if bbox else (),
                         tags_text=_text(cells[columns["tags"]]),
                         dates_texts=(_text(cells[columns["dates"]]),),
+                        area_description=description,
                         notes=_notes_of(page, row, header, notes_index),
                         page=page.number,
-                        title=info,
+                        title=row_title,
                         description_page=int(page_ref.group(1)) if page_ref else None,
                         bbox=_row_bbox([cells[c] for c in sorted(columns.values())]),
                     )
@@ -726,6 +811,7 @@ def rows_from_text(
                     tuple(dates[i].text for i in owned[index]),
                     page.number,
                     info,
+                    spec,
                 )
             )
     return out, carried
@@ -752,17 +838,22 @@ def _text_row(
     dates: tuple[str, ...],
     page_number: int,
     info: TitleInfo,
+    spec: Brochure = BIG_GAME,
 ) -> HuntRow:
     """Build a path-B row from its column texts (the footnote marker is still inline)."""
     page_ref = PAGE_REF_RE.search(area_text)
     rest = PAGE_REF_RE.sub(" ", area_text).strip()
-    match = AREA_RE.match(rest)
+    # An area cell that carries its own description is split before the id is matched,
+    # so both paths read the same id out of `50-1: All of Units 54 and 55` (§12 T-23).
+    rest, description = split_area_cell(rest, spec)
+    match = spec.area_re.match(rest)
     return HuntRow(
         hunt_number=number,
         area=match.group("area") if match else rest.split(" ")[0],
         marks=(match.group("mark"),) if match and match.group("mark") else (),
         tags_text=tags,
         dates_texts=dates,
+        area_description=description,
         page=page_number,
         title=info,
         description_page=int(page_ref.group(1)) if page_ref else None,
@@ -901,9 +992,16 @@ def observe(page: Page, state: DocState, spec: Brochure) -> None:
         state.notes_items[page.number] = items
 
 
-def is_hunt_page(page: Page) -> bool:
-    """A page that prints a controlled-hunt table (found by content, never by number)."""
-    return not page.rotated and "Hunt No." in page.text
+def is_hunt_page(page: Page, spec: Brochure = BIG_GAME) -> bool:
+    """A page that prints a controlled-hunt table (found by content, never by number).
+
+    The marker comes from the `Brochure`: the Upland brochure's turkey tables print
+    `Hunt No` with no period (§12 T-23). It is looked for in the page's least-cropped
+    view, because the fixed side crop can cut the header's own column (T-13).
+    """
+    if page.rotated:
+        return False
+    return bool(spec.hunt_page_re.search(page.text) or spec.hunt_page_re.search(page.full_text))
 
 
 def page_rows(page: Page, ctx: ParseContext, spec: Brochure) -> list[tuple[HuntRow, bool]]:
@@ -912,7 +1010,7 @@ def page_rows(page: Page, ctx: ParseContext, spec: Brochure) -> list[tuple[HuntR
     observe(page, state, spec)
     if page.number in state.rows:
         return state.rows[page.number]
-    if not is_hunt_page(page):
+    if not is_hunt_page(page, spec):
         return []
     state.hunt_pages.append(page.number)
     legend = legend_for(page, spec) or state.legend
@@ -1004,6 +1102,7 @@ def resolve_dates(
     windows: list[Window] = []
     leftovers: list[str] = []
     both = bool(spec and spec.both_years and ctx.year_end > ctx.license_year)
+    calendar = bool(spec and spec.calendar_years)
     for text in row.dates_texts:
         ranges = common.parse_date_ranges(text, ctx.license_year)
         leftovers += common.leftover_date_text(text, ranges)
@@ -1013,7 +1112,15 @@ def resolve_dates(
         for found in ranges:
             start, end = found.start, found.end
             year = row.title.year
-            if year is not None and start.year != year and start.month >= 7:
+            # A calendar-year brochure dates every window by its table's own year, so a
+            # spring window stays in `license_year` instead of rolling into the next
+            # one as §8.3's Jul→Jun rule would put it (§12 T-23).
+            anchor = year if year is not None else ctx.license_year
+            if calendar and start.year != anchor:
+                shift = anchor - start.year
+                start = start.replace(year=start.year + shift)
+                end = end.replace(year=end.year + shift)
+            elif year is not None and start.year != year and start.month >= 7:
                 shift = year - start.year
                 start = start.replace(year=start.year + shift)
                 end = end.replace(year=end.year + shift)
@@ -1148,10 +1255,24 @@ def rows_for(state: DocState, spec: Brochure, species: str) -> list[tuple[HuntRo
 
 
 def text_hunt_numbers(state: DocState, spec: Brochure, species: str) -> set[str]:
-    """4-digit hunt numbers that start a line on a hunt-table page (§8.7 completeness)."""
+    """4-digit hunt numbers that start a line on a hunt-table page (§8.7 completeness).
+
+    A brochure may set `numbers_anywhere` to count every hunt number printed on the
+    page instead of only those starting a line: the turkey tables' rows interleave in
+    the text layer, so `9013` can print mid-line while still being a real row, and
+    their `9xxx` prefix is used by nothing else on those pages (§12 T-23).
+    """
     out: set[str] = set()
     for number in state.hunt_pages:
-        for line in state.page_text.get(number, "").splitlines():
+        text = state.page_text.get(number, "")
+        if spec.numbers_anywhere:
+            out |= {
+                m.group(1)
+                for m in re.finditer(r"\b(\d{4})\b", text)
+                if spec.species_of(m.group(1)) == species
+            }
+            continue
+        for line in text.splitlines():
             m = re.match(r"\s*(\d{4})\b", line)
             if m is None or spec.species_of(m.group(1)) != species:
                 continue
@@ -1201,31 +1322,38 @@ def _area_entries(state: DocState, spec: Brochure, area: str, physical: int | No
 
 
 def write_hunt_areas(ctx: ParseContext, state: DocState, spec: Brochure, species: str) -> int:
-    """Write this species' `hunt_areas` rows (§5), replacing the document's previous ones."""
+    """Write this species' `hunt_areas` rows (§5), replacing the document's previous ones.
+
+    A brochure that prints each area's description inside its own cell (§12 T-23) has no
+    description pages, so the verbatim text is stored here; `hunt_areas.py` then reads
+    it back instead of looking for a `Hunt Area <id> —` entry that does not exist.
+    """
     db.exec(
         "DELETE FROM hunt_areas WHERE document_id = ? AND species_id = ?",
         ctx.document_id,
         species,
     )
-    seen: dict[tuple[int, str], tuple[int | None, bool, bool]] = {}
+    seen: dict[tuple[int, str], tuple[int | None, bool, bool, str]] = {}
     for row, _ in rows_for(state, spec, species):
         found = resolve_dates(row, ctx, spec)[0]
         year = found[0].start.year if found else ctx.license_year
         meanings = marker_meanings(row, state.legend)
         physical = state.printed_pages.get(row.description_page or -1)
-        previous = seen.get((year, row.area), (None, False, False))
+        previous = seen.get((year, row.area), (None, False, False, ""))
         both = BOTH_CONDITIONS in meanings
         seen[(year, row.area)] = (
             physical or previous[0],
             previous[1] or both or "includes_other_units" in meanings,
             previous[2] or both or "portion_only" in meanings,
+            previous[3] or row.area_description,
         )
     db.exec_many(
         "INSERT OR REPLACE INTO hunt_areas (license_year, species_id, area_id, description_page,"
-        " includes_other_units, portion_only, document_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        " includes_other_units, portion_only, description, document_id)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
-            (year, species, area, page, int(other), int(portion), ctx.document_id)
-            for (year, area), (page, other, portion) in sorted(seen.items())
+            (year, species, area, page, int(other), int(portion), text or None, ctx.document_id)
+            for (year, area), (page, other, portion, text) in sorted(seen.items())
         ],
     )
     return len(seen)
@@ -1295,16 +1423,23 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
         if wins
     ]
     scopes = checksum_scopes(state, spec, species)
-    tag_totals = [
-        {
-            "title": title,
-            "header": amount,
-            "parsed": sum(r.tag_quota or 0 for r in scope),
-            "unlimited": sum(1 for r in scope if r.tag_quota is None),
-            "rows": len(scope),
-        }
-        for title, amount, scope in scopes
-    ]
+    # A brochure that prints no section total has no checksum to run: leaving the field
+    # `None` skips `tag_checksum` (T-22a) instead of failing it on a total that was
+    # never printed, which is what the turkey tables do (§12 T-23).
+    tag_totals = (
+        [
+            {
+                "title": title,
+                "header": amount,
+                "parsed": sum(r.tag_quota or 0 for r in scope),
+                "unlimited": sum(1 for r in scope if r.tag_quota is None),
+                "rows": len(scope),
+            }
+            for title, amount, scope in scopes
+        ]
+        if spec.prints_tag_totals
+        else None
+    )
     refs = sorted(
         {(row.area, row.description_page) for row in rows if row.description_page is not None}
     )

@@ -508,6 +508,27 @@ def description_for(state: DocState, species_id: str, area_id: str) -> AreaDescr
     return entry
 
 
+def stored_description(row: Any, species_id: str) -> AreaDescription | None:
+    """The description a controlled table stored on `hunt_areas` itself (§12 T-23).
+
+    The turkey tables print each area's description inside its own cell, so there are no
+    `CONTROLLED HUNT AREA DESCRIPTIONS` pages to read: `controlled.write_hunt_areas`
+    saved the verbatim text and this turns it back into the same `AreaDescription` the
+    description pages would have produced, so one resolution path serves both brochures.
+    """
+    text = row["description"] if "description" in row.keys() else None
+    if not text:
+        return None
+    page = row["description_page"] if "description_page" in row.keys() else None
+    return AreaDescription(
+        species_id=species_id,
+        area_id=str(row["area_id"]),
+        page=int(page) if page else 0,
+        printed_page=int(page) if page else None,
+        parts=[str(text)],
+    )
+
+
 def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts | None:
     """Resolve this species' hunt areas, write them, and report what the checks read."""
     state = state_for(ctx)
@@ -521,6 +542,7 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
     # `hunt_areas` is keyed per license year, so an area printed in two years (spring
     # bear) arrives twice; the footnotes of all its rows are the area's footnotes.
     footnotes: dict[str, tuple[bool, bool]] = {}
+    stored: dict[str, AreaDescription] = {}
     for row in rows:
         area_id = str(row["area_id"])
         other, portion = footnotes.get(area_id, (False, False))
@@ -528,12 +550,14 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
             other or bool(row["includes_other_units"]),
             portion or bool(row["portion_only"]),
         )
+        if (entry := stored_description(row, species)) is not None:
+            stored.setdefault(area_id, entry)
     coverage = load_coverage(ctx.license_year)
     known_units = set(ctx.units)
     staged = _staged_areas(ctx, species)
     facts: list[AreaFacts] = []
     for area_id, (includes_other_units, portion_only) in sorted(footnotes.items()):
-        description = description_for(state, species, area_id)
+        description = description_for(state, species, area_id) or stored.get(area_id)
         resolved = resolve_area(species, area_id, description, coverage)
         write_descriptions(ctx, species, resolved, description)
         seasons = write_units(staged.get(area_id, []), resolved, known_units)
@@ -564,6 +588,7 @@ def finalize(ctx: ParseContext, *, spec: Brochure, species: str) -> SectionFacts
             has_geometry=coverage.has_species(species),
             coverage_file=str(coverage_path(ctx.license_year).relative_to(COVERAGE_DIR.parents[2])),
             areas=facts,
+            footnotes_printed=spec.prints_footnotes,
         ),
     )
 

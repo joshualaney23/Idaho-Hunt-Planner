@@ -69,6 +69,10 @@ PDF_MAGIC = b"%PDF-"
 #: on p. 19). Uncropped, that tab is just a one-column table the header-driven reader
 #: ignores (§12 T-25).
 SIDE_CROP_BY_KIND: dict[str, float] = {"moose_sheep_goat": 0.0}
+#: Sections whose seasons are dated by **calendar** year rather than the Jul→Jun
+#: license year. Turkey tags expire on December 31 of the year of purchase (Upland
+#: brochure, printed p. 22), so a spring season belongs to `license_year` (§12 T-23).
+CALENDAR_YEAR_SECTIONS: frozenset[str] = frozenset({"turkey_general", "controlled_turkey"})
 
 
 # ───────── parsed rows ─────────
@@ -349,11 +353,18 @@ def validate(
         problems.append(f"invalid sex {season.sex!r}")
     if season.end < season.start:
         problems.append(f"end {to_iso(season.end)} is before start {to_iso(season.start)}")
+    # An Upland turkey season is dated by calendar year, not by the Jul→Jun license
+    # year (§12 T-23): its tags expire on December 31 of the year of purchase.
+    calendar = season.section in CALENDAR_YEAR_SECTIONS
     for label, value in (("start", season.start), ("end", season.end)):
-        if not common.in_license_year(value, ctx.license_year, ctx.year_end):
+        if not common.in_license_year(value, ctx.license_year, ctx.year_end, calendar=calendar):
+            window = (
+                f"Jan 1 {ctx.license_year} – Dec 31 {ctx.year_end}"
+                if calendar
+                else f"Jul 1 {ctx.license_year} – Jun 30 {ctx.year_end + 1}"
+            )
             problems.append(
-                f"{label} {to_iso(value)} is outside the {ctx.license_year} license year"
-                f" (Jul 1 {ctx.license_year} – Jun 30 {ctx.year_end + 1})"
+                f"{label} {to_iso(value)} is outside the {ctx.license_year} license year ({window})"
             )
     refs = season.unit_refs()
     if not refs:
@@ -638,6 +649,7 @@ from planner.importer import (  # noqa: E402,F401  (side effect)
     elk,
     hunt_areas,
     msg,
+    turkey,
     upland,
 )
 from planner.importer.checks import SectionFacts  # noqa: E402,F401  (re-exported for parsers)
