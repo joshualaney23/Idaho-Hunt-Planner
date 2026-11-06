@@ -420,6 +420,11 @@ def _header_groups(table: CellTable, spec: Brochure) -> tuple[int | None, list[G
     return None, []
 
 
+def _is_header_row(row: Sequence[Cell | None], spec: Brochure) -> bool:
+    """Is this body row actually another table's header row (§12 T-23)?"""
+    return any(_text(c).lower().rstrip(".").startswith("hunt no") for c in row)
+
+
 def _title_text(table: CellTable, header_index: int) -> str:
     """Everything printed above the header row, in reading order."""
     seen: list[str] = []
@@ -469,9 +474,25 @@ def rows_from_tables(
         # order it is printed in, and the order the golden files keep.
         for columns in groups:
             start = len(out)
+            row_title = info
             for row in table[header_index + 1 :]:
                 cells = list(row) + [None] * (max(columns.values()) + 1 - len(row))
                 number = _text(cells[columns["number"]])
+                # Two printed tables can come back as ONE `cell_table` when they share a
+                # drawn rule: the 2026 Upland turkey page prints its Youth Only table
+                # directly above its Male or Bearded one, so the second table's title
+                # and header arrive as body rows. Without re-reading the title there,
+                # every hunt below inherits the first table's `youth_only` — and both
+                # extraction paths agree on it, so no check fires (§12 T-23).
+                joined = " ".join(_text(c) for c in row if _text(c))
+                if _is_header_row(row, spec):
+                    continue
+                if not re.fullmatch(r"\d{4}", number) and joined:
+                    found = parse_title(joined, spec)
+                    if found.matched:
+                        row_title = found
+                        start = len(out)  # a continuation row may not reach back past it
+                        continue
                 if not re.fullmatch(r"\d{4}", number):
                     # A continuation row: no hunt number, one more season window for the
                     # hunt above it (2026 deer 1123 prints four). Never dropped (D3).
@@ -495,7 +516,7 @@ def rows_from_tables(
                         area_description=description,
                         notes=_notes_of(page, row, header, notes_index),
                         page=page.number,
-                        title=info,
+                        title=row_title,
                         description_page=int(page_ref.group(1)) if page_ref else None,
                         bbox=_row_bbox([cells[c] for c in sorted(columns.values())]),
                     )
